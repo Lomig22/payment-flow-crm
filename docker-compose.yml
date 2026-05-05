@@ -1,0 +1,57 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pf_crm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       payment_flow_crm
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    healthcheck:
+      test:     ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  backend:
+    build:
+      context:    ./backend
+      dockerfile: Dockerfile
+    container_name: pf_crm_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV:      production
+      PORT:          4000
+      DATABASE_URL:  postgresql://postgres:password@postgres:5432/payment_flow_crm
+      JWT_SECRET:    CHANGE_ME_IN_PRODUCTION_VERY_LONG_SECRET_32_CHARS
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL:  http://localhost:3000
+    ports:
+      - '4000:4000'
+
+  frontend:
+    build:
+      context:    ./frontend
+      dockerfile: Dockerfile
+    container_name: pf_crm_web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres_data:
