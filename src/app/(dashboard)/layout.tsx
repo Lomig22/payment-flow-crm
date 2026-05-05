@@ -19,12 +19,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname        = usePathname();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted]       = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [mounted, isAuthenticated, router]);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return null;
 
