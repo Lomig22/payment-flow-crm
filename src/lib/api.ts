@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { Lead, User, Tag, LeadsFilters } from '@/types';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -47,8 +47,8 @@ export const leadsApi = {
   delete:   (id: string) => api.delete(`/leads/${id}`),
   import:   (formData: FormData) =>
     api.post('/leads/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  assign:   (leadIds: string[], setterId: string, mode?: string) =>
-    api.post('/leads/assign', { leadIds, setterId, mode }),
+  assign:   (leadIds: string[], setterId: string) =>
+    api.post('/leads/assign', { lead_ids: leadIds, setter_id: setterId }),
 };
 
 export const usersApi = {
