@@ -4,8 +4,8 @@ node_modules/
 .pnp.js
 
 # Next.js
-frontend/.next/
-frontend/out/
+.next/
+out/
 
 # Production build
 dist/
