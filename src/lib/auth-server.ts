@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 export interface AuthUser {
   id:         string;
@@ -19,13 +19,14 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
     const token   = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
 
-    const result = await query(
-      'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE id = $1',
-      [decoded.userId]
-    );
-    const user = result.rows[0];
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, email, first_name, last_name, role, is_active')
+      .eq('id', decoded.userId)
+      .single();
+
     if (!user || !user.is_active) return null;
-    return user;
+    return user as AuthUser;
   } catch {
     return null;
   }
