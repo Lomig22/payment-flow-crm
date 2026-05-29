@@ -10,10 +10,15 @@ export async function GET(request: NextRequest) {
   const days = Math.min(365, Math.max(1, parseInt(searchParams.get('period') || '30')));
   const setterId = user.role !== 'admin' ? user.id : null;
 
-  const { data } = await supabase.rpc('get_dashboard_stats', {
+  const { data, error } = await supabase.rpc('get_dashboard_stats', {
     p_setter_id: setterId,
     p_days: days,
   });
 
-  return NextResponse.json(data || {});
+  if (error) {
+    console.error('get_dashboard_stats error:', error);
+    return NextResponse.json({ message: 'Erreur RPC' }, { status: 500 });
+  }
+
+  return NextResponse.json(data ?? {});
 }

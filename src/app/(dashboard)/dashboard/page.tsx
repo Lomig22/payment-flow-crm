@@ -40,7 +40,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !data.overview) {
     return (
       <div className="card p-8 text-center text-gray-500">
         Impossible de charger les statistiques. Vérifiez la connexion au serveur.
@@ -50,19 +50,19 @@ export default function DashboardPage() {
 
   const { overview, by_quality, by_status, by_setter, timeline } = data;
 
-  const qualityChartData = [
-    { name: 'Chaud',        value: Number(by_quality.hot) },
-    { name: 'Tiède',        value: Number(by_quality.warm) },
-    { name: 'Froid',        value: Number(by_quality.cold) },
-    { name: 'Non qualifié', value: Number(by_quality.unqualified) },
-  ].filter((d) => d.value > 0);
+  const qualityChartData = by_quality ? [
+    { name: 'Chaud',        value: Number(by_quality.hot        ?? 0) },
+    { name: 'Tiède',        value: Number(by_quality.warm       ?? 0) },
+    { name: 'Froid',        value: Number(by_quality.cold       ?? 0) },
+    { name: 'Non qualifié', value: Number(by_quality.unqualified ?? 0) },
+  ].filter((d) => d.value > 0) : [];
 
-  const timelineFormatted = timeline.map((t) => ({
+  const timelineFormatted = (timeline ?? []).map((t) => ({
     ...t,
     date: formatDate(t.date),
   }));
 
-  const setterChartData = by_setter.map((s) => ({
+  const setterChartData = (by_setter ?? []).map((s) => ({
     name:      s.name.split(' ')[0],
     'Leads':   Number(s.total),
     'Clients': Number(s.clients),
