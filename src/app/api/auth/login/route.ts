@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
-
     if (!email || !password) {
       return NextResponse.json({ message: 'Email et mot de passe requis' }, { status: 400 });
     }
 
-    const result = await query(
-      'SELECT id, email, password_hash, first_name, last_name, role, is_active, avatar_url FROM users WHERE email = $1',
-      [email.toLowerCase().trim()]
-    );
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, password_hash, first_name, last_name, role, is_active, avatar_url')
+      .eq('email', email.toLowerCase().trim())
+      .single();
 
-    const user = result.rows[0];
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json({ message: 'Identifiants incorrects' }, { status: 401 });
     }
     if (!user.is_active) {
@@ -36,6 +35,7 @@ export async function POST(request: NextRequest) {
     );
 
     const { password_hash, ...userOut } = user;
+    void password_hash;
     return NextResponse.json({ token, user: userOut });
   } catch (err) {
     console.error(err);

@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeLead(l: any) {
+  const u = l.users as { id?: string; first_name?: string; last_name?: string } | null;
+  const lt = l.lead_tags as Array<{ tags: unknown }> | null;
+  return {
+    ...l,
+    setter_user_id: u?.id ?? null,
+    setter_first_name: u?.first_name ?? null,
+    setter_last_name: u?.last_name ?? null,
+    tags: (lt || []).map((t) => t.tags).filter(Boolean),
+    users: undefined,
+    lead_tags: undefined,
+  };
+}
+
+const VALID_SORTS: Record<string, string> = {
+  created_at: 'created_at', updated_at: 'updated_at',
+  last_name: 'last_name', status: 'status', lead_quality: 'lead_quality',
+};
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -13,51 +33,31 @@ export async function GET(request: NextRequest) {
   const search    = searchParams.get('search');
   const page      = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit     = Math.min(100, parseInt(searchParams.get('limit') || '20'));
-  const sort      = searchParams.get('sort') || 'created_at';
-  const order     = searchParams.get('order') === 'asc' ? 'asc' : 'desc';
+  const sort      = VALID_SORTS[searchParams.get('sort') || ''] || 'created_at';
+  const asc       = searchParams.get('order') === 'asc';
   const offset    = (page - 1) * limit;
 
-  const validSorts = ['created_at', 'updated_at', 'last_name', 'status', 'lead_quality'];
-  const safeSort   = validSorts.includes(sort) ? `l.${sort}` : 'l.created_at';
-
-  const conditions: string[] = [];
-  const params: unknown[]    = [];
-  let idx = 1;
+  let q = supabase
+    .from('leads')
+    .select('*, users!setter_id(id, first_name, last_name), lead_tags(tags(id, name, color))', { count: 'exact' });
 
   if (user.role !== 'admin') {
-    conditions.push(`l.setter_id = $${idx++}`); params.push(user.id);
+    q = q.eq('setter_id', user.id);
   } else if (setter_id) {
-    conditions.push(`l.setter_id = $${idx++}`); params.push(setter_id);
+    q = q.eq('setter_id', setter_id);
   }
-  if (status)  { conditions.push(`l.status = $${idx++}`);       params.push(status); }
-  if (quality) { conditions.push(`l.lead_quality = $${idx++}`); params.push(quality); }
-  if (search) {
-    conditions.push(`(l.first_name ILIKE $${idx} OR l.last_name ILIKE $${idx} OR l.company ILIKE $${idx} OR l.email ILIKE $${idx})`);
-    params.push(`%${search}%`); idx++;
-  }
+  if (status)  q = q.eq('status', status);
+  if (quality) q = q.eq('lead_quality', quality);
+  if (search)  q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`);
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  q = q.order(sort, { ascending: asc }).range(offset, offset + limit - 1);
 
-  const countRes = await query(`SELECT COUNT(*) FROM leads l ${where}`, params);
-  const total    = parseInt(countRes.rows[0].count);
+  const { data, count, error } = await q;
+  if (error) return NextResponse.json({ message: 'Erreur serveur' }, { status: 500 });
 
-  const leadsRes = await query(
-    `SELECT l.*, u.first_name AS setter_first_name, u.last_name AS setter_last_name,
-            COALESCE(json_agg(json_build_object('id',t.id,'name',t.name,'color',t.color))
-              FILTER (WHERE t.id IS NOT NULL), '[]') AS tags
-     FROM leads l
-     LEFT JOIN users u  ON l.setter_id = u.id
-     LEFT JOIN lead_tags lt ON l.id = lt.lead_id
-     LEFT JOIN tags t  ON lt.tag_id = t.id
-     ${where}
-     GROUP BY l.id, u.first_name, u.last_name
-     ORDER BY ${safeSort} ${order}
-     LIMIT $${idx++} OFFSET $${idx++}`,
-    [...params, limit, offset]
-  );
-
+  const total = count ?? 0;
   return NextResponse.json({
-    data: leadsRes.rows,
+    data: (data || []).map(normalizeLead),
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
   });
 }
@@ -78,20 +78,23 @@ export async function POST(request: NextRequest) {
 
   const assignedTo = user.role === 'admin' ? (setter_id || null) : user.id;
 
-  const result = await query(
-    `INSERT INTO leads (first_name,last_name,company,phone,email,location,called,action_in_progress,
-      lead_quality,need_identified,setter_id,appointment_taken,appointment_honored,quote_sent,
-      r2_planned,r3_planned,status,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
-    [first_name, last_name, company||null, phone||null, email||null, location||null,
-     called||false, action_in_progress||'to_call', lead_quality||null, need_identified||null,
-     assignedTo, appointment_taken||false, appointment_honored||false, quote_sent||false,
-     r2_planned||false, r3_planned||false, status||'in_progress', notes||null]
-  );
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .insert({
+      first_name, last_name, company: company || null, phone: phone || null,
+      email: email || null, location: location || null,
+      called: called || false, action_in_progress: action_in_progress || 'to_call',
+      lead_quality: lead_quality || null, need_identified: need_identified || null,
+      setter_id: assignedTo, appointment_taken: appointment_taken || false,
+      appointment_honored: appointment_honored || false, quote_sent: quote_sent || false,
+      r2_planned: r2_planned || false, r3_planned: r3_planned || false,
+      status: status || 'in_progress', notes: notes || null,
+    })
+    .select()
+    .single();
 
-  const lead = result.rows[0];
-  await query('INSERT INTO lead_history (lead_id,user_id,action_note) VALUES ($1,$2,$3)',
-    [lead.id, user.id, 'Lead créé']);
+  if (error || !lead) return NextResponse.json({ message: 'Erreur serveur' }, { status: 500 });
 
+  await supabase.from('lead_history').insert({ lead_id: lead.id, user_id: user.id, action_note: 'Lead créé' });
   return NextResponse.json(lead, { status: 201 });
 }

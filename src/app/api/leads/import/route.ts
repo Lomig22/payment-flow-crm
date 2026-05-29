@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { parse } from 'csv-parse/sync';
 
 const COLUMN_MAP: Record<string, string> = {
@@ -23,9 +23,7 @@ export async function POST(request: NextRequest) {
   const file = formData.get('file') as File | null;
   const setterIdParam = formData.get('setter_id') as string | null;
 
-  if (!file) {
-    return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
-  }
+  if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
   const text = await file.text();
   let records: Record<string, string>[];
@@ -38,6 +36,7 @@ export async function POST(request: NextRequest) {
 
   let imported = 0;
   let skipped = 0;
+  const assignedTo = user.role === 'admin' ? (setterIdParam || null) : user.id;
 
   for (const raw of records) {
     const row: Record<string, string> = {};
@@ -45,22 +44,27 @@ export async function POST(request: NextRequest) {
       const mapped = COLUMN_MAP[k.toLowerCase().trim()];
       if (mapped) row[mapped] = v;
     }
-
     if (!row.first_name || !row.last_name) { skipped++; continue; }
 
-    const assignedTo = user.role === 'admin' ? (setterIdParam || null) : user.id;
+    const { data: lead } = await supabase
+      .from('leads')
+      .insert({
+        first_name: row.first_name, last_name: row.last_name,
+        company: row.company || null, phone: row.phone || null,
+        email: row.email || null, location: row.location || null,
+        lead_quality: row.lead_quality || null,
+        status: row.status || 'in_progress',
+        notes: row.notes || null, setter_id: assignedTo,
+      })
+      .select('id')
+      .single();
 
-    const result = await query(
-      `INSERT INTO leads (first_name,last_name,company,phone,email,location,lead_quality,status,notes,setter_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-      [row.first_name, row.last_name, row.company||null, row.phone||null, row.email||null,
-       row.location||null, row.lead_quality||null, row.status||'in_progress', row.notes||null, assignedTo]
-    );
-
-    await query('INSERT INTO lead_history (lead_id,user_id,action_note) VALUES ($1,$2,$3)',
-      [result.rows[0].id, user.id, 'Lead importé via CSV']);
-
-    imported++;
+    if (lead) {
+      await supabase.from('lead_history').insert({ lead_id: lead.id, user_id: user.id, action_note: 'Lead importé via CSV' });
+      imported++;
+    } else {
+      skipped++;
+    }
   }
 
   return NextResponse.json({ message: `${imported} leads importés, ${skipped} ignorés`, imported, skipped });

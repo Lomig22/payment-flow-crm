@@ -1,46 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized, forbidden, notFound } from '@/lib/auth-server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeLead(l: any) {
+  const u = l.users as { id?: string; first_name?: string; last_name?: string } | null;
+  const lt = l.lead_tags as Array<{ tags: unknown }> | null;
+  return {
+    ...l,
+    setter_user_id: u?.id ?? null,
+    setter_first_name: u?.first_name ?? null,
+    setter_last_name: u?.last_name ?? null,
+    tags: (lt || []).map((t) => t.tags).filter(Boolean),
+    users: undefined,
+    lead_tags: undefined,
+  };
+}
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
 
-  const result = await query(
-    `SELECT l.*, u.id AS setter_user_id, u.first_name AS setter_first_name, u.last_name AS setter_last_name,
-            COALESCE(json_agg(DISTINCT jsonb_build_object('id',t.id,'name',t.name,'color',t.color))
-              FILTER (WHERE t.id IS NOT NULL), '[]') AS tags
-     FROM leads l
-     LEFT JOIN users u ON l.setter_id = u.id
-     LEFT JOIN lead_tags lt ON l.id = lt.lead_id
-     LEFT JOIN tags t ON lt.tag_id = t.id
-     WHERE l.id = $1
-     GROUP BY l.id, u.id, u.first_name, u.last_name`,
-    [params.id]
-  );
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('*, users!setter_id(id, first_name, last_name), lead_tags(tags(id, name, color))')
+    .eq('id', params.id)
+    .single();
 
-  if (!result.rows[0]) return notFound('Lead introuvable');
-  const lead = result.rows[0];
+  if (error || !lead) return notFound('Lead introuvable');
   if (user.role !== 'admin' && lead.setter_id !== user.id) return forbidden();
 
-  const history = await query(
-    `SELECT h.*, u.first_name, u.last_name FROM lead_history h
-     LEFT JOIN users u ON h.user_id = u.id
-     WHERE h.lead_id = $1 ORDER BY h.created_at DESC`,
-    [params.id]
-  );
+  const { data: history } = await supabase
+    .from('lead_history')
+    .select('*, users!user_id(first_name, last_name)')
+    .eq('lead_id', params.id)
+    .order('created_at', { ascending: false });
 
-  return NextResponse.json({ ...lead, history: history.rows });
+  const normalizedHistory = (history || []).map((h: Record<string, unknown>) => {
+    const hu = h.users as { first_name?: string; last_name?: string } | null;
+    return { ...h, first_name: hu?.first_name, last_name: hu?.last_name, users: undefined };
+  });
+
+  return NextResponse.json({ ...normalizeLead(lead), history: normalizedHistory });
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
 
-  const current = await query('SELECT * FROM leads WHERE id = $1', [params.id]);
-  if (!current.rows[0]) return notFound('Lead introuvable');
-  const lead = current.rows[0];
-  if (user.role !== 'admin' && lead.setter_id !== user.id) return forbidden();
+  const { data: current, error: fetchErr } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', params.id)
+    .single();
+
+  if (fetchErr || !current) return notFound('Lead introuvable');
+  if (user.role !== 'admin' && current.setter_id !== user.id) return forbidden();
 
   const body = await request.json();
   const allowed = ['first_name','last_name','company','phone','email','location','called',
@@ -48,35 +63,35 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     'quote_sent','r2_planned','r3_planned','status','notes'];
   if (user.role === 'admin') allowed.push('setter_id');
 
-  const updates: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
+  const updates: Record<string, unknown> = {};
+  const historyRows: Record<string, unknown>[] = [];
 
   for (const field of allowed) {
-    if (body[field] !== undefined && String(body[field]) !== String(lead[field])) {
-      updates.push(`${field} = $${idx++}`);
-      values.push(body[field]);
-      await query(
-        'INSERT INTO lead_history (lead_id,user_id,field_changed,old_value,new_value) VALUES ($1,$2,$3,$4,$5)',
-        [params.id, user.id, field, String(lead[field] ?? ''), String(body[field] ?? '')]
+    if (body[field] !== undefined && String(body[field]) !== String(current[field])) {
+      updates[field] = body[field];
+      historyRows.push({
+        lead_id: params.id, user_id: user.id, field_changed: field,
+        old_value: String(current[field] ?? ''), new_value: String(body[field] ?? ''),
+      });
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await supabase.from('leads').update(updates).eq('id', params.id);
+    if (historyRows.length > 0) await supabase.from('lead_history').insert(historyRows);
+  }
+
+  if (body.tags !== undefined) {
+    await supabase.from('lead_tags').delete().eq('lead_id', params.id);
+    if (body.tags.length > 0) {
+      await supabase.from('lead_tags').insert(
+        body.tags.map((tagId: string) => ({ lead_id: params.id, tag_id: tagId }))
       );
     }
   }
 
-  if (updates.length > 0) {
-    values.push(params.id);
-    await query(`UPDATE leads SET ${updates.join(',')} WHERE id = $${idx}`, values);
-  }
-
-  if (body.tags !== undefined) {
-    await query('DELETE FROM lead_tags WHERE lead_id = $1', [params.id]);
-    for (const tagId of body.tags || []) {
-      await query('INSERT INTO lead_tags (lead_id,tag_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [params.id, tagId]);
-    }
-  }
-
-  const updated = await query('SELECT * FROM leads WHERE id = $1', [params.id]);
-  return NextResponse.json(updated.rows[0]);
+  const { data: updated } = await supabase.from('leads').select('*').eq('id', params.id).single();
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
@@ -84,7 +99,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   if (!user) return unauthorized();
   if (user.role !== 'admin') return forbidden();
 
-  const result = await query('DELETE FROM leads WHERE id = $1 RETURNING id', [params.id]);
-  if (!result.rows[0]) return notFound('Lead introuvable');
+  const { data, error } = await supabase.from('leads').delete().eq('id', params.id).select('id').single();
+  if (error || !data) return notFound('Lead introuvable');
   return NextResponse.json({ message: 'Lead supprimé', id: params.id });
 }

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { getAuthUser, unauthorized, forbidden } from '@/lib/auth-server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
   if (user.role !== 'admin') return forbidden();
 
-  const result = await query(
-    'SELECT id, email, first_name, last_name, role, is_active, avatar_url, created_at FROM users ORDER BY created_at DESC'
-  );
-  return NextResponse.json(result.rows);
+  const { data } = await supabase
+    .from('users')
+    .select('id, email, first_name, last_name, role, is_active, avatar_url, created_at')
+    .order('created_at', { ascending: false });
+
+  return NextResponse.json(data || []);
 }
 
 export async function POST(request: NextRequest) {
@@ -28,18 +30,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Le mot de passe doit contenir au moins 8 caractères' }, { status: 400 });
   }
 
-  const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
-  if (existing.rows[0]) {
-    return NextResponse.json({ message: 'Email déjà utilisé' }, { status: 409 });
-  }
+  const { data: existing } = await supabase.from('users').select('id').eq('email', email).single();
+  if (existing) return NextResponse.json({ message: 'Email déjà utilisé' }, { status: 409 });
 
   const hash = await bcrypt.hash(password, 10);
-  const result = await query(
-    `INSERT INTO users (email, password_hash, first_name, last_name, role)
-     VALUES ($1,$2,$3,$4,$5)
-     RETURNING id, email, first_name, last_name, role, is_active, created_at`,
-    [email, hash, first_name, last_name, role || 'setter']
-  );
+  const { data } = await supabase
+    .from('users')
+    .insert({ email, password_hash: hash, first_name, last_name, role: role || 'setter' })
+    .select('id, email, first_name, last_name, role, is_active, created_at')
+    .single();
 
-  return NextResponse.json(result.rows[0], { status: 201 });
+  return NextResponse.json(data, { status: 201 });
 }

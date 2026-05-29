@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized, forbidden } from '@/lib/auth-server';
-import { query } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
 
-  const result = await query('SELECT * FROM tags ORDER BY name');
-  return NextResponse.json(result.rows);
+  const { data } = await supabase.from('tags').select('*').order('name');
+  return NextResponse.json(data || []);
 }
 
 export async function POST(request: NextRequest) {
@@ -18,9 +18,11 @@ export async function POST(request: NextRequest) {
   const { name, color } = await request.json();
   if (!name) return NextResponse.json({ message: 'Nom requis' }, { status: 400 });
 
-  const result = await query(
-    'INSERT INTO tags (name, color) VALUES ($1, $2) RETURNING *',
-    [name, color || '#6366f1']
-  );
-  return NextResponse.json(result.rows[0], { status: 201 });
+  const { data } = await supabase
+    .from('tags')
+    .insert({ name, color: color || '#6366f1' })
+    .select()
+    .single();
+
+  return NextResponse.json(data, { status: 201 });
 }
