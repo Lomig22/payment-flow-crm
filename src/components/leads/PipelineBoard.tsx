@@ -5,7 +5,7 @@ import {
   DndContext, DragEndEvent, DragStartEvent, DragOverlay,
   useDroppable, useDraggable,
   MouseSensor, TouchSensor, useSensor, useSensors,
-  pointerWithin,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { Phone, Building } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,23 @@ import { leadsApi } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import type { Lead, LeadStatus } from '@/types';
+
+// Detect the column whose horizontal center is closest to the pointer X.
+// This is more predictable than pointerWithin: the card always lands in
+// whichever column the cursor is most "inside" horizontally.
+const closestColumnByX: CollisionDetection = ({ droppableContainers, pointerCoordinates }) => {
+  if (!pointerCoordinates) return [];
+  const px = pointerCoordinates.x;
+  let best: { id: string | number; dist: number } | null = null;
+  for (const c of droppableContainers) {
+    const rect = c.rect.current;
+    if (!rect) continue;
+    const centerX = rect.left + rect.width / 2;
+    const dist = Math.abs(px - centerX);
+    if (!best || dist < best.dist) best = { id: c.id, dist };
+  }
+  return best ? [{ id: best.id, data: {} }] : [];
+};
 
 const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: string; ringColor: string }[] = [
   { id: 'in_progress', label: 'En cours', topColor: 'border-t-yellow-400', hoverBg: 'bg-yellow-50/60',  ringColor: 'ring-yellow-300' },
@@ -78,7 +95,7 @@ function OverlayCard({ lead }: { lead: Lead }) {
   return (
     <div
       className="bg-white rounded-lg border-2 border-indigo-400 p-3 shadow-2xl
-                 rotate-2 scale-105 cursor-grabbing select-none"
+                 cursor-grabbing select-none"
       style={{ width: 272 }}
     >
       <LeadCardInner lead={lead} />
@@ -204,7 +221,7 @@ export default function PipelineBoard() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={closestColumnByX}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
