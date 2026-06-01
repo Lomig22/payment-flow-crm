@@ -1,87 +1,156 @@
 'use client';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Phone, Building } from 'lucide-react';
+import {
+  DndContext, DragEndEvent, DragStartEvent, DragOverlay,
+  useDroppable, useDraggable,
+  MouseSensor, TouchSensor, useSensor, useSensors,
+  pointerWithin,
+} from '@dnd-kit/core';
+import { Phone, Building } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { leadsApi } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
 import type { Lead, LeadStatus } from '@/types';
 
-const COLUMNS: { id: LeadStatus; label: string; color: string }[] = [
-  { id: 'in_progress', label: 'En cours', color: 'border-t-yellow-400' },
-  { id: 'client',      label: 'Clients',  color: 'border-t-green-500'  },
-  { id: 'lost',        label: 'Perdu',    color: 'border-t-gray-400'   },
+const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: string; ringColor: string }[] = [
+  { id: 'in_progress', label: 'En cours', topColor: 'border-t-yellow-400', hoverBg: 'bg-yellow-50/60',  ringColor: 'ring-yellow-300' },
+  { id: 'client',      label: 'Clients',  topColor: 'border-t-green-500',  hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'  },
+  { id: 'lost',        label: 'Perdu',    topColor: 'border-t-gray-400',   hoverBg: 'bg-gray-100/60',   ringColor: 'ring-gray-300'   },
 ];
 
-function LeadCard({ lead }: { lead: Lead }) {
-  const router = useRouter();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: lead.id,
-    data: { status: lead.status },
-  });
-
+/* ── Card ─────────────────────────────────────────────────────────── */
+function LeadCardInner({ lead }: { lead: Lead }) {
   return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => router.push(`/leads/${lead.id}`)}
-    >
-      <div className="flex items-start gap-2">
-        <button
-          {...attributes} {...listeners}
-          className="mt-0.5 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{lead.first_name} {lead.last_name}</p>
-          {lead.company && (
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate">
-              <Building className="w-3 h-3 flex-shrink-0" />{lead.company}
-            </p>
-          )}
-          {lead.phone && (
-            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-              <Phone className="w-3 h-3 flex-shrink-0" />{lead.phone}
-            </p>
-          )}
-          <div className="flex items-center gap-1 mt-2">
-            {lead.lead_quality && <Badge variant={lead.lead_quality} />}
-            {lead.called && <span className="badge bg-green-100 text-green-700 text-[10px]">Appelé</span>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Column({ status, leads, label, colorClass }: { status: LeadStatus; leads: Lead[]; label: string; colorClass: string }) {
-  const { setNodeRef } = useSortable({ id: status, data: { isColumn: true } });
-  return (
-    <div ref={setNodeRef} className={`card flex flex-col min-h-96 border-t-4 ${colorClass}`} style={{ minWidth: 260 }}>
-      <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-800">{label}</h3>
-        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{leads.length}</span>
-      </div>
-      <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[70vh]">
-        <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-          {leads.map((lead) => <LeadCard key={lead.id} lead={lead} />)}
-        </SortableContext>
-        {leads.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-gray-300 text-xs">Aucun lead</div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-semibold text-gray-900 truncate">
+        {lead.first_name} {lead.last_name}
+      </p>
+      {lead.company && (
+        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate">
+          <Building className="w-3 h-3 flex-shrink-0 text-gray-400" />
+          {lead.company}
+        </p>
+      )}
+      {lead.phone && (
+        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+          <Phone className="w-3 h-3 flex-shrink-0" />
+          {lead.phone}
+        </p>
+      )}
+      <div className="flex items-center gap-1 mt-2 flex-wrap">
+        {lead.lead_quality && <Badge variant={lead.lead_quality} />}
+        {lead.called && (
+          <span className="badge bg-green-100 text-green-700 text-[10px]">Appelé</span>
         )}
       </div>
     </div>
   );
 }
 
+function DraggableCard({ lead }: { lead: Lead }) {
+  const router = useRouter();
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: lead.id,
+    data: { lead },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0 : 1, touchAction: 'none' }}
+      className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm
+                 hover:shadow-md hover:border-indigo-200 transition-all
+                 cursor-grab active:cursor-grabbing select-none"
+      onClick={() => { if (!isDragging) router.push(`/leads/${lead.id}`); }}
+    >
+      <LeadCardInner lead={lead} />
+    </div>
+  );
+}
+
+/* Floating card shown while dragging */
+function OverlayCard({ lead }: { lead: Lead }) {
+  return (
+    <div
+      className="bg-white rounded-lg border-2 border-indigo-400 p-3 shadow-2xl
+                 rotate-2 scale-105 cursor-grabbing select-none"
+      style={{ width: 272 }}
+    >
+      <LeadCardInner lead={lead} />
+    </div>
+  );
+}
+
+/* ── Column ───────────────────────────────────────────────────────── */
+function Column({
+  col, leads, isTargeted,
+}: {
+  col: typeof COLUMNS[number];
+  leads: Lead[];
+  isTargeted: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: col.id });
+  const active = isOver && isTargeted;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`card flex flex-col border-t-4 ${col.topColor} transition-colors duration-150
+        ${active ? col.hoverBg : ''}
+      `}
+      style={{ minWidth: 280, minHeight: 420 }}
+    >
+      {/* Header */}
+      <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">{col.label}</h3>
+        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+          {leads.length}
+        </span>
+      </div>
+
+      {/* Cards */}
+      <div
+        className={`flex-1 p-2 space-y-2 overflow-y-auto max-h-[72vh]
+          transition-all duration-150
+          ${active ? `ring-2 ring-inset ${col.ringColor}` : ''}
+        `}
+      >
+        {leads.map((lead) => <DraggableCard key={lead.id} lead={lead} />)}
+
+        {leads.length === 0 && (
+          <div
+            className={`flex items-center justify-center h-24 rounded-lg border-2 border-dashed
+              transition-colors text-xs
+              ${active
+                ? 'border-indigo-300 text-indigo-400 bg-indigo-50/40'
+                : 'border-gray-200 text-gray-300'
+              }
+            `}
+          >
+            {active ? 'Déposer ici' : 'Aucun lead'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Board ────────────────────────────────────────────────────────── */
 export default function PipelineBoard() {
   const qc = useQueryClient();
+  const [activeLead, setActiveLead] = useState<Lead | null>(null);
+  const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
+
+  // 8 px distance before drag activates → clicks still work normally
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ['leads-pipeline'],
@@ -91,34 +160,68 @@ export default function PipelineBoard() {
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
       leadsApi.update(id, { status }).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
+      setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
       qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads'] });
     },
-    onError: () => toast.error('Erreur lors du déplacement'),
+    onError: (_, { id }) => {
+      setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
+      toast.error('Erreur lors du déplacement');
+    },
   });
 
-  const leads = data ?? [];
-  const getColumn = (status: LeadStatus) => leads.filter((l) => l.status === status);
+  const rawLeads = data ?? [];
+  const leads = rawLeads.map((l) =>
+    optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l
+  );
+  const getColumn = (s: LeadStatus) => leads.filter((l) => l.status === s);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-    const leadId    = active.id as string;
-    const overId    = over.id as string;
-    const newStatus = COLUMNS.find((c) => c.id === overId)?.id ?? leads.find((l) => l.id === overId)?.status;
-    if (newStatus && newStatus !== leads.find((l) => l.id === leadId)?.status) {
-      mutation.mutate({ id: leadId, status: newStatus });
-    }
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveLead(active.data.current?.lead ?? null);
   };
 
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveLead(null);
+    if (!over) return;
+    const leadId    = active.id as string;
+    const newStatus = over.id as LeadStatus;
+    if (!COLUMNS.find((c) => c.id === newStatus)) return;
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead || lead.status === newStatus) return;
+    setOptimistic((p) => ({ ...p, [leadId]: newStatus }));
+    mutation.mutate({ id: leadId, status: newStatus });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner className="w-8 h-8" />
+      </div>
+    );
+  }
+
   return (
-    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => (
-          <Column key={col.id} status={col.id} label={col.label} colorClass={col.color} leads={getColumn(col.id)} />
+          <Column
+            key={col.id}
+            col={col}
+            leads={getColumn(col.id)}
+            isTargeted={activeLead !== null && activeLead.status !== col.id}
+          />
         ))}
       </div>
+
+      <DragOverlay dropAnimation={{ duration: 150, easing: 'cubic-bezier(0.18,0.67,0.6,1.22)' }}>
+        {activeLead ? <OverlayCard lead={activeLead} /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }
