@@ -2,24 +2,35 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, CheckCircle, AlertCircle, Users, RefreshCw } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import Spinner from '@/components/ui/Spinner';
 
-export default function ImportPage() {
-  const user    = useAuthStore((s) => s.user);
-  const qc      = useQueryClient();
+interface ImportResult {
+  total:           number;
+  imported:        number;
+  skipped:         number;
+  assignment_mode: string;
+  errors?:         string[];
+  message:         string;
+}
 
-  const [file,       setFile]       = useState<File | null>(null);
-  const [mode,       setMode]       = useState<'round_robin' | 'manual'>('round_robin');
-  const [setterId,   setSetterId]   = useState('');
-  const [result,     setResult]     = useState<any>(null);
+export default function ImportPage() {
+  const user = useAuthStore((s) => s.user);
+  const qc   = useQueryClient();
+  const isAdmin = user?.role === 'admin';
+
+  const [file,     setFile]     = useState<File | null>(null);
+  const [mode,     setMode]     = useState<'round_robin' | 'manual'>('round_robin');
+  const [setterId, setSetterId] = useState('');
+  const [result,   setResult]   = useState<ImportResult | null>(null);
 
   const { data: setters } = useQuery({
     queryKey: ['users-setters'],
     queryFn:  () => usersApi.getAll({ role: 'setter', is_active: 'true' }).then((r) => r.data),
+    enabled:  isAdmin,
   });
 
   const mutation = useMutation({
@@ -29,12 +40,16 @@ export default function ImportPage() {
       formData.append('file', file);
       formData.append('assignment_mode', mode);
       if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
-      return leadsApi.import(formData).then((r) => r.data);
+      return leadsApi.import(formData).then((r) => r.data as ImportResult);
     },
     onSuccess: (data) => {
       setResult(data);
-      toast.success(`${data.total} leads importés avec succès !`);
-      qc.invalidateQueries({ queryKey: ['leads'] });
+      if (data.imported > 0) {
+        toast.success(`${data.imported} lead${data.imported > 1 ? 's' : ''} importé${data.imported > 1 ? 's' : ''} !`);
+        qc.invalidateQueries({ queryKey: ['leads'] });
+      } else {
+        toast.error('Aucun lead importé — vérifiez le format du fichier');
+      }
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message ?? 'Erreur lors de l\'import');
@@ -50,6 +65,11 @@ export default function ImportPage() {
     accept: { 'text/csv': ['.csv'], 'text/plain': ['.txt'] },
     maxFiles: 1,
   });
+
+  const MODE_LABELS: Record<string, string> = {
+    round_robin: 'Round-robin',
+    manual:      'Attribution manuelle',
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -90,75 +110,101 @@ export default function ImportPage() {
           )}
         </div>
 
-        {/* Assignment mode */}
-        <div className="mt-5 space-y-4">
-          <div>
-            <label className="label">Mode d'attribution</label>
-            <div className="flex gap-3">
-              {([
-                ['round_robin', 'Round-robin automatique', 'Distribue équitablement entre tous les setters'],
-                ['manual',      'Attribution manuelle',     'Assigne tous les leads à un setter spécifique'],
-              ] as const).map(([val, title, desc]) => (
-                <label
-                  key={val}
-                  className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all
-                    ${mode === val ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <input type="radio" value={val} checked={mode === val}
-                    onChange={() => setMode(val)} className="sr-only" />
-                  <p className="text-sm font-medium text-gray-800">{title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {mode === 'manual' && (
+        {/* Assignment — admin only */}
+        {isAdmin && (
+          <div className="mt-5 space-y-4">
             <div>
-              <label className="label">Setter assigné *</label>
-              <select
-                value={setterId}
-                onChange={(e) => setSetterId(e.target.value)}
-                className="select"
-              >
-                <option value="">Choisir un setter…</option>
-                {setters?.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+              <label className="label">Mode d'attribution</label>
+              <div className="flex gap-3">
+                {([
+                  ['round_robin', 'Round-robin automatique', 'Distribue équitablement entre tous les setters actifs'],
+                  ['manual',      'Attribution manuelle',     'Assigne tous les leads à un setter spécifique'],
+                ] as const).map(([val, title, desc]) => (
+                  <label
+                    key={val}
+                    className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all
+                      ${mode === val ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+                  >
+                    <input type="radio" value={val} checked={mode === val}
+                      onChange={() => setMode(val)} className="sr-only" />
+                    <p className="text-sm font-medium text-gray-800">{title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
-          )}
-        </div>
+
+            {mode === 'manual' && (
+              <div>
+                <label className="label">Setter assigné *</label>
+                <select value={setterId} onChange={(e) => setSetterId(e.target.value)} className="select">
+                  <option value="">Choisir un setter…</option>
+                  {setters?.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           onClick={() => mutation.mutate()}
-          disabled={!file || mutation.isPending || (mode === 'manual' && !setterId)}
+          disabled={!file || mutation.isPending || (isAdmin && mode === 'manual' && !setterId)}
           className="btn-primary w-full justify-center mt-6 py-2.5"
         >
-          {mutation.isPending ? <><Spinner className="w-4 h-4" /> Import en cours…</> : <><Upload className="w-4 h-4" /> Lancer l'import</>}
+          {mutation.isPending
+            ? <><Spinner className="w-4 h-4" /> Import en cours…</>
+            : <><Upload className="w-4 h-4" /> Lancer l'import</>
+          }
         </button>
       </div>
 
       {/* Result */}
       {result && (
-        <div className="card p-6 border-green-200 bg-green-50">
+        <div className={`card p-6 ${result.imported > 0 ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
           <div className="flex items-center gap-3 mb-4">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-            <h3 className="font-semibold text-green-800">Import réussi !</h3>
+            {result.imported > 0
+              ? <CheckCircle className="w-6 h-6 text-green-600" />
+              : <AlertCircle className="w-6 h-6 text-orange-500" />
+            }
+            <h3 className={`font-semibold ${result.imported > 0 ? 'text-green-800' : 'text-orange-700'}`}>
+              {result.imported > 0 ? 'Import terminé' : 'Aucun lead importé'}
+            </h3>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-white rounded-lg p-3 border border-green-100">
-              <p className="text-xs text-gray-500">Leads importés</p>
-              <p className="text-2xl font-bold text-gray-900">{result.total}</p>
+
+          <div className="grid grid-cols-3 gap-3 text-sm mb-4">
+            <div className="bg-white rounded-lg p-3 border border-gray-100">
+              <p className="text-xs text-gray-500">Importés</p>
+              <p className="text-2xl font-bold text-gray-900">{result.imported}</p>
             </div>
-            <div className="bg-white rounded-lg p-3 border border-green-100">
+            <div className="bg-white rounded-lg p-3 border border-gray-100">
+              <p className="text-xs text-gray-500">Ignorés</p>
+              <p className="text-2xl font-bold text-gray-500">{result.skipped}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-gray-100">
               <p className="text-xs text-gray-500">Mode</p>
-              <p className="font-medium text-gray-700 capitalize mt-1">{result.assignment_mode}</p>
+              <p className="text-sm font-medium text-gray-700 mt-1">
+                {MODE_LABELS[result.assignment_mode] ?? result.assignment_mode}
+              </p>
             </div>
           </div>
+
+          {result.errors && result.errors.length > 0 && (
+            <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-100">
+              <p className="text-xs font-medium text-red-700 mb-1">
+                <AlertCircle className="inline w-3.5 h-3.5 mr-1" />
+                Lignes ignorées :
+              </p>
+              <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
+                {result.errors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
           <button
             onClick={() => { setFile(null); setResult(null); }}
-            className="btn-secondary w-full justify-center mt-4"
+            className="btn-secondary w-full justify-center"
           >
             <RefreshCw className="w-4 h-4" />
             Nouvel import
@@ -172,14 +218,17 @@ export default function ImportPage() {
         <p className="text-xs text-gray-500 mb-3">
           Les colonnes suivantes sont reconnues automatiquement (noms français ou anglais) :
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           {[
-            ['Prénom',       'prénom, prenom, firstname'],
-            ['Nom',          'nom, lastname, surname'],
-            ['Société',      'société, company, entreprise'],
-            ['Téléphone',    'téléphone, phone, mobile, tel'],
-            ['Email',        'email, e-mail, mail'],
-            ['Localisation', 'localisation, location, ville, city'],
+            ['Prénom *',      'prénom, prenom, firstname'],
+            ['Nom *',         'nom, lastname'],
+            ['Société',       'société, company, entreprise'],
+            ['Téléphone',     'téléphone, phone, mobile, tel'],
+            ['Email',         'email, mail'],
+            ['Localisation',  'localisation, location, ville, city'],
+            ['Notes',         'notes, commentaire'],
+            ['Qualité',       'qualité, lead_quality (hot/warm/cold)'],
+            ['Statut',        'statut, status (in_progress/client/lost)'],
           ].map(([field, aliases]) => (
             <div key={field} className="text-xs">
               <span className="font-medium text-gray-700">{field} : </span>
@@ -187,9 +236,9 @@ export default function ImportPage() {
             </div>
           ))}
         </div>
-        <div className="mt-3 p-2 bg-gray-50 rounded font-mono text-xs text-gray-600">
-          prénom,nom,société,téléphone,email,localisation<br />
-          Jean,Dupont,Acme SA,0612345678,jean@acme.fr,Paris
+        <p className="text-xs text-gray-500 mb-1">Exemple :</p>
+        <div className="p-2 bg-gray-50 rounded font-mono text-xs text-gray-600 whitespace-pre">
+          {`prénom,nom,société,téléphone,email,ville\nJean,Dupont,Acme SA,0612345678,jean@acme.fr,Paris\nMarie,Martin,,0698765432,,Lyon`}
         </div>
       </div>
     </div>
