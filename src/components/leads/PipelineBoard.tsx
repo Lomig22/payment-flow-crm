@@ -21,15 +21,17 @@ import type { Lead, LeadStatus } from '@/types';
 const closestColumnByX: CollisionDetection = ({ droppableContainers, pointerCoordinates }) => {
   if (!pointerCoordinates) return [];
   const px = pointerCoordinates.x;
-  let best: { id: string | number; dist: number } | null = null;
+  let best: { c: (typeof droppableContainers)[number]; dist: number } | null = null;
   for (const c of droppableContainers) {
     const rect = c.rect.current;
     if (!rect) continue;
     const centerX = rect.left + rect.width / 2;
     const dist = Math.abs(px - centerX);
-    if (!best || dist < best.dist) best = { id: c.id, dist };
+    if (!best || dist < best.dist) best = { c, dist };
   }
-  return best ? [{ id: best.id, data: {} }] : [];
+  return best
+    ? [{ id: best.c.id, data: { droppableContainer: best.c, value: best.dist } }]
+    : [];
 };
 
 const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: string; ringColor: string }[] = [
@@ -177,9 +179,15 @@ export default function PipelineBoard() {
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
       leadsApi.update(id, { status }).then((r) => r.data),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, { id, status }) => {
+      // Write the new status directly into the cache BEFORE clearing the
+      // optimistic override. Without this, React Query briefly re-renders
+      // with the stale cached status (e.g. "perdu") while the refetch is
+      // in-flight, making the card visually snap back.
+      qc.setQueryData<Lead[]>(['leads-pipeline'], (old) =>
+        old?.map((l) => (l.id === id ? { ...l, status } : l)) ?? old
+      );
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
-      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads'] });
     },
     onError: (_, { id }) => {
