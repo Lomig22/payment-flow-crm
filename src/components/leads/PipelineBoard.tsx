@@ -25,13 +25,13 @@ const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: strin
 function LeadCardInner({ lead }: { lead: Lead }) {
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-gray-900 truncate">
+      <p className="text-sm font-semibold text-gray-900 break-words">
         {lead.first_name} {lead.last_name}
       </p>
       {lead.company && (
-        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 truncate">
-          <Building className="w-3 h-3 flex-shrink-0 text-gray-400" />
-          {lead.company}
+        <p className="text-xs text-gray-500 flex items-start gap-1 mt-0.5 break-words">
+          <Building className="w-3 h-3 flex-shrink-0 text-gray-400 mt-0.5" />
+          <span>{lead.company}</span>
         </p>
       )}
       {lead.phone && (
@@ -103,7 +103,7 @@ function Column({
       className={`card flex flex-col border-t-4 ${col.topColor} transition-colors duration-150
         ${active ? col.hoverBg : ''}
       `}
-      style={{ minWidth: 280, minHeight: 420 }}
+      style={{ minHeight: 420 }}
     >
       {/* Header */}
       <div className="p-3 border-b border-gray-100 flex items-center justify-between">
@@ -208,7 +208,7 @@ export default function PipelineBoard() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="grid pb-4" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, 1fr)`, gap: '1rem' }}>
         {COLUMNS.map((col) => (
           <Column
             key={col.id}
