@@ -44,7 +44,8 @@ export const leadsApi = {
   getOne:   (id: string) => api.get<Lead>(`/leads/${id}`),
   create:   (data: Partial<Lead>) => api.post<Lead>('/leads', data),
   update:   (id: string, data: Partial<Lead>) => api.put<Lead>(`/leads/${id}`, data),
-  delete:   (id: string) => api.delete(`/leads/${id}`),
+  delete:      (id: string) => api.delete(`/leads/${id}`),
+  bulkDelete:  (ids: string[]) => api.post('/leads/bulk-delete', { ids }),
   import:   (formData: FormData) =>
     api.post('/leads/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   assign:   (leadIds: string[], setterId: string) =>

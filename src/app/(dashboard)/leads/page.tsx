@@ -1,9 +1,9 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
-  Plus, Search, Filter, Trash2, Eye, RefreshCw,
+  Plus, Search, Trash2, Eye, RefreshCw,
   ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -25,7 +25,8 @@ export default function LeadsPage() {
   const [filters, setFilters] = useState<LeadsFilters>({ page: 1, limit: 20 });
   const [search,  setSearch]  = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [selected,   setSelected]  = useState<Set<string>>(new Set());
+  const [selected,   setSelected]   = useState<Set<string>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback((val: string) => {
     setSearch(val);
@@ -52,8 +53,40 @@ export default function LeadsPage() {
     onError: () => toast.error('Erreur lors de la suppression'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => leadsApi.bulkDelete(ids),
+    onSuccess: (_, ids) => {
+      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
   const leads      = data?.data ?? [];
   const pagination = data?.pagination;
+
+  // Select-all state for current page
+  const pageIds         = leads.map((l: Lead) => l.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id: string) => selected.has(id));
+  const somePageSelected = pageIds.some((id: string) => selected.has(id)) && !allPageSelected;
+
+  // Sync indeterminate state on the checkbox
+  if (selectAllRef.current) {
+    selectAllRef.current.indeterminate = somePageSelected;
+  }
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageIds.forEach((id: string) => next.delete(id));
+      } else {
+        pageIds.forEach((id: string) => next.add(id));
+      }
+      return next;
+    });
+  };
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -67,11 +100,18 @@ export default function LeadsPage() {
     if (confirm('Supprimer ce lead ?')) deleteMutation.mutate(id);
   };
 
+  const handleBulkDelete = () => {
+    const ids   = Array.from(selected);
+    const count = ids.length;
+    if (confirm(`Supprimer ${count} lead${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''} ? Cette action est irréversible.`)) {
+      bulkDeleteMutation.mutate(ids);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Search */}
         <div className="relative flex-1 min-w-48 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -87,7 +127,6 @@ export default function LeadsPage() {
           )}
         </div>
 
-        {/* Filters */}
         <select
           className="select w-auto text-sm"
           value={filters.status ?? ''}
@@ -136,13 +175,36 @@ export default function LeadsPage() {
 
       {/* Table */}
       <div className="card overflow-hidden">
+        {/* Bulk action bar */}
+        {isAdmin && selected.size > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
+            <span className="text-sm font-medium text-indigo-700">
+              {selected.size} lead{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Supprimer la sélection
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Annuler
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
             <Spinner />
           </div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-            <Users className="w-10 h-10 mb-2 opacity-30" />
+            <UsersIcon className="w-10 h-10 mb-2 opacity-30" />
             <p className="text-sm">Aucun lead trouvé</p>
           </div>
         ) : (
@@ -150,7 +212,17 @@ export default function LeadsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {isAdmin && <th className="th w-8"><input type="checkbox" className="rounded" /></th>}
+                  {isAdmin && (
+                    <th className="th w-8">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        className="rounded cursor-pointer"
+                        checked={allPageSelected}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                  )}
                   <th className="th">Nom</th>
                   <th className="th hidden md:table-cell">Société</th>
                   <th className="th hidden lg:table-cell">Téléphone</th>
@@ -164,14 +236,18 @@ export default function LeadsPage() {
               </thead>
               <tbody>
                 {leads.map((lead: Lead) => (
-                  <tr key={lead.id} className="table-row cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
+                  <tr
+                    key={lead.id}
+                    className={`table-row cursor-pointer ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}
+                    onClick={() => router.push(`/leads/${lead.id}`)}
+                  >
                     {isAdmin && (
                       <td className="td" onClick={(e) => { e.stopPropagation(); toggleSelect(lead.id); }}>
                         <input
                           type="checkbox"
                           checked={selected.has(lead.id)}
                           onChange={() => {}}
-                          className="rounded"
+                          className="rounded cursor-pointer"
                         />
                       </td>
                     )}
@@ -280,7 +356,7 @@ export default function LeadsPage() {
   );
 }
 
-function Users({ className }: { className?: string }) {
+function UsersIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
