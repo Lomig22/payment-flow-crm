@@ -67,6 +67,10 @@ export const dashboardApi = {
   getLeaderboard: () => api.get('/dashboard/leaderboard'),
 };
 
+export const notificationsApi = {
+  getRecent: () => api.get('/notifications'),
+};
+
 export const tagsApi = {
   getAll: () => api.get<Tag[]>('/tags'),
   create: (data: Pick<Tag, 'name' | 'color'>) => api.post<Tag>('/tags', data),
