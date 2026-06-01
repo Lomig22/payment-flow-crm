@@ -20,6 +20,12 @@ const COLUMN_MAP: Record<string, string> = {
   'rllt__details 2': '_desc',
   'yylJEf href': '_website',
   'yylJEf href 2': '_ignore',
+  // Pages Jaunes (Data Scrapper)
+  'truncate-2-lines': 'company',
+  'number-contact': 'phone',
+  matched: 'location',
+  'bi-description': '_pj_desc',
+  'bi-denomination href': '_pj_url',
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
@@ -39,9 +45,14 @@ function decodeContent(buffer: Buffer): string {
   return asUtf8;
 }
 
-// Strip "· " / "• " prefixes from phone numbers
+// Strip prefixes from phone numbers
+// Handles Pages Jaunes format ("Tél :    04 81 68 19 96") and Google Maps bullets ("· 06…")
 function cleanPhone(raw: string): string {
-  return raw.replace(/^[\s·•\-–,]+/, '').replace(/\s+/g, ' ').trim();
+  return raw
+    .replace(/.*[Tt](?:él|el)\s*:\s*/i, '') // "Tél :" / "Tel :" prefix (Pages Jaunes)
+    .replace(/^[\s·•\-–,]+/, '')             // bullet prefix (Google Maps)
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // "Plus de 15 ans en activité · Bordeaux" → "Bordeaux"
@@ -126,6 +137,13 @@ export async function POST(request: NextRequest) {
         if (v) extras.push(v.trim());
       } else if (mapped === '_website') {
         if (v) extras.push(`Site : ${v.trim()}`);
+      } else if (mapped === '_pj_desc') {
+        // Pages Jaunes description → truncate to avoid bloat
+        const desc = v.trim();
+        if (desc) extras.push(desc.length > 400 ? desc.slice(0, 400) + '…' : desc);
+      } else if (mapped === '_pj_url') {
+        // Only store direct business profile URLs (not search results pages)
+        if (v && v.includes('/pros/')) extras.push(`Pages Jaunes : ${v.trim()}`);
       } else {
         row[mapped] = v.trim();
       }
