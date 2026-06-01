@@ -4,19 +4,52 @@ import { supabase } from '@/lib/supabase';
 import { parse } from 'csv-parse/sync';
 
 const COLUMN_MAP: Record<string, string> = {
-  prenom: 'first_name', prénom: 'first_name', firstname: 'first_name', first_name: 'first_name', 'prénom': 'first_name',
+  // Standard French/English
+  prenom: 'first_name', 'prénom': 'first_name', firstname: 'first_name', first_name: 'first_name',
   nom: 'last_name', lastname: 'last_name', last_name: 'last_name', surname: 'last_name',
-  entreprise: 'company', company: 'company', société: 'company', societe: 'company',
-  telephone: 'phone', téléphone: 'phone', phone: 'phone', tel: 'phone', mobile: 'phone',
+  entreprise: 'company', company: 'company', 'société': 'company', societe: 'company', nom_entreprise: 'company',
+  telephone: 'phone', 'téléphone': 'phone', phone: 'phone', tel: 'phone', mobile: 'phone', portable: 'phone',
   email: 'email', mail: 'email', 'e-mail': 'email',
   ville: 'location', location: 'location', adresse: 'location', localisation: 'location', city: 'location',
-  notes: 'notes', commentaire: 'notes', commentaires: 'notes',
-  qualite: 'lead_quality', qualité: 'lead_quality', lead_quality: 'lead_quality',
+  notes: 'notes', commentaire: 'notes', commentaires: 'notes', description: 'notes',
+  qualite: 'lead_quality', 'qualité': 'lead_quality', lead_quality: 'lead_quality',
   statut: 'status', status: 'status',
+  // Google Maps scraper column IDs
+  osrxxb: 'company',
+  'rllt__details 3': 'phone',
+  'rllt__details 2': '_desc',
+  'yylJEf href': '_website',
+  'yylJEf href 2': '_ignore',
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
 const VALID_STATUS  = new Set(['in_progress', 'client', 'lost']);
+
+// Detect and fix Windows-1252 bytes misread as UTF-8 (common with scraped files)
+function decodeContent(buffer: Buffer): string {
+  const asUtf8 = buffer.toString('utf8');
+  // Mojibake patterns: Ã© = é, Â· = ·, â€™ = '
+  if (/Ã[©àâäèêëîïôùûüœ]|â€[™œ""]|Ã‰|Ã‡|Ã |Â·/i.test(asUtf8)) {
+    try {
+      return new TextDecoder('windows-1252').decode(buffer);
+    } catch {
+      return asUtf8;
+    }
+  }
+  return asUtf8;
+}
+
+// Strip "· " / "• " prefixes from phone numbers
+function cleanPhone(raw: string): string {
+  return raw.replace(/^[\s·•\-–,]+/, '').replace(/\s+/g, ' ').trim();
+}
+
+// "Plus de 15 ans en activité · Bordeaux" → "Bordeaux"
+function extractLocation(desc: string): string {
+  const parts = desc.replace(/Â·|·/g, '·').split('·');
+  if (parts.length >= 2) return parts[parts.length - 1].trim();
+  return '';
+}
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -29,9 +62,11 @@ export async function POST(request: NextRequest) {
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
-  const text = await file.text();
-  let records: Record<string, string>[];
+  // Read raw bytes for encoding detection
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const text   = decodeContent(buffer);
 
+  let records: Record<string, string>[];
   try {
     records = parse(text, {
       columns: true,
@@ -47,17 +82,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Le fichier CSV est vide' }, { status: 400 });
   }
 
-  // Resolve setter list for round-robin
+  // Resolve setter list
   let setterIds: string[] = [];
   let rrIndex = 0;
 
   if (user.role === 'admin') {
     if (assignmentMode === 'round_robin') {
       const { data: activeSetters } = await supabase
-        .from('users')
-        .select('id')
-        .eq('role', 'setter')
-        .eq('is_active', true);
+        .from('users').select('id').eq('role', 'setter').eq('is_active', true);
       setterIds = (activeSetters ?? []).map((s: any) => s.id);
     } else if (assignmentMode === 'manual' && setterIdParam) {
       setterIds = [setterIdParam];
@@ -80,28 +112,57 @@ export async function POST(request: NextRequest) {
   for (let i = 0; i < records.length; i++) {
     const raw = records[i];
     const row: Record<string, string> = {};
+    const extras: string[] = [];
+
     for (const [k, v] of Object.entries(raw)) {
-      const mapped = COLUMN_MAP[k.toLowerCase().trim()];
-      if (mapped) row[mapped] = v.trim();
+      const key    = k.toLowerCase().trim();
+      const mapped = COLUMN_MAP[key];
+      if (!mapped || mapped === '_ignore') continue;
+
+      if (mapped === '_desc') {
+        // Extract location from "Plus de X ans · [City]"
+        const loc = extractLocation(v);
+        if (loc && !row.location) row.location = loc;
+        if (v) extras.push(v.trim());
+      } else if (mapped === '_website') {
+        if (v) extras.push(`Site : ${v.trim()}`);
+      } else {
+        row[mapped] = v.trim();
+      }
+    }
+
+    // Clean phone number
+    if (row.phone) row.phone = cleanPhone(row.phone);
+
+    // If no personal name but company exists, derive first/last from company
+    if (!row.first_name && !row.last_name && row.company) {
+      const words = row.company.trim().split(/\s+/);
+      row.first_name = words[0] ?? row.company;
+      row.last_name  = words.slice(1).join(' ') || '—';
     }
 
     if (!row.first_name || !row.last_name) {
       skipped++;
-      errors.push(`Ligne ${i + 2} : prénom ou nom manquant`);
+      errors.push(`Ligne ${i + 2} : prénom ou nom manquant (et aucune société trouvée)`);
       continue;
     }
 
+    // Append website/extra info to notes
+    if (extras.length > 0) {
+      row.notes = [row.notes, ...extras].filter(Boolean).join(' | ');
+    }
+
     const { error } = await supabase.from('leads').insert({
-      first_name:  row.first_name,
-      last_name:   row.last_name,
-      company:     row.company    || null,
-      phone:       row.phone      || null,
-      email:       row.email      || null,
-      location:    row.location   || null,
+      first_name:   row.first_name,
+      last_name:    row.last_name,
+      company:      row.company    || null,
+      phone:        row.phone      || null,
+      email:        row.email      || null,
+      location:     row.location   || null,
       lead_quality: VALID_QUALITY.has(row.lead_quality) ? row.lead_quality : null,
-      status:      VALID_STATUS.has(row.status) ? row.status : 'in_progress',
-      notes:       row.notes      || null,
-      setter_id:   getNextSetter(),
+      status:       VALID_STATUS.has(row.status) ? row.status : 'in_progress',
+      notes:        row.notes      || null,
+      setter_id:    getNextSetter(),
     });
 
     if (error) {
