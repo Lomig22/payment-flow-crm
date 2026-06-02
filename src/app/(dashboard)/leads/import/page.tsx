@@ -2,19 +2,21 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import Spinner from '@/components/ui/Spinner';
 
 interface ImportResult {
-  total:           number;
-  imported:        number;
-  skipped:         number;
-  assignment_mode: string;
-  errors?:         string[];
-  message:         string;
+  total:            number;
+  imported:         number;
+  skipped:          number;
+  duplicate_count:  number;
+  assignment_mode:  string;
+  errors?:          string[];
+  duplicates?:      string[];
+  message:          string;
 }
 
 export default function ImportPage() {
@@ -174,7 +176,7 @@ export default function ImportPage() {
             </h3>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-sm mb-4">
+          <div className="grid grid-cols-4 gap-3 text-sm mb-4">
             <div className="bg-white rounded-lg p-3 border border-gray-100">
               <p className="text-xs text-gray-500">Importés</p>
               <p className="text-2xl font-bold text-gray-900">{result.imported}</p>
@@ -184,12 +186,30 @@ export default function ImportPage() {
               <p className="text-2xl font-bold text-gray-500">{result.skipped}</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-gray-100">
+              <p className="text-xs text-gray-500">Doublons</p>
+              <p className={`text-2xl font-bold ${result.duplicate_count > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
+                {result.duplicate_count ?? 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-gray-100">
               <p className="text-xs text-gray-500">Mode</p>
               <p className="text-sm font-medium text-gray-700 mt-1">
                 {MODE_LABELS[result.assignment_mode] ?? result.assignment_mode}
               </p>
             </div>
           </div>
+
+          {result.duplicates && result.duplicates.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-xs font-medium text-amber-700 mb-1.5 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {result.duplicate_count} doublon{result.duplicate_count > 1 ? 's' : ''} détecté{result.duplicate_count > 1 ? 's' : ''} — lead{result.duplicate_count > 1 ? 's' : ''} importé{result.duplicate_count > 1 ? 's' : ''} quand même :
+              </p>
+              <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                {result.duplicates.map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+            </div>
+          )}
 
           {result.errors && result.errors.length > 0 && (
             <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-100">

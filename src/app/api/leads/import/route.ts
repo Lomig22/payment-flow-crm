@@ -143,9 +143,10 @@ export async function POST(request: NextRequest) {
     return id;
   };
 
-  let imported = 0;
-  let skipped  = 0;
-  const errors: string[] = [];
+  // ── Pass 1 : parse all records into structured rows ──────────────────────
+  type ParsedRow = Record<string, string> & { _lineNum: number; _extras: string[] };
+  const parsedRows: ParsedRow[] = [];
+  const parseErrors: string[] = [];
 
   for (let i = 0; i < records.length; i++) {
     const raw = records[i];
@@ -153,30 +154,25 @@ export async function POST(request: NextRequest) {
     const extras: string[] = [];
 
     for (const [k, v] of Object.entries(raw)) {
-      const key    = k.toLowerCase().trim().replace(/^﻿/, ''); // strip BOM from first column
+      const key    = k.toLowerCase().trim().replace(/^﻿/, '');
       const mapped = effectiveMap[key];
       if (!mapped || mapped === '_ignore') continue;
 
       if (mapped === '_desc') {
-        // Extract location from "Plus de X ans · [City]"
         const loc = extractLocation(v);
         if (loc && !row.location) row.location = loc;
         if (v) extras.push(v.trim());
       } else if (mapped === '_website') {
         if (v) extras.push(`Site : ${v.trim()}`);
       } else if (mapped === '_pj_desc') {
-        // Pages Jaunes description → truncate to avoid bloat
         const desc = v.trim();
         if (desc) extras.push(desc.length > 400 ? desc.slice(0, 400) + '…' : desc);
       } else if (mapped === '_pj_url') {
-        // Only store direct business profile URLs (not search results pages)
         if (v && v.includes('/pros/')) extras.push(`Pages Jaunes : ${v.trim()}`);
       } else if (mapped === '_dirigeant') {
-        // "JOSHUA MARK BAKER" or "ALEXIS SEVIN (SEVIN)" → strip parenthetical, split into name
         const name = v.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
         if (name) row._dirigeant = name;
       } else if (mapped === '_categories') {
-        // "Maçon|Couvreur|Peintre" → add as readable note
         const cats = v.trim();
         if (cats) extras.push(cats.replace(/\|/g, ', '));
       } else {
@@ -184,7 +180,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse dirigeant → first_name / last_name (only if no name yet)
     if (row._dirigeant && !row.first_name) {
       const words = row._dirigeant.split(/\s+/);
       row.first_name = words[0];
@@ -192,32 +187,99 @@ export async function POST(request: NextRequest) {
     }
     delete row._dirigeant;
 
-    // Clean phone number
     if (row.phone) row.phone = cleanPhone(row.phone);
 
-    // If no personal name but company exists, derive first/last from company
     if (!row.first_name && !row.last_name && row.company) {
       const words = row.company.trim().split(/\s+/);
       row.first_name = words[0] ?? row.company;
       row.last_name  = words.slice(1).join(' ') || '—';
     }
 
-    // Truncate to DB VARCHAR(100) limits
     if (row.first_name) row.first_name = row.first_name.slice(0, 99);
     if (row.last_name)  row.last_name  = row.last_name.slice(0, 99);
 
     if (!row.first_name || !row.last_name) {
-      skipped++;
-      errors.push(`Ligne ${i + 2} : prénom ou nom manquant (et aucune société trouvée)`);
+      parseErrors.push(`Ligne ${i + 2} : prénom ou nom manquant (et aucune société trouvée)`);
       continue;
     }
 
-    // Append website/extra info to notes
     if (extras.length > 0) {
       row.notes = [row.notes, ...extras].filter(Boolean).join(' | ');
     }
 
-    const { error } = await supabase.from('leads').insert({
+    parsedRows.push({ ...row, _lineNum: i + 2, _extras: extras });
+  }
+
+  // ── Pass 2 : bulk duplicate detection ────────────────────────────────────
+  // Normalize phone for comparison (digits only, no spaces/dashes)
+  const normPhone = (p: string) => p.replace(/[\s.\-\(\)\/]/g, '');
+
+  // Collect phones and emails present in this CSV
+  const csvPhones  = parsedRows.map(r => r.phone).filter(Boolean).map(normPhone);
+  const csvEmails  = parsedRows.map(r => r.email).filter(Boolean).map(e => e.toLowerCase());
+
+  // Sets of values already in DB
+  const dbPhoneSet = new Set<string>();
+  const dbEmailSet = new Set<string>();
+  // Map value → "Prénom Nom" for display in warning message
+  const dbPhoneLabel: Record<string, string> = {};
+  const dbEmailLabel: Record<string, string> = {};
+
+  if (csvPhones.length > 0 || csvEmails.length > 0) {
+    const db = supabase as any;
+    const orParts: string[] = [];
+    if (csvPhones.length > 0) orParts.push(`phone.in.(${csvPhones.join(',')})`);
+    if (csvEmails.length > 0) orParts.push(`email.in.(${csvEmails.join(',')})`);
+
+    const { data: existing } = await db
+      .from('leads')
+      .select('first_name, last_name, phone, email')
+      .or(orParts.join(','));
+
+    for (const lead of existing ?? []) {
+      const label = `${lead.first_name} ${lead.last_name}`.trim();
+      if (lead.phone) { const np = normPhone(lead.phone); dbPhoneSet.add(np); dbPhoneLabel[np] = label; }
+      if (lead.email) { const ne = lead.email.toLowerCase(); dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
+    }
+  }
+
+  // Track intra-CSV duplicates (same phone/email appears twice in the file)
+  const seenPhones = new Set<string>();
+  const seenEmails = new Set<string>();
+
+  // ── Pass 3 : insert with duplicate tagging ────────────────────────────────
+  let imported = 0;
+  let skipped  = 0;
+  const errors:     string[] = [...parseErrors];
+  const duplicates: string[] = [];
+
+  for (const row of parsedRows) {
+    const lineNum = row._lineNum;
+    const label   = `${row.first_name} ${row.last_name}`.trim();
+
+    // Check phone duplicates
+    if (row.phone) {
+      const np = normPhone(row.phone);
+      if (dbPhoneSet.has(np)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : téléphone ${row.phone} déjà présent — ${dbPhoneLabel[np]}`);
+      } else if (seenPhones.has(np)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : téléphone ${row.phone} en doublon dans ce fichier`);
+      }
+      seenPhones.add(np);
+    }
+
+    // Check email duplicates
+    if (row.email) {
+      const ne = row.email.toLowerCase();
+      if (dbEmailSet.has(ne)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : email ${row.email} déjà présent — ${dbEmailLabel[ne]}`);
+      } else if (seenEmails.has(ne)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : email ${row.email} en doublon dans ce fichier`);
+      }
+      seenEmails.add(ne);
+    }
+
+    const { error } = await (supabase as any).from('leads').insert({
       first_name:   row.first_name,
       last_name:    row.last_name,
       company:      row.company    || null,
@@ -232,7 +294,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       skipped++;
-      errors.push(`Ligne ${i + 2} : ${error.message}`);
+      errors.push(`Ligne ${lineNum} : ${error.message}`);
     } else {
       imported++;
     }
@@ -243,7 +305,9 @@ export async function POST(request: NextRequest) {
     total:           imported,
     imported,
     skipped,
+    duplicate_count: duplicates.length,
     assignment_mode: assignmentMode,
     errors:          errors.slice(0, 10),
+    duplicates:      duplicates.slice(0, 20),
   });
 }
