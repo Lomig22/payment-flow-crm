@@ -12,6 +12,7 @@ const COLUMN_MAP: Record<string, string> = {
   email: 'email', mail: 'email', 'e-mail': 'email',
   ville: 'location', location: 'location', adresse: 'location', localisation: 'location', city: 'location',
   notes: 'notes', commentaire: 'notes', commentaires: 'notes', description: 'notes',
+  'prises de notes': 'notes',
   qualite: 'lead_quality', 'qualité': 'lead_quality', lead_quality: 'lead_quality',
   statut: 'status', status: 'status',
   // Google Maps scraper column IDs
@@ -26,6 +27,20 @@ const COLUMN_MAP: Record<string, string> = {
   matched: 'location',
   'bi-description': '_pj_desc',
   'bi-denomination href': '_pj_url',
+  // Prospects export (prospects_export_*.csv)
+  dirigeant: '_dirigeant',
+  'catégories': '_categories',
+  categories: '_categories',
+  'code postal': '_ignore',
+  siret: '_ignore',
+  'statut clé': '_ignore',
+  'statut cle': '_ignore',
+  rappel: '_ignore',
+  'dernier contact': '_ignore',
+  'créé le': '_ignore',
+  'cree le': '_ignore',
+  'nombre avis': '_ignore',
+  note: '_ignore',
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
@@ -84,6 +99,7 @@ export async function POST(request: NextRequest) {
       skip_empty_lines: true,
       trim: true,
       relax_column_count: true,
+      bom: true,
     });
   } catch (e: any) {
     return NextResponse.json({ message: `Fichier CSV invalide : ${e.message}` }, { status: 400 });
@@ -92,6 +108,15 @@ export async function POST(request: NextRequest) {
   if (records.length === 0) {
     return NextResponse.json({ message: 'Le fichier CSV est vide' }, { status: 400 });
   }
+
+  // Detect "prospects export" format: has a "dirigeant" column → Nom = company, not last name
+  const firstRecordHeaders = Object.keys(records[0] || {}).map(h =>
+    h.toLowerCase().trim().replace(/^﻿/, '')
+  );
+  const isProspectsExport = firstRecordHeaders.includes('dirigeant');
+  const effectiveMap: Record<string, string> = isProspectsExport
+    ? { ...COLUMN_MAP, nom: 'company' }
+    : COLUMN_MAP;
 
   // Resolve setter list
   let setterIds: string[] = [];
@@ -128,8 +153,8 @@ export async function POST(request: NextRequest) {
     const extras: string[] = [];
 
     for (const [k, v] of Object.entries(raw)) {
-      const key    = k.toLowerCase().trim();
-      const mapped = COLUMN_MAP[key];
+      const key    = k.toLowerCase().trim().replace(/^﻿/, ''); // strip BOM from first column
+      const mapped = effectiveMap[key];
       if (!mapped || mapped === '_ignore') continue;
 
       if (mapped === '_desc') {
@@ -146,10 +171,26 @@ export async function POST(request: NextRequest) {
       } else if (mapped === '_pj_url') {
         // Only store direct business profile URLs (not search results pages)
         if (v && v.includes('/pros/')) extras.push(`Pages Jaunes : ${v.trim()}`);
+      } else if (mapped === '_dirigeant') {
+        // "JOSHUA MARK BAKER" or "ALEXIS SEVIN (SEVIN)" → strip parenthetical, split into name
+        const name = v.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+        if (name) row._dirigeant = name;
+      } else if (mapped === '_categories') {
+        // "Maçon|Couvreur|Peintre" → add as readable note
+        const cats = v.trim();
+        if (cats) extras.push(cats.replace(/\|/g, ', '));
       } else {
         row[mapped] = v.trim();
       }
     }
+
+    // Parse dirigeant → first_name / last_name (only if no name yet)
+    if (row._dirigeant && !row.first_name) {
+      const words = row._dirigeant.split(/\s+/);
+      row.first_name = words[0];
+      if (!row.last_name) row.last_name = words.slice(1).join(' ') || '—';
+    }
+    delete row._dirigeant;
 
     // Clean phone number
     if (row.phone) row.phone = cleanPhone(row.phone);
