@@ -1,6 +1,6 @@
 export type UserRole    = 'admin' | 'setter';
 export type LeadQuality = 'hot' | 'warm' | 'cold';
-export type LeadStatus  = 'lost' | 'in_progress' | 'client';
+export type LeadStatus  = 'lost' | 'in_progress' | 'client' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2';
 export type ActionType  = 'to_call' | 'callback' | 'follow_up' | 'negotiation' | 'no_action';
 
 export interface User {

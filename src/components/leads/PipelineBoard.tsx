@@ -35,9 +35,13 @@ const closestColumnByX: CollisionDetection = ({ droppableContainers, pointerCoor
 };
 
 const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: string; ringColor: string }[] = [
-  { id: 'in_progress', label: 'En cours', topColor: 'border-t-yellow-400', hoverBg: 'bg-yellow-50/60',  ringColor: 'ring-yellow-300' },
-  { id: 'client',      label: 'Clients',  topColor: 'border-t-green-500',  hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'  },
-  { id: 'lost',        label: 'Perdu',    topColor: 'border-t-gray-400',   hoverBg: 'bg-gray-100/60',   ringColor: 'ring-gray-300'   },
+  { id: 'in_progress',    label: 'En cours',     topColor: 'border-t-yellow-400',  hoverBg: 'bg-yellow-50/60',  ringColor: 'ring-yellow-300'  },
+  { id: 'to_follow_up',   label: 'À relancer',   topColor: 'border-t-orange-400',  hoverBg: 'bg-orange-50/60',  ringColor: 'ring-orange-300'  },
+  { id: 'to_follow_up_2', label: 'À relancer 2', topColor: 'border-t-red-400',     hoverBg: 'bg-red-50/60',     ringColor: 'ring-red-300'     },
+  { id: 'appointment',    label: 'RDV pris',     topColor: 'border-t-blue-400',    hoverBg: 'bg-blue-50/60',    ringColor: 'ring-blue-300'    },
+  { id: 'r2',             label: 'R2 pris',      topColor: 'border-t-purple-400',  hoverBg: 'bg-purple-50/60',  ringColor: 'ring-purple-300'  },
+  { id: 'client',         label: 'Client',       topColor: 'border-t-green-500',   hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'   },
+  { id: 'lost',           label: 'Perdu',        topColor: 'border-t-gray-400',    hoverBg: 'bg-gray-100/60',   ringColor: 'ring-gray-300'    },
 ];
 
 /* ── Card ─────────────────────────────────────────────────────────── */
@@ -119,10 +123,10 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`card flex flex-col border-t-4 ${col.topColor} transition-colors duration-150
+      className={`card flex flex-col border-t-4 ${col.topColor} transition-colors duration-150 flex-shrink-0
         ${active ? col.hoverBg : ''}
       `}
-      style={{ minHeight: 420 }}
+      style={{ minHeight: 420, width: 260 }}
     >
       {/* Header */}
       <div className="p-3 border-b border-gray-100 flex items-center justify-between">
@@ -233,7 +237,7 @@ export default function PipelineBoard() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid pb-4" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, 1fr)`, gap: '1rem' }}>
+      <div className="flex gap-4 pb-4 overflow-x-auto" style={{ minWidth: 'max-content' }}>
         {COLUMNS.map((col) => (
           <Column
             key={col.id}

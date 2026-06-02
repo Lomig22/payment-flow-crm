@@ -44,7 +44,7 @@ const COLUMN_MAP: Record<string, string> = {
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
-const VALID_STATUS  = new Set(['in_progress', 'client', 'lost']);
+const VALID_STATUS  = new Set(['in_progress', 'client', 'lost', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']);
 
 // Detect and fix Windows-1252 bytes misread as UTF-8 (common with scraped files)
 function decodeContent(buffer: Buffer): string {

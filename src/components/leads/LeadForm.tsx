@@ -26,7 +26,7 @@ const schema = z.object({
   quote_sent:         z.boolean().default(false),
   r2_planned:         z.boolean().default(false),
   r3_planned:         z.boolean().default(false),
-  status:             z.enum(['lost', 'in_progress', 'client']).default('in_progress'),
+  status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']).default('in_progress'),
   notes:              z.string().optional(),
 });
 
@@ -156,6 +156,10 @@ export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         <F label="Statut" name="status">
           <select {...register('status')} className="select">
             <option value="in_progress">En cours</option>
+            <option value="to_follow_up">À relancer</option>
+            <option value="to_follow_up_2">À relancer 2</option>
+            <option value="appointment">RDV pris</option>
+            <option value="r2">R2 pris</option>
             <option value="client">Client</option>
             <option value="lost">Perdu</option>
           </select>

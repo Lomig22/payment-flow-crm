@@ -24,9 +24,13 @@ export const QUALITY_LABELS: Record<string, string> = {
 };
 
 export const STATUS_LABELS: Record<string, string> = {
-  in_progress: 'En cours',
-  client:      'Client',
-  lost:        'Perdu',
+  in_progress:    'En cours',
+  to_follow_up:   'À relancer',
+  to_follow_up_2: 'À relancer 2',
+  appointment:    'RDV pris',
+  r2:             'R2 pris',
+  client:         'Client',
+  lost:           'Perdu',
 };
 
 export const ACTION_LABELS: Record<string, string> = {

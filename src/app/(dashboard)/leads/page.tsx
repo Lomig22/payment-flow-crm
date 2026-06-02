@@ -197,6 +197,10 @@ export default function LeadsPage() {
         >
           <option value="">Tous les statuts</option>
           <option value="in_progress">En cours</option>
+          <option value="to_follow_up">À relancer</option>
+          <option value="to_follow_up_2">À relancer 2</option>
+          <option value="appointment">RDV pris</option>
+          <option value="r2">R2 pris</option>
           <option value="client">Client</option>
           <option value="lost">Perdu</option>
         </select>
