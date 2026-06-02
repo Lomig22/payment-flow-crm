@@ -40,11 +40,15 @@ export async function GET(request: NextRequest) {
     .select('id, conversation_id, content, created_at, sender_id')
     .in('conversation_id', convIds)
     .order('created_at', { ascending: false })
-    .limit(convIds.length * 3);
+    .limit(Math.max(100, convIds.length * 10));
 
   // 4. Get unread messages (sent since oldest last_read_at, not by me)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const oldest = memberships.reduce(
-    (min: string, m: any) => (!m.last_read_at || m.last_read_at < min ? (m.last_read_at ?? '1970-01-01') : min),
+    (min: string, m: any) => {
+      const t = m.last_read_at ?? thirtyDaysAgo;
+      return t < min ? t : min;
+    },
     new Date().toISOString()
   );
   const { data: unreadMsgs } = await db

@@ -1,15 +1,20 @@
 'use client';
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { Loader2, Shield } from 'lucide-react';
+import { Loader2, Shield, User } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { authApi } from '@/lib/api';
+import { authApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import Badge from '@/components/ui/Badge';
 import { getInitials } from '@/lib/utils';
+
+const nameSchema = z.object({
+  first_name: z.string().min(1, 'Requis'),
+  last_name:  z.string().min(1, 'Requis'),
+});
+type NameForm = z.infer<typeof nameSchema>;
 
 const pwdSchema = z.object({
   old_password: z.string().min(1, 'Requis'),
@@ -22,7 +27,25 @@ const pwdSchema = z.object({
 type PwdForm = z.infer<typeof pwdSchema>;
 
 export default function ProfilePage() {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
+
+  const {
+    register: rName,
+    handleSubmit: hsName,
+    formState: { errors: nameErrors },
+  } = useForm<NameForm>({
+    resolver: zodResolver(nameSchema),
+    defaultValues: { first_name: user?.first_name ?? '', last_name: user?.last_name ?? '' },
+  });
+
+  const nameMutation = useMutation({
+    mutationFn: (d: NameForm) => usersApi.update(user!.id, d).then((r) => r.data),
+    onSuccess: (data: any) => {
+      toast.success('Nom mis à jour');
+      updateUser({ first_name: data.first_name, last_name: data.last_name });
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Erreur'),
+  });
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<PwdForm>({
     resolver: zodResolver(pwdSchema),
@@ -60,6 +83,32 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Edit name */}
+      <div className="card p-6">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          Modifier le nom
+        </h3>
+        <form onSubmit={hsName((d) => nameMutation.mutate(d))} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Prénom</label>
+              <input {...rName('first_name')} className="input" />
+              {nameErrors.first_name && <p className="field-error">{nameErrors.first_name.message}</p>}
+            </div>
+            <div>
+              <label className="label">Nom</label>
+              <input {...rName('last_name')} className="input" />
+              {nameErrors.last_name && <p className="field-error">{nameErrors.last_name.message}</p>}
+            </div>
+          </div>
+          <button type="submit" disabled={nameMutation.isPending} className="btn-primary">
+            {nameMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            Enregistrer
+          </button>
+        </form>
       </div>
 
       {/* Change password */}

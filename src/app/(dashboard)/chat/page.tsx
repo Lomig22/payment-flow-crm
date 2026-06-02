@@ -185,10 +185,11 @@ export default function ChatPage() {
   const inputRef       = useRef<HTMLTextAreaElement>(null);
 
   /* ── Conversations list (poll every 5s) */
-  const { data: conversations = [], isLoading: convsLoading } = useQuery({
+  const { data: conversations = [], isLoading: convsLoading, isError: convsError } = useQuery({
     queryKey: ['chat-conversations'],
     queryFn:  () => chatApi.getConversations().then((r) => r.data as Conversation[]),
     refetchInterval: 5000,
+    retry: 1,
   });
 
   /* ── Messages for active conversation (poll every 2s) */
@@ -267,7 +268,17 @@ export default function ChatPage() {
             <div className="flex justify-center py-10"><Spinner className="w-5 h-5" /></div>
           )}
 
-          {!convsLoading && conversations.length === 0 && (
+          {convsError && (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <p className="text-sm font-semibold text-red-500 mb-1">Erreur de connexion</p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Les tables de chat n&apos;existent peut-être pas encore.<br />
+                Exécutez <span className="font-mono bg-gray-100 px-1 rounded">supabase/chat-migration.sql</span> dans l&apos;éditeur SQL Supabase.
+              </p>
+            </div>
+          )}
+
+          {!convsLoading && !convsError && conversations.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
                 <MessageSquarePlus className="w-5 h-5 text-gray-400" />
