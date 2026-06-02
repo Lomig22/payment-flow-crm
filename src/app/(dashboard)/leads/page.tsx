@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Trash2, Eye, RefreshCw,
-  ChevronLeft, ChevronRight, X,
+  ChevronLeft, ChevronRight, X, UserCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -24,8 +24,9 @@ export default function LeadsPage() {
 
   const [filters, setFilters] = useState<LeadsFilters>({ page: 1, limit: 20 });
   const [search,  setSearch]  = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
-  const [selected,   setSelected]   = useState<Set<string>>(new Set());
+  const [createOpen,    setCreateOpen]    = useState(false);
+  const [selected,      setSelected]      = useState<Set<string>>(new Set());
+  const [bulkSetterId,  setBulkSetterId]  = useState('');
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback((val: string) => {
@@ -62,6 +63,23 @@ export default function LeadsPage() {
     },
     onError: () => toast.error('Erreur lors de la suppression'),
   });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: ({ ids, setterId }: { ids: string[]; setterId: string }) =>
+      leadsApi.assign(ids, setterId || null as any),
+    onSuccess: (_, { ids }) => {
+      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
+      setSelected(new Set());
+      setBulkSetterId('');
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: () => toast.error('Erreur lors de la réassignation'),
+  });
+
+  const handleBulkAssign = () => {
+    const ids = Array.from(selected);
+    bulkAssignMutation.mutate({ ids, setterId: bulkSetterId });
+  };
 
   const leads      = data?.data ?? [];
   const pagination = data?.pagination;
@@ -177,17 +195,40 @@ export default function LeadsPage() {
       <div className="card overflow-hidden">
         {/* Bulk action bar */}
         {isAdmin && selected.size > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
             <span className="text-sm font-medium text-indigo-700">
               {selected.size} lead{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
             </span>
+
+            {/* Bulk assign */}
+            <div className="flex items-center gap-2">
+              <select
+                value={bulkSetterId}
+                onChange={(e) => setBulkSetterId(e.target.value)}
+                className="select text-xs py-1 h-7"
+              >
+                <option value="">— Choisir un setter —</option>
+                {(setters ?? []).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkAssign}
+                disabled={!bulkSetterId || bulkAssignMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                Assigner
+              </button>
+            </div>
+
             <button
               onClick={handleBulkDelete}
               disabled={bulkDeleteMutation.isPending}
               className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Supprimer la sélection
+              Supprimer
             </button>
             <button
               onClick={() => setSelected(new Set())}
