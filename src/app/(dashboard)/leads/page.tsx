@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Trash2, Eye, RefreshCw,
-  ChevronLeft, ChevronRight, X, UserCheck,
+  ChevronLeft, ChevronRight, X, UserCheck, AlertTriangle, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -44,6 +44,13 @@ export default function LeadsPage() {
     queryFn:  () => usersApi.getAll({ role: 'setter', is_active: 'true' }).then((r) => r.data),
     enabled:  isAdmin,
   });
+
+  const { data: dupData } = useQuery({
+    queryKey: ['leads-duplicates'],
+    queryFn:  () => leadsApi.duplicates().then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+  const [dupExpanded, setDupExpanded] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: leadsApi.delete,
@@ -128,6 +135,39 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
+      {/* Duplicate warning banner */}
+      {dupData && dupData.count > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+          <button
+            onClick={() => setDupExpanded((v) => !v)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-100 transition-colors"
+          >
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span className="flex-1 text-sm font-medium text-amber-800">
+              {dupData.count} lead{dupData.count > 1 ? 's' : ''} en doublon détecté{dupData.count > 1 ? 's' : ''} dans votre base
+            </span>
+            {dupExpanded
+              ? <ChevronUp className="w-4 h-4 text-amber-500" />
+              : <ChevronDown className="w-4 h-4 text-amber-500" />
+            }
+          </button>
+          {dupExpanded && (
+            <div className="px-4 pb-3 border-t border-amber-200">
+              <ul className="mt-2 space-y-1">
+                {dupData.groups.map((g, i) => (
+                  <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+                    <span className="shrink-0 font-medium">
+                      {g.field === 'phone' ? 'Tél' : 'Email'} {g.value} :
+                    </span>
+                    <span>{g.leads.map((l) => `${l.first_name} ${l.last_name}`).join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48 max-w-xs">

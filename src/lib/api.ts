@@ -50,6 +50,7 @@ export const leadsApi = {
     api.post('/leads/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   assign:   (leadIds: string[], setterId: string) =>
     api.post('/leads/assign', { lead_ids: leadIds, setter_id: setterId }),
+  duplicates: () => api.get<{ count: number; groups: { field: string; value: string; leads: { id: string; first_name: string; last_name: string }[] }[] }>('/leads/duplicates'),
 };
 
 export const usersApi = {
