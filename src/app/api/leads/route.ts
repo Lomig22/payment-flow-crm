@@ -8,9 +8,7 @@ function normalizeLead(l: any) {
   const lt = l.lead_tags as Array<{ tags: unknown }> | null;
   return {
     ...l,
-    setter_user_id: u?.id ?? null,
-    setter_first_name: u?.first_name ?? null,
-    setter_last_name: u?.last_name ?? null,
+    setter: u ? { id: u.id, first_name: u.first_name, last_name: u.last_name, email: '' } : null,
     tags: (lt || []).map((t) => t.tags).filter(Boolean),
     users: undefined,
     lead_tags: undefined,
