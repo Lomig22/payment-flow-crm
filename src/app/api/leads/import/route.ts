@@ -202,6 +202,10 @@ export async function POST(request: NextRequest) {
       row.last_name  = words.slice(1).join(' ') || '—';
     }
 
+    // Truncate to DB VARCHAR(100) limits
+    if (row.first_name) row.first_name = row.first_name.slice(0, 99);
+    if (row.last_name)  row.last_name  = row.last_name.slice(0, 99);
+
     if (!row.first_name || !row.last_name) {
       skipped++;
       errors.push(`Ligne ${i + 2} : prénom ou nom manquant (et aucune société trouvée)`);
