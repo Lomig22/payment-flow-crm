@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Trash2, Eye, RefreshCw,
-  ChevronLeft, ChevronRight, X, UserCheck, AlertTriangle, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight, X, UserCheck, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -50,7 +50,7 @@ export default function LeadsPage() {
     queryFn:  () => leadsApi.duplicates().then((r) => r.data),
     staleTime: 5 * 60 * 1000,
   });
-  const [dupExpanded, setDupExpanded] = useState(false);
+  const [dupExpanded, setDupExpanded] = useState(true);
 
   const deleteMutation = useMutation({
     mutationFn: leadsApi.delete,
@@ -137,29 +137,34 @@ export default function LeadsPage() {
     <div className="space-y-4">
       {/* Duplicate warning banner */}
       {dupData && dupData.count > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
-          <button
-            onClick={() => setDupExpanded((v) => !v)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-100 transition-colors"
-          >
-            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            <span className="flex-1 text-sm font-medium text-amber-800">
-              {dupData.count} lead{dupData.count > 1 ? 's' : ''} en doublon détecté{dupData.count > 1 ? 's' : ''} dans votre base
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 overflow-hidden shadow-sm">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-amber-100 border-b border-amber-300">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <span className="flex-1 text-sm font-semibold text-amber-900">
+              ⚠️ {dupData.count} lead{dupData.count > 1 ? 's' : ''} en doublon détecté{dupData.count > 1 ? 's' : ''} dans votre base
             </span>
-            {dupExpanded
-              ? <ChevronUp className="w-4 h-4 text-amber-500" />
-              : <ChevronDown className="w-4 h-4 text-amber-500" />
-            }
-          </button>
+            <button
+              onClick={() => setDupExpanded((v) => !v)}
+              className="text-xs text-amber-700 underline hover:text-amber-900"
+            >
+              {dupExpanded ? 'Réduire' : 'Voir le détail'}
+            </button>
+          </div>
+          {/* Detail list — visible by default */}
           {dupExpanded && (
-            <div className="px-4 pb-3 border-t border-amber-200">
-              <ul className="mt-2 space-y-1">
+            <div className="px-4 py-3">
+              <ul className="space-y-1.5">
                 {dupData.groups.map((g, i) => (
-                  <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
-                    <span className="shrink-0 font-medium">
-                      {g.field === 'phone' ? 'Tél' : 'Email'} {g.value} :
+                  <li key={i} className="text-xs text-amber-800 flex items-start gap-2">
+                    <span className="shrink-0 font-semibold bg-amber-200 text-amber-900 rounded px-1.5 py-0.5">
+                      {g.field === 'phone' ? 'Tél' : 'Email'}
                     </span>
-                    <span>{g.leads.map((l) => `${l.first_name} ${l.last_name}`).join(', ')}</span>
+                    <span>
+                      <span className="font-medium">{g.value}</span>
+                      {' — '}
+                      {g.leads.map((l) => `${l.first_name} ${l.last_name}`).join(' · ')}
+                    </span>
                   </li>
                 ))}
               </ul>
