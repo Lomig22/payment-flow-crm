@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserX, BarChart2, Loader2 } from 'lucide-react';
+import { Plus, UserX, BarChart2, Loader2, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -44,6 +44,16 @@ export default function TeamPage() {
     mutationFn: (id: string) => usersApi.deactivate(id),
     onSuccess:  () => { toast.success('Utilisateur désactivé'); qc.invalidateQueries({ queryKey: ['users'] }); },
     onError:    () => toast.error('Erreur'),
+  });
+
+  const changeRole = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: 'admin' | 'setter' }) =>
+      usersApi.update(id, { role }),
+    onSuccess: (_, { role }) => {
+      toast.success(`Rôle mis à jour : ${role === 'admin' ? 'Admin' : 'Setter'}`);
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Erreur lors du changement de rôle'),
   });
 
   const createMutation = useMutation({
@@ -115,6 +125,23 @@ export default function TeamPage() {
                 <BarChart2 className="w-3.5 h-3.5" />
                 Stats
               </button>
+              {u.id !== user?.id && (
+                <button
+                  title={u.role === 'admin' ? 'Rétrograder en Setter' : 'Promouvoir en Admin'}
+                  onClick={() => {
+                    const newRole = u.role === 'admin' ? 'setter' : 'admin';
+                    const label   = newRole === 'admin' ? 'admin' : 'setter';
+                    if (confirm(`Changer le rôle de ${u.first_name} en ${label} ?`))
+                      changeRole.mutate({ id: u.id, role: newRole });
+                  }}
+                  className="btn-secondary btn-sm"
+                >
+                  {u.role === 'admin'
+                    ? <ShieldOff className="w-3.5 h-3.5 text-orange-500" />
+                    : <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                  }
+                </button>
+              )}
               {u.is_active && u.id !== user?.id && (
                 <button
                   onClick={() => { if (confirm(`Désactiver ${u.first_name} ?`)) deactivate.mutate(u.id); }}
