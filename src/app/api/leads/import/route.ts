@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
   };
 
   // ── Pass 1 : parse all records into structured rows ──────────────────────
-  type ParsedRow = Record<string, string> & { _lineNum: number; _extras: string[] };
+  type ParsedRow = Record<string, string>;
   const parsedRows: ParsedRow[] = [];
   const parseErrors: string[] = [];
 
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       row.notes = [row.notes, ...extras].filter(Boolean).join(' | ');
     }
 
-    parsedRows.push({ ...row, _lineNum: i + 2, _extras: extras });
+    parsedRows.push({ ...row, _lineNum: String(i + 2) });
   }
 
   // ── Pass 2 : bulk duplicate detection ────────────────────────────────────
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
   const duplicates: string[] = [];
 
   for (const row of parsedRows) {
-    const lineNum = row._lineNum;
+    const lineNum = Number(row._lineNum);
     const label   = `${row.first_name} ${row.last_name}`.trim();
 
     // Check phone duplicates
