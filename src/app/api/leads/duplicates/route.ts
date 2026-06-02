@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const groups: DuplicateGroup[] = [];
 
-  for (const [value, group] of phoneMap) {
+  Array.from(phoneMap.values()).forEach((group) => {
     if (group.length > 1) {
       groups.push({
         field: 'phone',
@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
         leads: group.map(({ id, first_name, last_name }) => ({ id, first_name, last_name })),
       });
     }
-  }
+  });
 
-  for (const [, group] of emailMap) {
+  Array.from(emailMap.values()).forEach((group) => {
     if (group.length > 1) {
       groups.push({
         field: 'email',
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         leads: group.map(({ id, first_name, last_name }) => ({ id, first_name, last_name })),
       });
     }
-  }
+  });
 
   // Total individual leads involved in at least one duplicate group
   const affectedIds = new Set(groups.flatMap((g) => g.leads.map((l) => l.id)));
