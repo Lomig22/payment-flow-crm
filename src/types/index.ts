@@ -90,6 +90,35 @@ export interface DashboardStats {
   }>;
 }
 
+export interface ConversationMember {
+  user_id: string;
+  users: { id: string; first_name: string; last_name: string } | null;
+}
+
+export interface Conversation {
+  id:          string;
+  name:        string | null;
+  is_group:    boolean;
+  updated_at:  string;
+  last_read_at: string | null;
+  unread_count: number;
+  last_message: {
+    content:    string;
+    created_at: string;
+    sender_id:  string;
+  } | null;
+  conversation_members: ConversationMember[];
+}
+
+export interface Message {
+  id:              string;
+  conversation_id: string;
+  sender_id:       string;
+  content:         string;
+  created_at:      string;
+  users: { id: string; first_name: string; last_name: string } | null;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: {

@@ -71,6 +71,16 @@ export const notificationsApi = {
   getRecent: () => api.get('/notifications'),
 };
 
+export const chatApi = {
+  getConversations:   () => api.get('/chat/conversations'),
+  createConversation: (data: { member_ids: string[]; name?: string; is_group?: boolean }) =>
+    api.post('/chat/conversations', data),
+  getMessages:        (convId: string) => api.get(`/chat/conversations/${convId}/messages`),
+  sendMessage:        (convId: string, content: string) =>
+    api.post(`/chat/conversations/${convId}/messages`, { content }),
+  markRead:           (convId: string) => api.put(`/chat/conversations/${convId}/read`),
+};
+
 export const tagsApi = {
   getAll: () => api.get<Tag[]>('/tags'),
   create: (data: Pick<Tag, 'name' | 'color'>) => api.post<Tag>('/tags', data),

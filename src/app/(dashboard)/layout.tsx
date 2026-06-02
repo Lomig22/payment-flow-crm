@@ -12,7 +12,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/import':    'Import CSV',
   '/team':      'Équipe',
   '/profile':   'Mon profil',
+  '/chat':      'Messages',
 };
+
+const NO_PADDING_PAGES = ['/chat'];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router          = useRouter();
@@ -50,7 +53,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header title={title} onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main className={`flex-1 min-h-0 ${
+          NO_PADDING_PAGES.some(p => pathname.startsWith(p))
+            ? 'overflow-hidden flex flex-col'
+            : 'overflow-y-auto p-4 lg:p-6'
+        }`}>
           {children}
         </main>
       </div>
