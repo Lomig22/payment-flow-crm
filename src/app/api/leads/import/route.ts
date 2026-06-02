@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData();
   const file           = formData.get('file') as File | null;
-  const assignmentMode = (formData.get('assignment_mode') as string | null) ?? 'round_robin';
+  let assignmentMode = (formData.get('assignment_mode') as string | null) ?? 'round_robin';
   const setterIdParam  = formData.get('setter_id') as string | null;
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
@@ -106,7 +106,9 @@ export async function POST(request: NextRequest) {
       setterIds = [setterIdParam];
     }
   } else {
+    // Setter imports are always assigned to themselves
     setterIds = [user.id];
+    assignmentMode = 'self';
   }
 
   const getNextSetter = (): string | null => {

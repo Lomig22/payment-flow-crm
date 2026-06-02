@@ -69,6 +69,7 @@ export default function ImportPage() {
   const MODE_LABELS: Record<string, string> = {
     round_robin: 'Round-robin',
     manual:      'Attribution manuelle',
+    self:        'Assigné à moi',
   };
 
   return (
