@@ -54,9 +54,10 @@ export const leadsApi = {
 };
 
 export const shiftsApi = {
-  start: () => api.post<{ id: string; started_at: string }>('/shifts/start'),
-  end:   (shiftId?: string) => api.post('/shifts/end', shiftId ? { shift_id: shiftId } : {}),
-  list:  (date?: string) => api.get<any[]>('/shifts', { params: date ? { date } : {} }),
+  start:     () => api.post<{ id: string; started_at: string }>('/shifts/start'),
+  end:       (shiftId?: string) => api.post('/shifts/end', shiftId ? { shift_id: shiftId } : {}),
+  heartbeat: () => api.post('/shifts/heartbeat'),
+  list:      (date?: string) => api.get<any[]>('/shifts', { params: date ? { date } : {} }),
 };
 
 export const usersApi = {

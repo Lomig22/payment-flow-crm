@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Clock, LogIn, LogOut, Loader2 } from 'lucide-react';
 import { shiftsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 
-const SHIFT_KEY = 'pf_shift_id';
+const SHIFT_KEY      = 'pf_shift_id';
 const SHIFT_DATE_KEY = 'pf_shift_date';
+const HEARTBEAT_MS   = 60_000; // 1 min
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -17,7 +18,8 @@ function StartModal({ onStarted }: { onStarted: (id: string) => void }) {
   const [time, setTime] = useState('');
 
   useEffect(() => {
-    const tick = () => setTime(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    const tick = () =>
+      setTime(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
@@ -53,10 +55,7 @@ function StartModal({ onStarted }: { onStarted: (id: string) => void }) {
             disabled={loading}
             className="btn-primary w-full justify-center py-3 text-base"
           >
-            {loading
-              ? <Loader2 className="w-5 h-5 animate-spin" />
-              : <LogIn className="w-5 h-5" />
-            }
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
             Début de shift
           </button>
         </div>
@@ -116,11 +115,38 @@ export function EndShiftModal({
 /* ── Main guard ───────────────────────────────────────────────────── */
 export default function ShiftGuard() {
   const user = useAuthStore((s) => s.user);
-  const [showStart, setShowStart]   = useState(false);
-  const [showEnd,   setShowEnd]     = useState(false);
-  const [shiftId,   setShiftId]     = useState<string | null>(null);
-  const [mounted,   setMounted]     = useState(false);
-  const endingRef = useRef(false);
+  const [showStart, setShowStart] = useState(false);
+  const [showEnd,   setShowEnd]   = useState(false);
+  const [shiftId,   setShiftId]   = useState<string | null>(null);
+  const [mounted,   setMounted]   = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (!mounted || !user) return;
+    // Admins skip shift tracking entirely
+    if (user.role === 'admin') return;
+
+    const storedId   = localStorage.getItem(SHIFT_KEY);
+    const storedDate = localStorage.getItem(SHIFT_DATE_KEY);
+
+    if (storedId && storedDate === today()) {
+      setShiftId(storedId);
+    } else {
+      localStorage.removeItem(SHIFT_KEY);
+      localStorage.removeItem(SHIFT_DATE_KEY);
+      setShowStart(true);
+    }
+  }, [mounted, user]);
+
+  // Heartbeat every 60s — keeps the shift alive; stops when shiftId is null
+  useEffect(() => {
+    if (!shiftId) return;
+    const tick = () => shiftsApi.heartbeat().catch(() => {});
+    tick(); // immediate first beat
+    const t = setInterval(tick, HEARTBEAT_MS);
+    return () => clearInterval(t);
+  }, [shiftId]);
 
   // Listen for "end shift" trigger dispatched by the Header button
   useEffect(() => {
@@ -129,61 +155,18 @@ export default function ShiftGuard() {
     return () => window.removeEventListener('pf:shift:end', handler);
   }, [shiftId]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted || !user) return;
-
-    const storedId   = localStorage.getItem(SHIFT_KEY);
-    const storedDate = localStorage.getItem(SHIFT_DATE_KEY);
-
-    if (storedId && storedDate === today()) {
-      // Already clocked in today
-      setShiftId(storedId);
-    } else {
-      // Clear stale shift data and show start modal
-      localStorage.removeItem(SHIFT_KEY);
-      localStorage.removeItem(SHIFT_DATE_KEY);
-      setShowStart(true);
-    }
-  }, [mounted, user]);
-
-  // beforeunload: send beacon to end shift when browser/tab closes
-  useEffect(() => {
-    if (!shiftId) return;
-
-    const handleUnload = () => {
-      if (endingRef.current) return;
-      const token = localStorage.getItem('pf_token');
-      if (!token) return;
-      navigator.sendBeacon(
-        '/api/shifts/end',
-        new Blob(
-          [JSON.stringify({ shift_id: shiftId })],
-          { type: 'application/json' }
-        )
-      );
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [shiftId]);
-
   const handleStarted = useCallback((id: string) => {
     setShiftId(id);
     setShowStart(false);
   }, []);
 
   const handleEndConfirmed = useCallback(() => {
-    endingRef.current = true;
     setShiftId(null);
     setShowEnd(false);
     setShowStart(true);
   }, []);
 
-  if (!mounted || !user) return null;
+  if (!mounted || !user || user.role === 'admin') return null;
 
   return (
     <>
@@ -197,13 +180,4 @@ export default function ShiftGuard() {
       )}
     </>
   );
-}
-
-/* Hook to trigger end-shift modal from any component */
-export function useShiftEnd() {
-  const triggerEnd = useCallback(() => {
-    const event = new CustomEvent('pf:shift:end');
-    window.dispatchEvent(event);
-  }, []);
-  return { triggerEnd };
 }
