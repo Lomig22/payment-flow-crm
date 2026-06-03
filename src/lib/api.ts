@@ -53,6 +53,12 @@ export const leadsApi = {
   duplicates: () => api.get<{ count: number; groups: { field: string; value: string; leads: { id: string; first_name: string; last_name: string }[] }[] }>('/leads/duplicates'),
 };
 
+export const shiftsApi = {
+  start: () => api.post<{ id: string; started_at: string }>('/shifts/start'),
+  end:   (shiftId?: string) => api.post('/shifts/end', shiftId ? { shift_id: shiftId } : {}),
+  list:  (date?: string) => api.get<any[]>('/shifts', { params: date ? { date } : {} }),
+};
+
 export const usersApi = {
   getAll:         (params?: Record<string, unknown>) => api.get<User[]>('/users', { params }),
   getOne:         (id: string) => api.get<User>(`/users/${id}`),

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, Bell, User, LogOut, ChevronRight } from 'lucide-react';
+import { Menu, Bell, User, LogOut, ChevronRight, Timer } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
@@ -107,6 +107,17 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
       <h1 className="text-lg font-semibold text-gray-900 flex-shrink-0">{title}</h1>
 
       <div className="flex items-center gap-2 ml-auto">
+
+        {/* ── Fin de shift ──────────────────────────── */}
+        {user?.role !== 'admin' && (
+          <button
+            onClick={() => window.dispatchEvent(new Event('pf:shift:end'))}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors"
+          >
+            <Timer className="w-3.5 h-3.5" />
+            Fin de shift
+          </button>
+        )}
 
         {/* ── Notifications ─────────────────────────── */}
         <div ref={notifRef} className="relative">

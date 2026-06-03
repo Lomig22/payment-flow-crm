@@ -3,16 +3,18 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
+import ShiftGuard from '@/components/shift/ShiftGuard';
 import { useAuthStore } from '@/store/authStore';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/leads':     'Leads',
-  '/pipeline':  'Pipeline',
-  '/import':    'Import CSV',
-  '/team':      'Équipe',
-  '/profile':   'Mon profil',
-  '/chat':      'Messages',
+  '/dashboard':  'Dashboard',
+  '/leads':      'Leads',
+  '/pipeline':   'Pipeline',
+  '/import':     'Import CSV',
+  '/team':       'Équipe',
+  '/profile':    'Mon profil',
+  '/chat':       'Messages',
+  '/ressources': 'Ressources',
 };
 
 const NO_PADDING_PAGES = ['/chat'];
@@ -49,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      <ShiftGuard />
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

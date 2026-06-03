@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, Kanban, Upload,
-  UsersRound, LogOut, Zap, User, X, Menu, MessageSquare,
+  UsersRound, LogOut, Zap, User, X, Menu, MessageSquare, BarChart3,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -16,9 +16,10 @@ const NAV_ITEMS = [
   { href: '/leads',     icon: Users,           label: 'Leads',        adminOnly: false },
   { href: '/pipeline',  icon: Kanban,          label: 'Pipeline',     adminOnly: false },
   { href: '/import',    icon: Upload,          label: 'Import CSV',   adminOnly: false },
-  { href: '/team',      icon: UsersRound,      label: 'Équipe',       adminOnly: true  },
-  { href: '/chat',      icon: MessageSquare,   label: 'Messages',     adminOnly: false },
-  { href: '/profile',   icon: User,            label: 'Mon profil',   adminOnly: false },
+  { href: '/team',       icon: UsersRound,    label: 'Équipe',       adminOnly: true  },
+  { href: '/ressources', icon: BarChart3,     label: 'Ressources',   adminOnly: true  },
+  { href: '/chat',       icon: MessageSquare, label: 'Messages',     adminOnly: false },
+  { href: '/profile',    icon: User,          label: 'Mon profil',   adminOnly: false },
 ];
 
 interface SidebarProps {
