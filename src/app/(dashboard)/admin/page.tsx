@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
-import { shiftsApi, socialAccountsApi, SocialAccount, SocialAccountPayload, SocialPlatform } from '@/lib/api';
+import { shiftsApi, socialAccountsApi, usersApi, SocialAccount, SocialAccountPayload, SocialPlatform } from '@/lib/api';
 import {
   Clock, UserCheck, UserX, Calendar, Timer,
   Instagram, Facebook, Plus, Pencil, Trash2, ExternalLink,
@@ -89,6 +89,11 @@ function AccountForm({ initial, defaultPlatform = 'instagram', onClose, onSaved 
     assigned_to:  initial?.assigned_to ?? '',
   });
   const [showPwd, setShowPwd] = useState(false);
+
+  const { data: setters = [] } = useQuery({
+    queryKey: ['users-setters'],
+    queryFn:  () => usersApi.getAll({ role: 'setter', is_active: 'true' }).then((r) => r.data),
+  });
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -217,13 +222,18 @@ function AccountForm({ initial, defaultPlatform = 'instagram', onClose, onSaved 
             <label className="block text-xs font-medium text-gray-700 mb-1">
               <User className="w-3.5 h-3.5 inline mr-1" />Attribué à
             </label>
-            <input
-              type="text"
+            <select
               value={form.assigned_to}
               onChange={set('assigned_to')}
-              placeholder="Nom du setter responsable"
-              className="input w-full"
-            />
+              className="select w-full"
+            >
+              <option value="">— Non assigné —</option>
+              {(setters as any[]).map((s) => (
+                <option key={s.id} value={`${s.first_name} ${s.last_name}`}>
+                  {s.first_name} {s.last_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Notes */}
