@@ -85,6 +85,9 @@ export async function POST(request: NextRequest) {
   const file           = formData.get('file') as File | null;
   let assignmentMode = (formData.get('assignment_mode') as string | null) ?? 'round_robin';
   const setterIdParam  = formData.get('setter_id') as string | null;
+  const VALID_SOURCE   = new Set(['instagram', 'facebook', 'cold_call']);
+  const rawSource      = formData.get('source') as string | null;
+  const leadSource     = rawSource && VALID_SOURCE.has(rawSource) ? rawSource : null;
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
@@ -288,6 +291,7 @@ export async function POST(request: NextRequest) {
       location:     row.location   || null,
       lead_quality: VALID_QUALITY.has(row.lead_quality) ? row.lead_quality : null,
       status:       VALID_STATUS.has(row.status) ? row.status : 'in_progress',
+      source:       leadSource,
       notes:        row.notes      || null,
       setter_id:    getNextSetter(),
     });

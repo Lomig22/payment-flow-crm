@@ -27,6 +27,7 @@ export default function ImportPage() {
   const [file,     setFile]     = useState<File | null>(null);
   const [mode,     setMode]     = useState<'round_robin' | 'manual'>('round_robin');
   const [setterId, setSetterId] = useState('');
+  const [source,   setSource]   = useState<string>('cold_call');
   const [result,   setResult]   = useState<ImportResult | null>(null);
 
   const { data: setters } = useQuery({
@@ -42,6 +43,7 @@ export default function ImportPage() {
       formData.append('file', file);
       formData.append('assignment_mode', mode);
       if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
+      if (source) formData.append('source', source);
       return leadsApi.import(formData).then((r) => r.data as ImportResult);
     },
     onSuccess: (data) => {
@@ -150,6 +152,29 @@ export default function ImportPage() {
             )}
           </div>
         )}
+
+        {/* Source channel */}
+        <div className="mt-5">
+          <label className="label">Canal d'acquisition</label>
+          <div className="flex gap-3">
+            {([
+              ['cold_call', '📞 Cold call',  'Prospection téléphonique'],
+              ['instagram', '📸 Instagram',  'Leads depuis Instagram'],
+              ['facebook',  '💬 Facebook',   'Leads depuis Facebook'],
+            ] as const).map(([val, title, desc]) => (
+              <label
+                key={val}
+                className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all
+                  ${source === val ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+              >
+                <input type="radio" value={val} checked={source === val}
+                  onChange={() => setSource(val)} className="sr-only" />
+                <p className="text-sm font-medium text-gray-800">{title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+              </label>
+            ))}
+          </div>
+        </div>
 
         <button
           onClick={() => mutation.mutate()}
