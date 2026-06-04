@@ -31,3 +31,9 @@ Thumbs.db
 
 # Uploads (runtime)
 backend/uploads/
+.vercel
+
+# Large source PDFs (too big for GitHub — copy to public/docs/ manually if needed)
+ressource/
+package-lock.json
+next-env.d.ts

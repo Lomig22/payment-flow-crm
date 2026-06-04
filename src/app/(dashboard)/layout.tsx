@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/profile':    'Mon profil',
   '/chat':       'Messages',
   '/ressources': 'Ressources',
+  '/admin':      'Admin',
 };
 
 const NO_PADDING_PAGES = ['/chat'];
