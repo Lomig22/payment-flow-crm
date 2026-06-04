@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const body = await request.json();
   const allowed = ['first_name','last_name','company','phone','email','location','called',
     'action_in_progress','lead_quality','need_identified','appointment_taken','appointment_honored',
-    'quote_sent','r2_planned','r3_planned','status','notes'];
+    'quote_sent','r2_planned','r3_planned','status','source','notes'];
   if (user.role === 'admin') allowed.push('setter_id');
 
   const updates: Record<string, unknown> = {};

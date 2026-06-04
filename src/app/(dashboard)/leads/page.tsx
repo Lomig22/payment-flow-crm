@@ -14,7 +14,7 @@ import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import LeadForm from '@/components/leads/LeadForm';
 import { formatDate, ACTION_LABELS } from '@/lib/utils';
-import type { Lead, LeadsFilters, LeadStatus, LeadQuality } from '@/types';
+import type { Lead, LeadsFilters, LeadStatus, LeadQuality, LeadSource } from '@/types';
 
 export default function LeadsPage() {
   const router       = useRouter();
@@ -214,6 +214,17 @@ export default function LeadsPage() {
           <option value="hot">Chaud</option>
           <option value="warm">Tiède</option>
           <option value="cold">Froid</option>
+        </select>
+
+        <select
+          className="select w-auto text-sm"
+          value={filters.source ?? ''}
+          onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value as LeadSource | '', page: 1 }))}
+        >
+          <option value="">Toutes sources</option>
+          <option value="instagram">📸 Instagram</option>
+          <option value="facebook">💬 Facebook</option>
+          <option value="cold_call">📞 Cold call</option>
         </select>
 
         {isAdmin && setters && (

@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
   const setter_id = searchParams.get('setter_id');
   const status    = searchParams.get('status');
   const quality   = searchParams.get('quality');
+  const source    = searchParams.get('source');
   const search    = searchParams.get('search');
   const page      = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit     = Math.min(100, parseInt(searchParams.get('limit') || '20'));
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
   }
   if (status)  q = q.eq('status', status);
   if (quality) q = q.eq('lead_quality', quality);
+  if (source)  q = q.eq('source', source);
   if (search)  q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`);
 
   q = q.order(sort, { ascending: asc }).range(offset, offset + limit - 1);
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
   const { first_name, last_name, company, phone, email, location,
           called, action_in_progress, lead_quality, need_identified,
           setter_id, appointment_taken, appointment_honored, quote_sent,
-          r2_planned, r3_planned, status, notes } = body;
+          r2_planned, r3_planned, status, source, notes } = body;
 
   if (!first_name || !last_name) {
     return NextResponse.json({ message: 'Prénom et nom sont requis' }, { status: 400 });
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
       setter_id: assignedTo, appointment_taken: appointment_taken || false,
       appointment_honored: appointment_honored || false, quote_sent: quote_sent || false,
       r2_planned: r2_planned || false, r3_planned: r3_planned || false,
-      status: status || 'in_progress', notes: notes || null,
+      status: status || 'in_progress', source: source || null, notes: notes || null,
     })
     .select()
     .single();

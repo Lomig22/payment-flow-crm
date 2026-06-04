@@ -5,17 +5,21 @@ import { supabase } from '@/lib/supabase';
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
-  if (user.role !== 'admin') return forbidden();
 
   const db = supabase as any;
   const { searchParams } = new URL(request.url);
-  const platform = searchParams.get('platform'); // 'instagram' | 'facebook' | null
+  const platform = searchParams.get('platform');
 
   let query = db
     .from('social_accounts')
     .select('*, users!created_by ( id, first_name, last_name )')
     .order('platform')
     .order('account_name');
+
+  // Setters only see their own accounts
+  if (user.role !== 'admin') {
+    query = query.eq('created_by', user.id);
+  }
 
   if (platform) query = query.eq('platform', platform);
 
@@ -27,10 +31,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
-  if (user.role !== 'admin') return forbidden();
 
   const body = await request.json();
-  const { platform, account_name, username, url, notes, assigned_to } = body;
+  const { platform, account_name, username, login, password, url, notes, assigned_to } = body;
 
   if (!platform || !account_name) {
     return NextResponse.json({ message: 'Plateforme et nom de compte requis' }, { status: 400 });
@@ -42,7 +45,17 @@ export async function POST(request: NextRequest) {
   const db = supabase as any;
   const { data, error } = await db
     .from('social_accounts')
-    .insert({ platform, account_name, username: username || null, url: url || null, notes: notes || null, assigned_to: assigned_to || null, created_by: user.id })
+    .insert({
+      platform,
+      account_name,
+      username:    username    || null,
+      login:       login       || null,
+      password:    password    || null,
+      url:         url         || null,
+      notes:       notes       || null,
+      assigned_to: assigned_to || null,
+      created_by:  user.id,
+    })
     .select()
     .single();
 

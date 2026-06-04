@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import type { Lead } from '@/types';
+import type { Lead, LeadSource } from '@/types';
 
 const schema = z.object({
   first_name:         z.string().min(1, 'Prénom requis'),
@@ -27,6 +27,7 @@ const schema = z.object({
   r2_planned:         z.boolean().default(false),
   r3_planned:         z.boolean().default(false),
   status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']).default('in_progress'),
+  source:             z.enum(['instagram', 'facebook', 'cold_call']).optional().or(z.literal('')),
   notes:              z.string().optional(),
 });
 
@@ -69,6 +70,7 @@ export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           r2_planned:          lead.r2_planned,
           r3_planned:          lead.r3_planned,
           status:              lead.status,
+          source:              lead.source ?? '' as any,
           notes:               lead.notes ?? '',
         }
       : undefined,
@@ -76,7 +78,7 @@ export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
-      const payload = { ...data, lead_quality: data.lead_quality || undefined };
+      const payload = { ...data, lead_quality: data.lead_quality || undefined, source: (data.source as LeadSource) || undefined };
       return lead
         ? leadsApi.update(lead.id, payload).then((r) => r.data)
         : leadsApi.create(payload).then((r) => r.data);
@@ -162,6 +164,14 @@ export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
             <option value="r2">R2 pris</option>
             <option value="client">Client</option>
             <option value="lost">Perdu</option>
+          </select>
+        </F>
+        <F label="Source" name="source">
+          <select {...register('source')} className="select">
+            <option value="">— Inconnue —</option>
+            <option value="instagram">📸 Instagram</option>
+            <option value="facebook">💬 Facebook</option>
+            <option value="cold_call">📞 Cold call</option>
           </select>
         </F>
       </div>

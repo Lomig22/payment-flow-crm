@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
-import { shiftsApi, socialAccountsApi, SocialAccount, SocialPlatform } from '@/lib/api';
+import { shiftsApi, socialAccountsApi, SocialAccount, SocialAccountPayload, SocialPlatform } from '@/lib/api';
 import {
   Clock, UserCheck, UserX, Calendar, Timer,
   Instagram, Facebook, Plus, Pencil, Trash2, ExternalLink,
-  X, Loader2, AtSign, Link, StickyNote, User,
+  X, Loader2, AtSign, Link, StickyNote, User, Eye, EyeOff,
 } from 'lucide-react';
 import Spinner from '@/components/ui/Spinner';
 import { useRouter } from 'next/navigation';
@@ -82,16 +82,19 @@ function AccountForm({ initial, defaultPlatform = 'instagram', onClose, onSaved 
     platform:     (initial?.platform ?? defaultPlatform) as SocialPlatform,
     account_name: initial?.account_name ?? '',
     username:     initial?.username ?? '',
+    login:        initial?.login ?? '',
+    password:     initial?.password ?? '',
     url:          initial?.url ?? '',
     notes:        initial?.notes ?? '',
     assigned_to:  initial?.assigned_to ?? '',
   });
+  const [showPwd, setShowPwd] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () =>
       initial
         ? socialAccountsApi.update(initial.id, form)
-        : socialAccountsApi.create(form),
+        : socialAccountsApi.create(form as SocialAccountPayload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['social-accounts'] });
       onSaved();
@@ -189,6 +192,26 @@ function AccountForm({ initial, defaultPlatform = 'instagram', onClose, onSaved 
             />
           </div>
 
+          {/* Login + Password */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email / Login</label>
+              <input type="text" value={form.login} onChange={set('login')}
+                placeholder="email@exemple.com" className="input w-full" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Mot de passe</label>
+              <div className="relative">
+                <input type={showPwd ? 'text' : 'password'} value={form.password} onChange={set('password')}
+                  placeholder="••••••••" className="input w-full pr-8" />
+                <button type="button" onClick={() => setShowPwd((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Assigned to */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -247,6 +270,7 @@ function AccountCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [showPwd, setShowPwd] = useState(false);
   const cfg = PLATFORM_CONFIG[account.platform];
   return (
     <div className={`card p-4 border-l-4 ${account.platform === 'instagram' ? 'border-l-pink-400' : 'border-l-blue-400'}`}>
@@ -264,32 +288,50 @@ function AccountCard({
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {account.url && (
-            <a
-              href={account.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-            >
+            <a href={account.url} target="_blank" rel="noopener noreferrer"
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
-          <button
-            onClick={onEdit}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onEdit}
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500"
-          >
+          <button onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
+      {/* Credentials */}
+      {(account.login || account.password) && (
+        <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs">
+          {account.login && (
+            <div>
+              <p className="text-gray-400">Login</p>
+              <p className="font-medium text-gray-700 truncate">{account.login}</p>
+            </div>
+          )}
+          {account.password && (
+            <div>
+              <p className="text-gray-400">Mot de passe</p>
+              <div className="flex items-center gap-1">
+                <p className="font-mono font-medium text-gray-700 truncate">
+                  {showPwd ? account.password : '••••••••'}
+                </p>
+                <button onClick={() => setShowPwd((v) => !v)}
+                  className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                  {showPwd ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {(account.assigned_to || account.notes) && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
           {account.assigned_to && (
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <User className="w-3 h-3 text-gray-400" />

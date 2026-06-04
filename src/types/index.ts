@@ -2,6 +2,7 @@ export type UserRole    = 'admin' | 'setter';
 export type LeadQuality = 'hot' | 'warm' | 'cold';
 export type LeadStatus  = 'lost' | 'in_progress' | 'client' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2';
 export type ActionType  = 'to_call' | 'callback' | 'follow_up' | 'negotiation' | 'no_action';
+export type LeadSource  = 'instagram' | 'facebook' | 'cold_call';
 
 export interface User {
   id:         string;
@@ -54,6 +55,7 @@ export interface Lead {
   r2_planned:          boolean;
   r3_planned:          boolean;
   status:              LeadStatus;
+  source?:             LeadSource | null;
   notes?:              string;
   tags?:               Tag[];
   history?:            LeadHistory[];
@@ -133,6 +135,7 @@ export interface LeadsFilters {
   setter_id?: string;
   status?:    LeadStatus | '';
   quality?:   LeadQuality | '';
+  source?:    LeadSource | '';
   search?:    string;
   page?:      number;
   limit?:     number;

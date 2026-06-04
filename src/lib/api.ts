@@ -103,6 +103,8 @@ export interface SocialAccount {
   platform: SocialPlatform;
   account_name: string;
   username: string | null;
+  login: string | null;
+  password: string | null;
   url: string | null;
   notes: string | null;
   assigned_to: string | null;
@@ -110,12 +112,14 @@ export interface SocialAccount {
   created_at: string;
 }
 
+export type SocialAccountPayload = Omit<SocialAccount, 'id' | 'created_by' | 'created_at'>;
+
 export const socialAccountsApi = {
   getAll:  (platform?: SocialPlatform) =>
     api.get<SocialAccount[]>('/social-accounts', { params: platform ? { platform } : {} }),
-  create:  (data: Omit<SocialAccount, 'id' | 'created_by' | 'created_at'>) =>
+  create:  (data: SocialAccountPayload) =>
     api.post<SocialAccount>('/social-accounts', data),
-  update:  (id: string, data: Partial<Omit<SocialAccount, 'id' | 'created_by' | 'created_at'>>) =>
+  update:  (id: string, data: Partial<SocialAccountPayload>) =>
     api.put<SocialAccount>(`/social-accounts/${id}`, data),
   delete:  (id: string) => api.delete(`/social-accounts/${id}`),
 };
