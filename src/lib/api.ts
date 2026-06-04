@@ -95,3 +95,27 @@ export const tagsApi = {
   update: (id: string, data: Partial<Tag>) => api.put<Tag>(`/tags/${id}`, data),
   delete: (id: string) => api.delete(`/tags/${id}`),
 };
+
+export type SocialPlatform = 'instagram' | 'facebook';
+
+export interface SocialAccount {
+  id: string;
+  platform: SocialPlatform;
+  account_name: string;
+  username: string | null;
+  url: string | null;
+  notes: string | null;
+  assigned_to: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export const socialAccountsApi = {
+  getAll:  (platform?: SocialPlatform) =>
+    api.get<SocialAccount[]>('/social-accounts', { params: platform ? { platform } : {} }),
+  create:  (data: Omit<SocialAccount, 'id' | 'created_by' | 'created_at'>) =>
+    api.post<SocialAccount>('/social-accounts', data),
+  update:  (id: string, data: Partial<Omit<SocialAccount, 'id' | 'created_by' | 'created_at'>>) =>
+    api.put<SocialAccount>(`/social-accounts/${id}`, data),
+  delete:  (id: string) => api.delete(`/social-accounts/${id}`),
+};
