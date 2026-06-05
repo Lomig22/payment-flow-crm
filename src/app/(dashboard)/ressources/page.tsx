@@ -312,108 +312,184 @@ Cordialement,
       <Section id="chatting" icon={<MessageSquare className="w-5 h-5 text-pink-600" />}
         title="Scripts DM Chatting" badge="Instagram / Facebook" color="border-pink-300">
 
+        {/* Règle d'or */}
+        <div className="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-bold text-pink-800 flex items-center gap-2">
+            <span className="text-base">⭐</span> RÈGLE D'OR
+          </p>
+          <p className="text-sm text-pink-700">Peu importe ce que le client répond, l'objectif est <strong>TOUJOURS</strong> de l'amener vers le call Calendly.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+            {[
+              { trigger: 'Il dit OUI', action: 'Copie-colle le Message 2 directement', color: 'bg-green-100 text-green-800 border-green-300' },
+              { trigger: 'Il répond AUTRE CHOSE', action: 'Va sur ChatGPT (voir section dédiée ci-dessous)', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+              { trigger: 'PAS DE RÉPONSE', action: 'Attends 2 jours puis relance (max 2 relances)', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+            ].map(({ trigger, action, color }) => (
+              <div key={trigger} className={`rounded-lg border p-2.5 text-xs ${color}`}>
+                <p className="font-bold mb-0.5">{trigger}</p>
+                <p>{action}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Cas 1 — Sans site */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="w-5 h-5 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center justify-center">1</span>
             CAS 1 — Prospect sans site web
           </h3>
-          <Script label="🟢 Message 1 — Curiosité" color="border-green-300" text={`👋 Bonjour (Prénom),
+          <Script label="Message 1 — À envoyer en premier" color="border-green-300" text={`Bonjour (Prénom),
 
 J'ai pris 15 minutes pour créer un aperçu de site web pensé spécifiquement pour (Entreprise).
+Rien à vendre ici - juste un visuel que j'aimerais vous montrer.
 
-Rien à vendre ici — juste un visuel que j'aimerais vous montrer.
+Je vous le montre ?`} />
+          <InfoBox type="info">Remplace <strong>(Prénom)</strong> par le vrai prénom et <strong>(Entreprise)</strong> par le nom du commerce. Ne change rien d'autre.</InfoBox>
 
-👉 Je vous le montre ?`} />
-          <Script label="🟡 Message 2 — Humanisation (CLÉ) — quand il dit oui" color="border-yellow-300" text={`Super 😃😊
+          <Script label="Message 2 — Quand il dit OUI (envoyer immédiatement)" color="border-yellow-300" text={`Super ! Je viens de terminer l'aperçu de votre site web !
+Je suis certain qu'il correspond parfaitement à votre image
 
-Je viens de terminer l'aperçu de votre site web ! Je suis certain qu'il correspond parfaitement à votre image 😊
+Je vous propose que l'on planifie ensemble un moment d'échange pour que je vous le présente ?
+Je vous montrerai comment ce site peut devenir un vrai levier pour développer votre chiffre d'affaires, sans que vous ayez à prospecter
 
-Je vous propose que l'on planifie ensemble un moment d'échange pour que je vous le présente ? Je vous montrerai comment ce site peut devenir un vrai levier pour développer votre chiffre d'affaires, sans que vous ayez à prospecter 🚀
-
-👉 Quel horaire vous conviendrait le plus (Prénom) ?
+Quel horaire vous conviendrait le plus (Prénom) ?
 (Lien Calendly)`} />
+          <InfoBox type="warning">Remplace <strong>(Prénom)</strong> et <strong>(Lien Calendly)</strong> avant d'envoyer. Envoie dès qu'il dit oui, ne tarde pas.</InfoBox>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Script label="🔴 Relance 1 — J+2" color="border-red-200" text={`Bonjour (Prénom) 😊
+            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom)
 
 Je voulais juste m'assurer que mon message vous avait bien atteint !
-
 L'aperçu de votre site est prêt, ça prend 10 minutes à regarder ensemble et ça pourrait vraiment changer la donne pour (Entreprise).
 
-👉 On se cale un moment cette semaine ?`} />
-            <Script label="🔴 Relance 2 — J+5" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message 🙏
+On se cale un moment cette semaine ?`} />
+            <Script label="Relance 2 — J+5 (dernière)" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message
 
 J'ai mis du temps sur cet aperçu spécifiquement pour vous, ce serait dommage de ne pas en profiter.
 
 Si ce n'est pas le bon moment, pas de souci, dites-le moi juste et je ne vous recontacte plus.
 
-👉 Sinon, 10 minutes suffisent : (Lien Calendly)`} />
+Sinon, 10 minutes suffisent : (Lien Calendly)`} />
+          </div>
+          <InfoBox type="danger">Après la Relance 2, même sans réponse → <strong>STOP</strong>. Passe à la personne suivante. Ne jamais envoyer un 3ème message de relance.</InfoBox>
+        </div>
+
+        {/* Réflexe ChatGPT */}
+        <div className="rounded-xl border-2 border-purple-300 overflow-hidden">
+          <div className="bg-purple-50 px-4 py-3 flex items-center gap-2">
+            <span className="text-lg">🤖</span>
+            <div>
+              <p className="text-sm font-bold text-purple-800">Réflexe ChatGPT — Quand il répond autre chose que oui</p>
+              <p className="text-xs text-purple-600">Il dit "C'est quoi ?", "Combien ça coûte ?", "J'ai pas le temps"... → utilise ChatGPT</p>
+            </div>
+          </div>
+          <div className="p-4 bg-white space-y-3">
+            <div className="space-y-2">
+              {[
+                { step: '1', text: 'Ouvre ChatGPT sur chatgpt.com (gratuit)' },
+                { step: '2', text: 'Copie le prompt ci-dessous dans ChatGPT en remplaçant les parties entre parenthèses' },
+                { step: '3', text: 'ChatGPT te donne une réponse toute faite → relis rapidement → copie → envoie au prospect' },
+                { step: '4', text: 'Si le prospect répond encore autre chose → retourne sur ChatGPT, ajoute la nouvelle réponse et redemande. Tu peux continuer dans le même chat.' },
+              ].map(({ step, text }) => (
+                <div key={step} className="flex gap-2 text-sm text-gray-700">
+                  <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{step}</span>
+                  {text}
+                </div>
+              ))}
+            </div>
+            <Script label="Prompt ChatGPT — Copie-colle ce texte exact" color="border-purple-300" text={`Tu es un expert en prospection commerciale sur Instagram et Facebook DM.
+Je prospecte des entreprises locales pour leur vendre des sites web.
+
+Voici ma trame de prospection :
+- Message 1 : je leur dis que j'ai créé un aperçu de site spécialement pour eux et je demande si je peux le montrer
+- Si oui : je propose un call de 10 min via Calendly pour leur présenter
+- Objectif final : toujours amener le prospect vers le call Calendly
+
+Voici mon échange avec le prospect jusqu'ici :
+MOI : (colle ton Message 1 ici)
+LUI : (colle exactement ce qu'il a répondu)
+
+Rédige-moi une réponse courte, naturelle et chaleureuse qui respecte ma trame et qui ramène doucement vers le call Calendly.
+Ton décontracté, pas trop commercial. En français.`} />
+            <InfoBox type="info">Si la réponse te semble trop longue, dis à ChatGPT <strong>"plus court"</strong> ou <strong>"plus simple"</strong> et il refait.</InfoBox>
           </div>
         </div>
 
         {/* Cas 2 — Avec site */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="w-5 h-5 bg-blue-100 text-blue-700 rounded text-xs font-bold flex items-center justify-center">2</span>
             CAS 2 — Prospect avec site web existant
           </h3>
-          <Script label="🟢 Message 1" color="border-green-300" text={`👋 Salut (Prénom),
+          <Script label="Message 1 — À envoyer en premier" color="border-green-300" text={`Salut (Prénom),
 
 J'ai pris quelques minutes pour regarder (Entreprise).
-
 J'ai remarqué un point intéressant sur votre présence en ligne.
-
 Juste un retour si ça peut être utile.
 
-👉 Je vous le partage ?`} />
-          <Script label="🟡 Message 2 — quand il dit oui" color="border-yellow-300" text={`Super 😃
+Je vous le partage ?`} />
+          <InfoBox type="warning"><strong>AVANT D'ENVOYER :</strong> note quelque chose de concret que tu as vu sur leur site (page lente, pas de bouton contact, mauvais affichage mobile...). Tu en auras besoin pour le call.</InfoBox>
+
+          <Script label="Message 2 — Quand il dit OUI" color="border-yellow-300" text={`Super !
 
 Je vous propose que l'on planifie ensemble un moment d'échange pour en discuter ?
 
-👉 Quel horaire vous conviendrait le plus (Prénom) ?
+Quel horaire vous conviendrait le plus (Prénom) ?
 (Lien Calendly)`} />
+          <InfoBox type="danger"><strong>NE RÉVÈLE PAS</strong> le "point" par message ! Garde-le pour le call. C'est ton argument de vente principal.</InfoBox>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Script label="🔴 Relance 1 — J+2" color="border-red-200" text={`Bonjour (Prénom) 😊
+            <Script label="Relance 1 — J+2" color="border-red-200" text={`Bonjour (Prénom)
 
 Je voulais m'assurer que vous aviez bien vu mon message !
-
 Le point que j'ai remarqué sur (Entreprise) peut vraiment faire la différence, ça vaut 10 minutes d'échange.
 
-👉 On se cale un moment cette semaine ?`} />
-            <Script label="🔴 Relance 2 — J+5" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message 🙏
+On se cale un moment cette semaine ?`} />
+            <Script label="Relance 2 — J+5 (dernière)" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message
 
 J'ai quelque chose de concret à vous partager sur votre présence en ligne, pas du blabla, un vrai retour terrain.
-
 Si ce n'est pas le bon moment, dites-le moi et je n'insiste plus.
 
-👉 Sinon : (Lien Calendly)`} />
+Sinon : (Lien Calendly)`} />
           </div>
+          <InfoBox type="info">Même réflexe que le Cas 1 si il répond autre chose : va sur ChatGPT avec le même prompt, en adaptant juste la description de ta trame.</InfoBox>
         </div>
 
-        {/* Schéma contact */}
+        {/* Schéma parcours */}
         <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            📊 Schéma du parcours de contact
-          </h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">📊 Schéma du parcours de contact</h3>
           <div className="flex items-center gap-2 text-xs text-center overflow-x-auto pb-1">
             {[
               { label: 'MSG 1', sub: 'J0', color: 'bg-green-100 text-green-700 border-green-300' },
-              { label: '→', sub: 'J+2', color: 'bg-transparent text-gray-400 border-transparent' },
+              { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
               { label: 'RELANCE 1', sub: 'J+2', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-              { label: '→', sub: 'J+5', color: 'bg-transparent text-gray-400 border-transparent' },
+              { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
               { label: 'RELANCE 2', sub: 'J+5', color: 'bg-red-100 text-red-700 border-red-300' },
               { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
-              { label: 'STOP', sub: 'Archiver', color: 'bg-gray-100 text-gray-600 border-gray-300' },
+              { label: 'STOP', sub: 'Personne suivante', color: 'bg-gray-100 text-gray-600 border-gray-300' },
             ].map(({ label, sub, color }, i) => (
-              <div key={i} className={`flex-shrink-0 ${label === '→' ? '' : `rounded-lg border px-3 py-2 ${color}`}`}>
+              <div key={i} className={`flex-shrink-0 ${label === '→' ? 'text-gray-400 font-bold' : `rounded-lg border px-3 py-2 ${color}`}`}>
                 <p className="font-bold">{label}</p>
                 {sub && <p className="text-gray-500 text-xs">{sub}</p>}
               </div>
             ))}
           </div>
-          <InfoBox type="info">
-            Si le lead répond à n'importe quelle étape → il passe immédiatement en pipe commercial. Après Relance 2 sans réponse → archiver, ne plus recontacter.
-          </InfoBox>
+        </div>
+
+        {/* 4 règles d'or */}
+        <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-4 space-y-2">
+          <p className="text-sm font-bold text-amber-800">📋 Rappel des 4 règles d'or</p>
+          {[
+            'Toujours remplacer (Prénom), (Entreprise) et (Lien Calendly) avant d\'envoyer.',
+            'Ne jamais donner le prix ou tous les détails par message — l\'objectif est toujours le call.',
+            'Maximum 2 relances. Après ça, passe à la personne suivante.',
+            'Toujours rester poli même si la personne dit non.',
+          ].map((rule, i) => (
+            <div key={i} className="flex gap-2 text-sm text-amber-800">
+              <span className="font-bold flex-shrink-0">{i + 1}.</span>
+              {rule}
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -542,6 +618,7 @@ Si ce n'est pas le bon moment, dites-le moi et je n'insiste plus.
         title="Documents à télécharger" color="border-gray-300">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
+            { name: 'Script Prospection DM',          file: 'script-prospection-dm.pdf', desc: 'Guide opérationnel complet IG & FB — Cas 1, Cas 2, ChatGPT, relances', color: 'text-pink-600 bg-pink-50 border-pink-200'       },
             { name: 'Processus Warm-Up complet',    file: 'processus-warmup.pdf',    desc: 'Guide opérationnel 17 pages — comptes IG & FB',    color: 'text-orange-600 bg-orange-50 border-orange-200' },
             { name: 'Script de Chatting',           file: 'script-chatting.pdf',    desc: 'Scripts DM Instagram & Facebook avec relances',    color: 'text-pink-600 bg-pink-50 border-pink-200'       },
             { name: 'Setting — Onboarding',         file: 'setting-onboarding.pdf', desc: 'Guide du setter : scripts cold call et processus', color: 'text-green-600 bg-green-50 border-green-200'    },
