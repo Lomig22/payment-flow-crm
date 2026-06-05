@@ -32,11 +32,16 @@ const KEYWORDS_STATUT = [
 const EMAIL_REGEX = /[\w.+\-]+@[\w\-]+\.[a-z]{2,6}/i;
 
 function scoreProfile(bio: string, followers: number, externalUrl: string, latestPost: string | null) {
-  let score = 0;
-  const details: string[] = [];
   const bl = bio.toLowerCase();
 
-  if (KEYWORDS_METIER.some((k) => bl.includes(k))) { score += 20; details.push('métier+20'); }
+  // MANDATORY: le bio doit mentionner le métier BTP — sinon ce n'est pas notre cible
+  if (!KEYWORDS_METIER.some((k) => bl.includes(k))) {
+    return { score: 0, score_details: 'pas de métier BTP en bio', email_bio: null };
+  }
+
+  let score = 20;
+  const details: string[] = ['métier+20'];
+
   if (!externalUrl) { score += 25; details.push('sans-site+25'); }
 
   const emailMatch = bio.match(EMAIL_REGEX);

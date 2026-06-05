@@ -4,9 +4,12 @@ import { supabase } from '@/lib/supabase';
 
 const APIFY_BASE = 'https://api.apify.com/v2';
 
+// Hashtags utilisés quasi exclusivement par les professionnels BTP (pas les particuliers)
 const HASHTAGS = [
-  'electricien', 'plombier', 'carreleur', 'peintre', 'macon',
-  'couvreur', 'menuisier', 'artisanbtp', 'btpfrance', 'renovationmaison',
+  'artisanbtp', 'artisanfrancais', 'btpfrance', 'electricienagréé',
+  'plombierqualifié', 'couvreurprofessionnel', 'maconprofessionnel',
+  'menuisierprofessionnel', 'peintreprofessionnel', 'carreleurprofessionnel',
+  'autoentrepreneurbt', 'travauxtpe', 'devisartisan', 'artisanqualibat',
 ];
 
 function encodeWebhooks(requestUrl: string) {
