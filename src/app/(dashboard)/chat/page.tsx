@@ -188,9 +188,17 @@ export default function ChatPage() {
   const { data: conversations = [], isLoading: convsLoading, isError: convsError } = useQuery({
     queryKey: ['chat-conversations'],
     queryFn:  () => chatApi.getConversations().then((r) => r.data as Conversation[]),
+    enabled:  !!user,
     refetchInterval: 5000,
-    retry: 1,
+    retry: 2,
   });
+
+  /* Auto-sélectionner la conversation la plus récente si aucune n'est active */
+  useEffect(() => {
+    if (!activeId && conversations.length > 0) {
+      openConversation(conversations[0].id);
+    }
+  }, [conversations]); // eslint-disable-line
 
   /* ── Messages for active conversation (poll every 2s) */
   const { data: messages = [], isLoading: msgsLoading } = useQuery({

@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, Bell, User, LogOut, ChevronRight, Timer } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import { notificationsApi, authApi } from '@/lib/api';
@@ -35,6 +35,7 @@ function getLeadName(entry: any): string {
 export default function Header({ title, onMenuClick }: HeaderProps) {
   const router              = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const qc                  = useQueryClient();
 
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -91,6 +92,7 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
   const handleLogout = async () => {
     setProfileOpen(false);
     try { await authApi.logout(); } catch (_) {}
+    qc.clear(); // vide tout le cache React Query avant de partir
     clearAuth();
     toast.success('Déconnexion réussie');
     router.push('/login');

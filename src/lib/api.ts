@@ -19,7 +19,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('pf_token');
-      localStorage.removeItem('pf_user');
+      localStorage.removeItem('pf_auth'); // clé Zustand persist correcte
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
