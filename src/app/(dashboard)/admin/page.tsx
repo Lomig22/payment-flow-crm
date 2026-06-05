@@ -7,7 +7,7 @@ import {
   Clock, UserCheck, UserX, Calendar, Timer,
   Instagram, Facebook, Plus, Pencil, Trash2, ExternalLink,
   X, Loader2, AtSign, Link, StickyNote, User, Eye, EyeOff,
-  PhoneCall, CalendarCheck, Trophy, ChevronLeft, ChevronRight,
+  History, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Spinner from '@/components/ui/Spinner';
 import { useRouter } from 'next/navigation';
@@ -476,6 +476,153 @@ function SocialAccountsSection() {
   );
 }
 
+/* ─── Shift history modal ─────────────────────────────────────────── */
+
+function ShiftHistoryModal({ onClose }: { onClose: () => void }) {
+  const thirtyDaysAgo = (() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10);
+  })();
+  const [start, setStart] = useState(thirtyDaysAgo);
+  const [end,   setEnd]   = useState(new Date().toISOString().slice(0, 10));
+
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['shifts-history', start, end],
+    queryFn:  () =>
+      fetch(`/api/shifts/history?start=${start}&end=${end}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('pf_token')}` },
+      }).then((r) => r.json()),
+    staleTime: 60_000,
+  });
+
+  const byDay = (history as any[]).reduce((acc: Record<string, any[]>, shift) => {
+    const day = shift.started_at.slice(0, 10);
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(shift);
+    return acc;
+  }, {});
+
+  const days = Object.keys(byDay).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5 text-indigo-500" />
+            <h2 className="font-bold text-gray-900">Historique des shifts</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs text-gray-500 font-medium">Période :</span>
+          <input type="date" value={start} onChange={(e) => setStart(e.target.value)}
+            className="input py-1 text-sm w-auto" />
+          <span className="text-xs text-gray-400">→</span>
+          <input type="date" value={end} max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setEnd(e.target.value)}
+            className="input py-1 text-sm w-auto" />
+          <span className="text-xs text-gray-400 ml-auto">
+            {(history as any[]).length} shift{(history as any[]).length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-y-auto flex-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+            </div>
+          ) : days.length === 0 ? (
+            <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+              Aucun shift sur cette période.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b border-gray-200 text-xs text-gray-500 font-medium">
+                  <th className="text-left px-6 py-3">Date</th>
+                  <th className="text-left px-4 py-3">Setter</th>
+                  <th className="text-left px-4 py-3">Début</th>
+                  <th className="text-left px-4 py-3">Fin</th>
+                  <th className="text-left px-4 py-3">Durée</th>
+                  <th className="text-center px-4 py-3">Appels</th>
+                  <th className="text-center px-4 py-3">RDV</th>
+                  <th className="text-center px-4 py-3">Clients</th>
+                </tr>
+              </thead>
+              <tbody>
+                {days.map((day) => {
+                  const dayShifts = byDay[day];
+                  const label = new Date(day + 'T12:00:00').toLocaleDateString('fr-FR', {
+                    weekday: 'long', day: 'numeric', month: 'long',
+                  });
+                  return dayShifts.map((shift: any, i: number) => (
+                    <tr key={shift.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      {/* Date cell — affiché seulement sur la première ligne du groupe */}
+                      <td className="px-6 py-3 align-top">
+                        {i === 0 ? (
+                          <span className="font-semibold text-gray-700 capitalize text-xs">{label}</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {getInitials(shift.first_name ?? '?', shift.last_name ?? '')}
+                          </div>
+                          <span className="font-medium text-gray-900 whitespace-nowrap">
+                            {shift.first_name} {shift.last_name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-gray-600">{formatTime(shift.started_at)}</td>
+                      <td className="px-4 py-3 tabular-nums text-gray-600">
+                        {shift.ended_at ? formatTime(shift.ended_at) : (
+                          <span className="text-green-600 font-medium flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
+                            En cours
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-indigo-600 tabular-nums">
+                          {shift.ended_at ? formatDuration(shift.started_at, shift.ended_at) : (
+                            <LiveDuration startedAt={shift.started_at} />
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-bold tabular-nums ${(shift.leads_called ?? 0) > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
+                          {shift.leads_called ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-bold tabular-nums ${(shift.appointments ?? 0) > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                          {shift.appointments ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-bold tabular-nums ${(shift.clients ?? 0) > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                          {shift.clients ?? 0}
+                        </span>
+                      </td>
+                    </tr>
+                  ));
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main page ───────────────────────────────────────────────────── */
 
 export default function RessourcesPage() {
@@ -489,6 +636,7 @@ export default function RessourcesPage() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
+  const [showHistory, setShowHistory] = useState(false);
 
   const { data: shifts = [], isLoading } = useQuery({
     queryKey:        ['shifts', selectedDate],
@@ -504,47 +652,37 @@ export default function RessourcesPage() {
   return (
     <div className="space-y-8 max-w-5xl">
 
+      {showHistory && <ShiftHistoryModal onClose={() => setShowHistory(false)} />}
+
       {/* ── Shift tracking section ───────────────────────────────── */}
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Clock className="w-5 h-5 text-indigo-500" />
-          <h1 className="text-base font-bold text-gray-900">Suivi des shifts</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-indigo-500" />
+            <h1 className="text-base font-bold text-gray-900">Suivi des shifts</h1>
+          </div>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="btn-secondary py-1.5 px-3 text-xs gap-1.5"
+          >
+            <History className="w-3.5 h-3.5" />
+            Historique
+          </button>
         </div>
 
         {/* Date picker */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSelectedDate(d => {
-              const prev = new Date(d); prev.setDate(prev.getDate() - 1);
-              return prev.toISOString().slice(0, 10);
-            })}
-            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4 text-gray-500" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="input py-1.5 text-sm w-auto"
-            />
-          </div>
-          <button
-            onClick={() => setSelectedDate(d => {
-              const next = new Date(d); next.setDate(next.getDate() + 1);
-              return next.toISOString().slice(0, 10);
-            })}
-            disabled={selectedDate >= new Date().toISOString().slice(0, 10)}
-            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-4 h-4 text-gray-500" />
-          </button>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="input py-1.5 text-sm w-auto"
+          />
           {selectedDate === new Date().toISOString().slice(0, 10) && (
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
-              Temps réel · 30s
+              Temps réel · actualisation toutes les 30s
             </span>
           )}
         </div>
@@ -584,7 +722,7 @@ export default function RessourcesPage() {
                         </div>
                         <span className="w-2.5 h-2.5 bg-green-400 rounded-full flex-shrink-0 animate-pulse" />
                       </div>
-                      <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs">
+                      <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs text-gray-500">
                         <div>
                           <p className="text-gray-400">Arrivée</p>
                           <p className="font-semibold text-gray-700">{formatTime(shift.started_at)}</p>
@@ -593,26 +731,6 @@ export default function RessourcesPage() {
                           <p className="text-gray-400">Durée</p>
                           <p className="font-semibold text-indigo-600">
                             <LiveDuration startedAt={shift.started_at} />
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-3 gap-1 text-xs text-center">
-                        <div className="bg-blue-50 rounded-lg py-1.5">
-                          <p className="font-bold text-blue-700 text-base leading-tight">{shift.leads_called ?? 0}</p>
-                          <p className="text-blue-500 flex items-center justify-center gap-0.5">
-                            <PhoneCall className="w-2.5 h-2.5" /> Appels
-                          </p>
-                        </div>
-                        <div className="bg-amber-50 rounded-lg py-1.5">
-                          <p className="font-bold text-amber-700 text-base leading-tight">{shift.appointments ?? 0}</p>
-                          <p className="text-amber-500 flex items-center justify-center gap-0.5">
-                            <CalendarCheck className="w-2.5 h-2.5" /> RDV
-                          </p>
-                        </div>
-                        <div className="bg-green-50 rounded-lg py-1.5">
-                          <p className="font-bold text-green-700 text-base leading-tight">{shift.clients ?? 0}</p>
-                          <p className="text-green-500 flex items-center justify-center gap-0.5">
-                            <Trophy className="w-2.5 h-2.5" /> Clients
                           </p>
                         </div>
                       </div>
@@ -643,65 +761,35 @@ export default function RessourcesPage() {
                         <th className="text-left px-4 py-3">Membre</th>
                         <th className="text-left px-4 py-3">Arrivée</th>
                         <th className="text-left px-4 py-3">Départ</th>
-                        <th className="text-left px-4 py-3">Durée</th>
-                        <th className="text-center px-3 py-3">
-                          <span className="flex items-center justify-center gap-1 text-blue-500">
-                            <PhoneCall className="w-3 h-3" /> Appels
-                          </span>
-                        </th>
-                        <th className="text-center px-3 py-3">
-                          <span className="flex items-center justify-center gap-1 text-amber-500">
-                            <CalendarCheck className="w-3 h-3" /> RDV
-                          </span>
-                        </th>
-                        <th className="text-center px-3 py-3">
-                          <span className="flex items-center justify-center gap-1 text-green-500">
-                            <Trophy className="w-3 h-3" /> Clients
-                          </span>
-                        </th>
+                        <th className="text-left px-4 py-3">Durée totale</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {completed.map((shift: any) => (
-                          <tr key={shift.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                  {getInitials(shift.first_name ?? '?', shift.last_name ?? '')}
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">
-                                    {shift.first_name} {shift.last_name}
-                                  </p>
-                                  <p className="text-xs text-gray-400 capitalize">{shift.role}</p>
-                                </div>
+                        <tr key={shift.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {getInitials(shift.first_name ?? '?', shift.last_name ?? '')}
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-700 tabular-nums">{formatTime(shift.started_at)}</td>
-                            <td className="px-4 py-3 text-gray-700 tabular-nums">
-                              {shift.ended_at ? formatTime(shift.ended_at) : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-semibold text-indigo-600">
-                                {shift.ended_at ? formatDuration(shift.started_at, shift.ended_at) : '—'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`font-bold ${shift.leads_called > 0 ? 'text-blue-700' : 'text-gray-300'}`}>
-                                {shift.leads_called ?? 0}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`font-bold ${shift.appointments > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
-                                {shift.appointments ?? 0}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`font-bold ${shift.clients > 0 ? 'text-green-600' : 'text-gray-300'}`}>
-                                {shift.clients ?? 0}
-                              </span>
-                            </td>
-                          </tr>
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {shift.first_name} {shift.last_name}
+                                </p>
+                                <p className="text-xs text-gray-400 capitalize">{shift.role}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 tabular-nums">{formatTime(shift.started_at)}</td>
+                          <td className="px-4 py-3 text-gray-700 tabular-nums">
+                            {shift.ended_at ? formatTime(shift.ended_at) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-indigo-600">
+                              {shift.ended_at ? formatDuration(shift.started_at, shift.ended_at) : '—'}
+                            </span>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -709,66 +797,21 @@ export default function RessourcesPage() {
               )}
             </section>
 
-            {/* Totaux journée */}
-            {shifts.length > 0 && (() => {
-              const totalCalls   = shifts.reduce((s: number, sh: any) => s + (sh.leads_called ?? 0), 0);
-              const totalRdv     = shifts.reduce((s: number, sh: any) => s + (sh.appointments ?? 0), 0);
-              const totalClients = shifts.reduce((s: number, sh: any) => s + (sh.clients ?? 0), 0);
-              const totalTime    = completed.reduce((s: number, sh: any) => {
-                if (!sh.ended_at) return s;
-                return s + (new Date(sh.ended_at).getTime() - new Date(sh.started_at).getTime());
-              }, 0);
-              const totalHours = Math.floor(totalTime / 3600000);
-              const totalMins  = Math.floor((totalTime % 3600000) / 60000);
-              return (
-                <section>
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-amber-500" />
-                    Totaux de la journée
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="card p-4 bg-indigo-50">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Clock className="w-4 h-4 text-indigo-500" />
-                        <p className="text-xs text-gray-500">Temps total</p>
-                      </div>
-                      <p className="text-2xl font-bold text-indigo-700">
-                        {totalHours > 0 ? `${totalHours}h${totalMins.toString().padStart(2,'0')}` : `${totalMins}min`}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{shifts.length} shift{shifts.length > 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="card p-4 bg-blue-50">
-                      <div className="flex items-center gap-2 mb-1">
-                        <PhoneCall className="w-4 h-4 text-blue-500" />
-                        <p className="text-xs text-gray-500">Appels passés</p>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-700">{totalCalls}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">leads contactés</p>
-                    </div>
-                    <div className="card p-4 bg-amber-50">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CalendarCheck className="w-4 h-4 text-amber-500" />
-                        <p className="text-xs text-gray-500">RDV pris</p>
-                      </div>
-                      <p className="text-2xl font-bold text-amber-700">{totalRdv}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {totalCalls > 0 ? `${Math.round(totalRdv / totalCalls * 100)}% de conversion` : '—'}
-                      </p>
-                    </div>
-                    <div className="card p-4 bg-green-50">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Trophy className="w-4 h-4 text-green-500" />
-                        <p className="text-xs text-gray-500">Clients signés</p>
-                      </div>
-                      <p className="text-2xl font-bold text-green-700">{totalClients}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {totalRdv > 0 ? `${Math.round(totalClients / totalRdv * 100)}% closing` : '—'}
-                      </p>
-                    </div>
+            {/* Stats */}
+            {shifts.length > 0 && (
+              <section className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Total pointages',   value: shifts.length,    icon: <Clock className="w-4 h-4 text-indigo-500" />, bg: 'bg-indigo-50' },
+                  { label: 'En ligne maintenant', value: active.length,  icon: <UserCheck className="w-4 h-4 text-green-500" />, bg: 'bg-green-50' },
+                  { label: 'Shifts terminés',   value: completed.length, icon: <UserX className="w-4 h-4 text-gray-400" />, bg: 'bg-gray-50' },
+                ].map(({ label, value, icon, bg }) => (
+                  <div key={label} className={`card p-4 ${bg}`}>
+                    <div className="flex items-center gap-2 mb-1">{icon}<p className="text-xs text-gray-500">{label}</p></div>
+                    <p className="text-2xl font-bold text-gray-900">{value}</p>
                   </div>
-                </section>
-              );
-            })()}
+                ))}
+              </section>
+            )}
           </>
         )}
       </div>
