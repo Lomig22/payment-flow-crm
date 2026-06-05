@@ -6,7 +6,6 @@ import { useAuthStore } from '@/store/authStore';
 
 const SHIFT_KEY      = 'pf_shift_id';
 const SHIFT_DATE_KEY = 'pf_shift_date';
-const HEARTBEAT_MS   = 60_000; // 1 min
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -138,33 +137,6 @@ export default function ShiftGuard() {
       setShowStart(true);
     }
   }, [mounted, user]);
-
-  // Heartbeat every 60s — keeps the shift alive; stops when shiftId is null
-  useEffect(() => {
-    if (!shiftId) return;
-    const tick = () => shiftsApi.heartbeat().catch(() => {});
-    tick(); // immediate first beat
-    const t = setInterval(tick, HEARTBEAT_MS);
-    return () => clearInterval(t);
-  }, [shiftId]);
-
-  // Heartbeat immédiat quand l'onglet redevient visible (browsers throttlent setInterval en arrière-plan)
-  useEffect(() => {
-    if (!shiftId) return;
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') shiftsApi.heartbeat().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [shiftId]);
-
-  // Heartbeat immédiat à la reconnexion réseau
-  useEffect(() => {
-    if (!shiftId) return;
-    const handleOnline = () => shiftsApi.heartbeat().catch(() => {});
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [shiftId]);
 
   // Listen for "end shift" trigger dispatched by the Header button
   useEffect(() => {

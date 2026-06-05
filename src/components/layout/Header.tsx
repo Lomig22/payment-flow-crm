@@ -112,10 +112,10 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         {user?.role !== 'admin' && (
           <button
             onClick={() => window.dispatchEvent(new Event('pf:shift:end'))}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-colors"
           >
             <Timer className="w-3.5 h-3.5" />
-            Fin de shift
+            <span className="hidden sm:inline">Fin de shift</span>
           </button>
         )}
 
@@ -229,6 +229,16 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
                   <User className="w-4 h-4 text-gray-400" />
                   Mon profil
                 </button>
+
+                {user?.role !== 'admin' && (
+                  <button
+                    onClick={() => { setProfileOpen(false); window.dispatchEvent(new Event('pf:shift:end')); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                  >
+                    <Timer className="w-4 h-4" />
+                    Fin de shift
+                  </button>
+                )}
               </div>
 
               <div className="border-t border-gray-100 py-1">

@@ -15,18 +15,6 @@ export async function GET(request: NextRequest) {
   const dayStart = `${date}T00:00:00+00:00`;
   const dayEnd   = `${date}T23:59:59+00:00`;
 
-  // Auto-close stale open shifts: no heartbeat for > 10 minutes
-  // (browsers throttle setInterval in background tabs, so 3 min was too tight)
-  const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  await db
-    .from('shifts')
-    .update({ ended_at: staleThreshold })
-    .is('ended_at', null)
-    .not('last_heartbeat', 'is', null)
-    .lt('last_heartbeat', staleThreshold)
-    .gte('started_at', dayStart)
-    .lte('started_at', dayEnd);
-
   const { data, error } = await db.rpc('get_shifts_with_stats', {
     day_start: dayStart,
     day_end:   dayEnd,
