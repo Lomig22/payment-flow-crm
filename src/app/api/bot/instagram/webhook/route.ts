@@ -145,11 +145,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const usernames = [...new Set(
+    const usernames = Array.from(new Set(
       items
         .map((item: any) => item.ownerUsername || item.username || '')
         .filter(Boolean)
-    )].slice(0, 400) as string[];
+    )).slice(0, 400) as string[];
 
     if (usernames.length === 0) {
       await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: 0, p_updated: 0 });
