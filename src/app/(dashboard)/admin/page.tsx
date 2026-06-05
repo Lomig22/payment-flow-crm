@@ -7,6 +7,7 @@ import {
   Clock, UserCheck, UserX, Calendar, Timer,
   Instagram, Facebook, Plus, Pencil, Trash2, ExternalLink,
   X, Loader2, AtSign, Link, StickyNote, User, Eye, EyeOff,
+  PhoneCall, CalendarCheck, Trophy, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Spinner from '@/components/ui/Spinner';
 import { useRouter } from 'next/navigation';
@@ -511,7 +512,16 @@ export default function RessourcesPage() {
         </div>
 
         {/* Date picker */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSelectedDate(d => {
+              const prev = new Date(d); prev.setDate(prev.getDate() - 1);
+              return prev.toISOString().slice(0, 10);
+            })}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4 text-gray-500" />
+          </button>
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-400" />
             <input
@@ -521,10 +531,20 @@ export default function RessourcesPage() {
               className="input py-1.5 text-sm w-auto"
             />
           </div>
+          <button
+            onClick={() => setSelectedDate(d => {
+              const next = new Date(d); next.setDate(next.getDate() + 1);
+              return next.toISOString().slice(0, 10);
+            })}
+            disabled={selectedDate >= new Date().toISOString().slice(0, 10)}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4 text-gray-500" />
+          </button>
           {selectedDate === new Date().toISOString().slice(0, 10) && (
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
-              Temps réel · actualisation toutes les 30s
+              Temps réel · 30s
             </span>
           )}
         </div>
@@ -550,37 +570,54 @@ export default function RessourcesPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {active.map((shift: any) => {
-                    const u = shift.users;
-                    return (
-                      <div key={shift.id} className="card p-4 border-l-4 border-l-green-400">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                            {getInitials(u?.first_name ?? '?', u?.last_name ?? '')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">
-                              {u?.first_name} {u?.last_name}
-                            </p>
-                            <p className="text-xs text-gray-400 capitalize">{u?.role}</p>
-                          </div>
-                          <span className="w-2.5 h-2.5 bg-green-400 rounded-full flex-shrink-0 animate-pulse" />
+                  {active.map((shift: any) => (
+                    <div key={shift.id} className="card p-4 border-l-4 border-l-green-400">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                          {getInitials(shift.first_name ?? '?', shift.last_name ?? '')}
                         </div>
-                        <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs text-gray-500">
-                          <div>
-                            <p className="text-gray-400">Arrivée</p>
-                            <p className="font-semibold text-gray-700">{formatTime(shift.started_at)}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400">Durée</p>
-                            <p className="font-semibold text-indigo-600">
-                              <LiveDuration startedAt={shift.started_at} />
-                            </p>
-                          </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm truncate">
+                            {shift.first_name} {shift.last_name}
+                          </p>
+                          <p className="text-xs text-gray-400 capitalize">{shift.role}</p>
+                        </div>
+                        <span className="w-2.5 h-2.5 bg-green-400 rounded-full flex-shrink-0 animate-pulse" />
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-gray-400">Arrivée</p>
+                          <p className="font-semibold text-gray-700">{formatTime(shift.started_at)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Durée</p>
+                          <p className="font-semibold text-indigo-600">
+                            <LiveDuration startedAt={shift.started_at} />
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-3 gap-1 text-xs text-center">
+                        <div className="bg-blue-50 rounded-lg py-1.5">
+                          <p className="font-bold text-blue-700 text-base leading-tight">{shift.leads_called ?? 0}</p>
+                          <p className="text-blue-500 flex items-center justify-center gap-0.5">
+                            <PhoneCall className="w-2.5 h-2.5" /> Appels
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 rounded-lg py-1.5">
+                          <p className="font-bold text-amber-700 text-base leading-tight">{shift.appointments ?? 0}</p>
+                          <p className="text-amber-500 flex items-center justify-center gap-0.5">
+                            <CalendarCheck className="w-2.5 h-2.5" /> RDV
+                          </p>
+                        </div>
+                        <div className="bg-green-50 rounded-lg py-1.5">
+                          <p className="font-bold text-green-700 text-base leading-tight">{shift.clients ?? 0}</p>
+                          <p className="text-green-500 flex items-center justify-center gap-0.5">
+                            <Trophy className="w-2.5 h-2.5" /> Clients
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -606,24 +643,37 @@ export default function RessourcesPage() {
                         <th className="text-left px-4 py-3">Membre</th>
                         <th className="text-left px-4 py-3">Arrivée</th>
                         <th className="text-left px-4 py-3">Départ</th>
-                        <th className="text-left px-4 py-3">Durée totale</th>
+                        <th className="text-left px-4 py-3">Durée</th>
+                        <th className="text-center px-3 py-3">
+                          <span className="flex items-center justify-center gap-1 text-blue-500">
+                            <PhoneCall className="w-3 h-3" /> Appels
+                          </span>
+                        </th>
+                        <th className="text-center px-3 py-3">
+                          <span className="flex items-center justify-center gap-1 text-amber-500">
+                            <CalendarCheck className="w-3 h-3" /> RDV
+                          </span>
+                        </th>
+                        <th className="text-center px-3 py-3">
+                          <span className="flex items-center justify-center gap-1 text-green-500">
+                            <Trophy className="w-3 h-3" /> Clients
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {completed.map((shift: any) => {
-                        const u = shift.users;
-                        return (
+                      {completed.map((shift: any) => (
                           <tr key={shift.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                  {getInitials(u?.first_name ?? '?', u?.last_name ?? '')}
+                                  {getInitials(shift.first_name ?? '?', shift.last_name ?? '')}
                                 </div>
                                 <div>
                                   <p className="font-medium text-gray-900">
-                                    {u?.first_name} {u?.last_name}
+                                    {shift.first_name} {shift.last_name}
                                   </p>
-                                  <p className="text-xs text-gray-400 capitalize">{u?.role}</p>
+                                  <p className="text-xs text-gray-400 capitalize">{shift.role}</p>
                                 </div>
                               </div>
                             </td>
@@ -636,30 +686,89 @@ export default function RessourcesPage() {
                                 {shift.ended_at ? formatDuration(shift.started_at, shift.ended_at) : '—'}
                               </span>
                             </td>
+                            <td className="px-3 py-3 text-center">
+                              <span className={`font-bold ${shift.leads_called > 0 ? 'text-blue-700' : 'text-gray-300'}`}>
+                                {shift.leads_called ?? 0}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <span className={`font-bold ${shift.appointments > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                                {shift.appointments ?? 0}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <span className={`font-bold ${shift.clients > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                                {shift.clients ?? 0}
+                              </span>
+                            </td>
                           </tr>
-                        );
-                      })}
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
             </section>
 
-            {/* Stats */}
-            {shifts.length > 0 && (
-              <section className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Total pointages', value: shifts.length, icon: <Clock className="w-4 h-4 text-indigo-500" />, bg: 'bg-indigo-50' },
-                  { label: 'En ligne maintenant', value: active.length, icon: <UserCheck className="w-4 h-4 text-green-500" />, bg: 'bg-green-50' },
-                  { label: 'Shifts terminés', value: completed.length, icon: <UserX className="w-4 h-4 text-gray-400" />, bg: 'bg-gray-50' },
-                ].map(({ label, value, icon, bg }) => (
-                  <div key={label} className={`card p-4 ${bg}`}>
-                    <div className="flex items-center gap-2 mb-1">{icon}<p className="text-xs text-gray-500">{label}</p></div>
-                    <p className="text-2xl font-bold text-gray-900">{value}</p>
+            {/* Totaux journée */}
+            {shifts.length > 0 && (() => {
+              const totalCalls   = shifts.reduce((s: number, sh: any) => s + (sh.leads_called ?? 0), 0);
+              const totalRdv     = shifts.reduce((s: number, sh: any) => s + (sh.appointments ?? 0), 0);
+              const totalClients = shifts.reduce((s: number, sh: any) => s + (sh.clients ?? 0), 0);
+              const totalTime    = completed.reduce((s: number, sh: any) => {
+                if (!sh.ended_at) return s;
+                return s + (new Date(sh.ended_at).getTime() - new Date(sh.started_at).getTime());
+              }, 0);
+              const totalHours = Math.floor(totalTime / 3600000);
+              const totalMins  = Math.floor((totalTime % 3600000) / 60000);
+              return (
+                <section>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    Totaux de la journée
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="card p-4 bg-indigo-50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="w-4 h-4 text-indigo-500" />
+                        <p className="text-xs text-gray-500">Temps total</p>
+                      </div>
+                      <p className="text-2xl font-bold text-indigo-700">
+                        {totalHours > 0 ? `${totalHours}h${totalMins.toString().padStart(2,'0')}` : `${totalMins}min`}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">{shifts.length} shift{shifts.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="card p-4 bg-blue-50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <PhoneCall className="w-4 h-4 text-blue-500" />
+                        <p className="text-xs text-gray-500">Appels passés</p>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-700">{totalCalls}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">leads contactés</p>
+                    </div>
+                    <div className="card p-4 bg-amber-50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CalendarCheck className="w-4 h-4 text-amber-500" />
+                        <p className="text-xs text-gray-500">RDV pris</p>
+                      </div>
+                      <p className="text-2xl font-bold text-amber-700">{totalRdv}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {totalCalls > 0 ? `${Math.round(totalRdv / totalCalls * 100)}% de conversion` : '—'}
+                      </p>
+                    </div>
+                    <div className="card p-4 bg-green-50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Trophy className="w-4 h-4 text-green-500" />
+                        <p className="text-xs text-gray-500">Clients signés</p>
+                      </div>
+                      <p className="text-2xl font-bold text-green-700">{totalClients}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {totalRdv > 0 ? `${Math.round(totalClients / totalRdv * 100)}% closing` : '—'}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </section>
-            )}
+                </section>
+              );
+            })()}
           </>
         )}
       </div>

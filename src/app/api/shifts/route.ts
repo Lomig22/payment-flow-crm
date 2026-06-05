@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized, forbidden } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 
-// GET — admin: all shifts for a given date (defaults to today)
+// GET — admin: all shifts for a given date with activity stats
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
@@ -26,15 +26,10 @@ export async function GET(request: NextRequest) {
     .gte('started_at', dayStart)
     .lte('started_at', dayEnd);
 
-  const { data, error } = await db
-    .from('shifts')
-    .select(`
-      id, started_at, ended_at, last_heartbeat,
-      users!user_id ( id, first_name, last_name, email, role )
-    `)
-    .gte('started_at', dayStart)
-    .lte('started_at', dayEnd)
-    .order('started_at', { ascending: false });
+  const { data, error } = await db.rpc('get_shifts_with_stats', {
+    day_start: dayStart,
+    day_end:   dayEnd,
+  });
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
