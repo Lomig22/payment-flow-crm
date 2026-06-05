@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Un scraping est déjà en cours.' }, { status: 409 });
   }
 
-  // Create tracking record (1 run = hashtags)
+  // Create tracking record (2 runs: hashtags → profiles)
   const { data: botRun, error: insertError } = await db
-    .from('bot_runs').insert({ runs_total: 1 }).select('id').single();
+    .from('bot_runs').insert({ runs_total: 2 }).select('id').single();
   if (insertError) {
     return NextResponse.json({ message: `Supabase : ${insertError.message}` }, { status: 500 });
   }

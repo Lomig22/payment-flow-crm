@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 const APIFY_BASE = 'https://api.apify.com/v2';
-const APIFY_TOKEN = process.env.APIFY_API_TOKEN!;
+
+function encodeWebhooks(requestUrl: string) {
+  const hooks = [{
+    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.ABORTED', 'ACTOR.RUN.TIMED_OUT'],
+    requestUrl,
+  }];
+  return Buffer.from(JSON.stringify(hooks)).toString('base64');
+}
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 
@@ -47,14 +54,12 @@ function scoreProfile(bio: string, followers: number, externalUrl: string, lates
   return { score, score_details: details.join(', '), email_bio: emailBio };
 }
 
-// ─── Normalisation ────────────────────────────────────────────────────────────
-
 function normalizeAndScore(raw: any) {
   const username = raw.username || raw.ownerUsername || raw.handle || '';
   if (!username) return null;
 
-  const bio        = raw.biography || raw.bio || raw.description || '';
-  const followers  = Number(raw.followersCount || raw.followers_count || 0);
+  const bio         = raw.biography || raw.bio || raw.description || '';
+  const followers   = Number(raw.followersCount || raw.followers_count || 0);
   const externalUrl = raw.externalUrl || raw.external_url || raw.website || '';
   const latestPost  = raw.latestPostTimestamp || raw.timestamp || raw.lastPostDate || null;
   const fullName    = (raw.fullName || raw.full_name || raw.name || '').trim();
@@ -90,8 +95,9 @@ function normalizeAndScore(raw: any) {
 
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const secret    = searchParams.get('secret');
-  const botRunId  = searchParams.get('bot_run_id');
+  const secret   = searchParams.get('secret');
+  const botRunId = searchParams.get('bot_run_id');
+  const task     = searchParams.get('task') || 'profiles';
 
   if (!secret || secret !== process.env.BOT_WEBHOOK_SECRET) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -100,6 +106,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Missing bot_run_id' }, { status: 400 });
   }
 
+  const APIFY_TOKEN = process.env.APIFY_API_TOKEN!;
   const db = supabase as any;
 
   let body: any;
@@ -108,13 +115,85 @@ export async function POST(request: NextRequest) {
   const eventType = body.eventType as string || '';
   const datasetId = body.resource?.defaultDatasetId as string | undefined;
 
-  // Failed / aborted run → just increment done counter
+  // ── Stage 1 : hashtag scraper → collect usernames → launch profile scraper ──
+  if (task === 'hashtags') {
+    if (!datasetId || !eventType.includes('SUCCEEDED')) {
+      // Hashtag run failed → mark bot_run as error
+      await db.from('bot_runs').update({
+        status: 'error',
+        error_message: `Hashtag scraper failed: ${eventType}`,
+        finished_at: new Date().toISOString(),
+        runs_done: 1,
+      }).eq('id', botRunId);
+      return NextResponse.json({ ok: true, skipped: true });
+    }
+
+    let items: any[] = [];
+    try {
+      const res = await fetch(
+        `${APIFY_BASE}/datasets/${datasetId}/items?token=${APIFY_TOKEN}&limit=2000&format=json`
+      );
+      items = await res.json();
+      if (!Array.isArray(items)) items = [];
+    } catch {
+      await db.from('bot_runs').update({
+        status: 'error',
+        error_message: 'Failed to fetch hashtag dataset',
+        finished_at: new Date().toISOString(),
+        runs_done: 1,
+      }).eq('id', botRunId);
+      return NextResponse.json({ ok: true });
+    }
+
+    const usernames = [...new Set(
+      items
+        .map((item: any) => item.ownerUsername || item.username || '')
+        .filter(Boolean)
+    )].slice(0, 400) as string[];
+
+    if (usernames.length === 0) {
+      await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: 0, p_updated: 0 });
+      return NextResponse.json({ ok: true, phase: 'hashtags', usernames: 0 });
+    }
+
+    const APP_URL = process.env.APP_URL || 'https://payment-flow-crm-delta.vercel.app';
+    const profileWebhookUrl = `${APP_URL}/api/bot/instagram/webhook?bot_run_id=${botRunId}&secret=${secret}&task=profiles`;
+    const webhooksParam = encodeURIComponent(encodeWebhooks(profileWebhookUrl));
+
+    try {
+      const res = await fetch(
+        `${APIFY_BASE}/acts/apify~instagram-profile-scraper/runs?token=${APIFY_TOKEN}&webhooks=${webhooksParam}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernames }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      await db.from('bot_runs').update({
+        status: 'error',
+        error_message: `Profile scraper launch failed: ${err.message}`,
+        finished_at: new Date().toISOString(),
+        runs_done: 1,
+      }).eq('id', botRunId);
+      return NextResponse.json({ ok: true, phase: 'hashtags_launch_failed' });
+    }
+
+    // Increment runs_done for the hashtag stage (progress bar: 1/2)
+    await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: 0, p_updated: 0 });
+    return NextResponse.json({ ok: true, phase: 'hashtags', usernames: usernames.length });
+  }
+
+  // ── Stage 2 : profile scraper → score → upsert ────────────────────────────
   if (!datasetId || !eventType.includes('SUCCEEDED')) {
     await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: 0, p_updated: 0 });
     return NextResponse.json({ ok: true });
   }
 
-  // Fetch dataset
   let items: any[] = [];
   try {
     const res = await fetch(
@@ -127,22 +206,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Normalize + score → qualified leads only
   const leads = items
-    .map((item) => normalizeAndScore(item.ownerProfile || item.author || item))
+    .map((item: any) => normalizeAndScore(item))
     .filter(Boolean);
 
   if (leads.length === 0) {
     await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: 0, p_updated: 0 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, qualified: 0 });
   }
 
-  // Upsert to leads table via DB function
   const { data: result } = await db.rpc('upsert_instagram_leads', { p_leads: leads });
   const inserted = result?.inserted ?? 0;
   const updated  = result?.updated  ?? 0;
 
-  // Update bot_run counters (atomic)
   await db.rpc('increment_bot_run', { p_id: botRunId, p_inserted: inserted, p_updated: updated });
 
   return NextResponse.json({ ok: true, qualified: leads.length, inserted, updated });
