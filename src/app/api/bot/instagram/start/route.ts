@@ -14,7 +14,7 @@ const HASHTAGS = [
 
 function encodeWebhooks(requestUrl: string) {
   const hooks = [{
-    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.ABORTED', 'ACTOR.RUN.TIMED-OUT'],
+    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.ABORTED', 'ACTOR.RUN.TIMED_OUT'],
     requestUrl,
   }];
   return Buffer.from(JSON.stringify(hooks)).toString('base64');
