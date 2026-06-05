@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Clock, LogIn, LogOut, Loader2 } from 'lucide-react';
-import { shiftsApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { shiftsApi, authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 
 const SHIFT_KEY      = 'pf_shift_id';
@@ -15,6 +17,9 @@ function today() {
 function StartModal({ onStarted }: { onStarted: (id: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [time, setTime] = useState('');
+  const router     = useRouter();
+  const clearAuth  = useAuthStore((s) => s.clearAuth);
+  const qc         = useQueryClient();
 
   useEffect(() => {
     const tick = () =>
@@ -34,6 +39,13 @@ function StartModal({ onStarted }: { onStarted: (id: string) => void }) {
     } catch {
       setLoading(false);
     }
+  };
+
+  const handleLogout = async () => {
+    try { await authApi.logout(); } catch (_) {}
+    qc.clear();
+    clearAuth();
+    router.push('/login');
   };
 
   return (
@@ -56,6 +68,13 @@ function StartModal({ onStarted }: { onStarted: (id: string) => void }) {
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
             Début de shift
+          </button>
+          <button
+            onClick={handleLogout}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Se déconnecter
           </button>
         </div>
       </div>
