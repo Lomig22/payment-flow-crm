@@ -15,8 +15,9 @@ export async function GET(request: NextRequest) {
   const dayStart = `${date}T00:00:00+00:00`;
   const dayEnd   = `${date}T23:59:59+00:00`;
 
-  // Auto-close stale open shifts: no heartbeat for > 3 minutes
-  const staleThreshold = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  // Auto-close stale open shifts: no heartbeat for > 10 minutes
+  // (browsers throttle setInterval in background tabs, so 3 min was too tight)
+  const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   await db
     .from('shifts')
     .update({ ended_at: staleThreshold })

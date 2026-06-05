@@ -148,6 +148,24 @@ export default function ShiftGuard() {
     return () => clearInterval(t);
   }, [shiftId]);
 
+  // Heartbeat immédiat quand l'onglet redevient visible (browsers throttlent setInterval en arrière-plan)
+  useEffect(() => {
+    if (!shiftId) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') shiftsApi.heartbeat().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [shiftId]);
+
+  // Heartbeat immédiat à la reconnexion réseau
+  useEffect(() => {
+    if (!shiftId) return;
+    const handleOnline = () => shiftsApi.heartbeat().catch(() => {});
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [shiftId]);
+
   // Listen for "end shift" trigger dispatched by the Header button
   useEffect(() => {
     const handler = () => { if (shiftId) setShowEnd(true); };
