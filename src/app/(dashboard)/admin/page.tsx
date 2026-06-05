@@ -482,7 +482,7 @@ function BotInstagramPanel() {
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ items: number; unique_users: number; qualified: number; inserted: number; updated: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ posts: number; usernames: number } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   const { data: status, refetch } = useQuery({
@@ -589,11 +589,11 @@ function BotInstagramPanel() {
       )}
 
       {importResult && (
-        <div className="mb-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
-          <p className="font-semibold text-green-800 mb-1">Import terminé</p>
-          <p className="text-green-700 text-xs">
-            {importResult.items} posts analysés · {importResult.unique_users} comptes uniques · {importResult.qualified} qualifiés
-            {' '}→ <strong>{importResult.inserted} ajoutés</strong>, {importResult.updated} mis à jour
+        <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm">
+          <p className="font-semibold text-blue-800 mb-1">Profile scraper lancé</p>
+          <p className="text-blue-700 text-xs">
+            {importResult.posts} posts récupérés · <strong>{importResult.usernames} comptes</strong> envoyés au profile scraper Apify.
+            Les leads apparaîtront ici dans 20-30 min.
           </p>
         </div>
       )}
