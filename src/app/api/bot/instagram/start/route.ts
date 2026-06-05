@@ -5,11 +5,8 @@ import { supabase } from '@/lib/supabase';
 const APIFY_BASE = 'https://api.apify.com/v2';
 
 const HASHTAGS = [
-  'electricien', 'plombier', 'plomberie', 'carreleur', 'carrelage',
-  'peintre', 'peinturedecoration', 'macon', 'maconnerie', 'couvreur',
-  'menuisier', 'menuiserie', 'charpentier', 'charpente',
-  'artisanfrancais', 'artisanbtp', 'btpfrance', 'renovationmaison',
-  'renovation', 'travauxtpe', 'autoentrepreneur', 'isolation', 'platrier', 'zingueur',
+  'electricien', 'plombier', 'carreleur', 'peintre', 'macon',
+  'couvreur', 'menuisier', 'artisanbtp', 'btpfrance', 'renovationmaison',
 ];
 
 function encodeWebhooks(requestUrl: string) {
@@ -66,7 +63,7 @@ export async function POST(request: NextRequest) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hashtags: HASHTAGS, resultsLimit: 200 }),
+        body: JSON.stringify({ hashtags: HASHTAGS, resultsLimit: 50 }),
       }
     );
     const json = await res.json();
