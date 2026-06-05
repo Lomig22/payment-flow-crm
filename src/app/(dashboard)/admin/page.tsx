@@ -481,6 +481,9 @@ function SocialAccountsSection() {
 function BotInstagramPanel() {
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ items: number; unique_users: number; qualified: number; inserted: number; updated: number } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const { data: status, refetch } = useQuery({
     queryKey: ['bot-instagram-status'],
@@ -512,6 +515,26 @@ function BotInstagramPanel() {
     }
   }
 
+  async function importLast() {
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const res = await fetch('/api/bot/instagram/import-last', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('pf_token')}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Erreur');
+      setImportResult(json);
+      refetch();
+    } catch (err: any) {
+      setImportError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function formatRelative(iso: string) {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
     if (diff < 1) return 'à l\'instant';
@@ -527,22 +550,51 @@ function BotInstagramPanel() {
           <Instagram className="w-4 h-4 text-pink-500" />
           Bot Instagram — Génération de leads
         </h2>
-        <button
-          onClick={launch}
-          disabled={isRunning || launching}
-          className="btn-primary py-1.5 px-3 text-xs gap-1.5 bg-pink-600 hover:bg-pink-700 disabled:opacity-50"
-        >
-          {launching || isRunning
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            : <Play className="w-3.5 h-3.5" />}
-          {isRunning ? 'En cours…' : 'Lancer le scraping'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={importLast}
+            disabled={importing || isRunning}
+            className="btn-secondary py-1.5 px-3 text-xs gap-1.5 disabled:opacity-50"
+          >
+            {importing
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <CheckCircle2 className="w-3.5 h-3.5 text-pink-500" />}
+            Importer le dernier dataset
+          </button>
+          <button
+            onClick={launch}
+            disabled={isRunning || launching}
+            className="btn-primary py-1.5 px-3 text-xs gap-1.5 bg-pink-600 hover:bg-pink-700 disabled:opacity-50"
+          >
+            {launching || isRunning
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Play className="w-3.5 h-3.5" />}
+            {isRunning ? 'En cours…' : 'Lancer le scraping'}
+          </button>
+        </div>
       </div>
 
       {launchError && (
         <div className="mb-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {launchError}
+        </div>
+      )}
+
+      {importError && (
+        <div className="mb-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {importError}
+        </div>
+      )}
+
+      {importResult && (
+        <div className="mb-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+          <p className="font-semibold text-green-800 mb-1">Import terminé</p>
+          <p className="text-green-700 text-xs">
+            {importResult.items} posts analysés · {importResult.unique_users} comptes uniques · {importResult.qualified} qualifiés
+            {' '}→ <strong>{importResult.inserted} ajoutés</strong>, {importResult.updated} mis à jour
+          </p>
         </div>
       )}
 
