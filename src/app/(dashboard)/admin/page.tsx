@@ -798,7 +798,7 @@ export default function RessourcesPage() {
   if (!user || user.role !== 'admin') return null;
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8">
 
       {showHistory && <ShiftHistoryModal onClose={() => setShowHistory(false)} />}
 
