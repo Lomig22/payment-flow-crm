@@ -8,8 +8,8 @@ const globalForSupa = globalThis as unknown as { supa: ReturnType<typeof createC
 export const supabase =
   globalForSupa.supa ||
   createClient<AnyDB>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    process.env.SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    process.env.SUPABASE_SERVICE_KEY ?? 'placeholder-key',
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
