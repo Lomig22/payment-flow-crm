@@ -346,15 +346,24 @@ Rien à vendre ici - juste un visuel que j'aimerais vous montrer.
 Je vous le montre ?`} />
           <InfoBox type="info">Remplace <strong>(Prénom)</strong> par le vrai prénom et <strong>(Entreprise)</strong> par le nom du commerce. Ne change rien d'autre.</InfoBox>
 
-          <Script label="Message 2 — Quand il dit OUI (envoyer immédiatement)" color="border-yellow-300" text={`Super ! Je viens de terminer l'aperçu de votre site web !
-Je suis certain qu'il correspond parfaitement à votre image
+          <Script label="Message 2 — Ancrage + curiosité (quand il dit OUI)" color="border-yellow-300" text={`Super 😊
 
-Je vous propose que l'on planifie ensemble un moment d'échange pour que je vous le présente ?
-Je vous montrerai comment ce site peut devenir un vrai levier pour développer votre chiffre d'affaires, sans que vous ayez à prospecter
+Voici l'aperçu que j'ai préparé pour (Entreprise) : (Lien maquette)
 
-Quel horaire vous conviendrait le plus (Prénom) ?
-(Lien Calendly)`} />
-          <InfoBox type="warning">Remplace <strong>(Prénom)</strong> et <strong>(Lien Calendly)</strong> avant d'envoyer. Envoie dès qu'il dit oui, ne tarde pas.</InfoBox>
+Ce que vous voyez là, c'est une base volontairement simplifiée.
+En échange de 15 minutes de votre temps, je vous explique concrètement comment ce site peut vous ramener des chantiers — sans que vous ayez à décrocher le téléphone pour chercher des clients.
+
+👉 Qu'est-ce que vous en pensez ?`} />
+          <InfoBox type="warning">Remplace <strong>(Entreprise)</strong> et <strong>(Lien maquette)</strong> avant d'envoyer. Envoie dès qu'il dit oui, ne tarde pas.</InfoBox>
+
+          <Script label="Message 3 — Booking du call (quand il réagit positivement)" color="border-indigo-300" text={`Content que ça vous plaise 😊
+
+En 15 minutes d'appel, je vous montre précisément comment ce site travaille pour vous — les demandes de devis qui arrivent, les clients qui vous trouvent sur Google, sans effort supplémentaire de votre part.
+
+Pas de présentation commerciale. Juste du concret.
+
+👉 On se cale ça quand vous voulez : (Lien Calendly)`} />
+          <InfoBox type="warning">Remplace <strong>(Lien Calendly)</strong> avant d'envoyer.</InfoBox>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom)
