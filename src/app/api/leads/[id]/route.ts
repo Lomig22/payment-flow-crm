@@ -58,8 +58,17 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const body = await request.json();
   const allowed = ['first_name','last_name','company','phone','email','location','called',
     'action_in_progress','lead_quality','need_identified','appointment_taken','appointment_honored',
-    'quote_sent','r2_planned','r3_planned','status','source','notes'];
+    'quote_sent','r2_planned','r3_planned','status','source','notes',
+    // Instagram
+    'instagram_username','instagram_url','a_ouvert','niche','bio','followers_count','ig_score'];
   if (user.role === 'admin') allowed.push('setter_id');
+
+  // Date automatique pour le funnel Instagram
+  const IG_STATUS_DATE: Record<string, string> = {
+    m1: 'm1_date', r1: 'r1_date', r2: 'r2_date',
+    reponse: 'reponse_date', a_relancer: 'a_relancer_date',
+    audit_a_envoyer: 'audit_date', audit_envoye: 'audit_date', rdv: 'rdv_date',
+  };
 
   const updates: Record<string, unknown> = {};
   const historyRows: Record<string, unknown>[] = [];
@@ -72,6 +81,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         old_value: String(current[field] ?? ''), new_value: String(body[field] ?? ''),
       });
     }
+  }
+
+  // Si le statut change et que c'est un lead Instagram → enregistre la date
+  if (updates.status && current.source === 'instagram') {
+    const dateField = IG_STATUS_DATE[updates.status as string];
+    if (dateField) updates[dateField] = new Date().toISOString();
   }
 
   if (Object.keys(updates).length > 0) {

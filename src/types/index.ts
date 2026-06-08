@@ -1,6 +1,10 @@
 export type UserRole    = 'admin' | 'setter';
 export type LeadQuality = 'hot' | 'warm' | 'cold';
-export type LeadStatus  = 'lost' | 'in_progress' | 'client' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2';
+// Cold call funnel
+export type ColdCallStatus = 'in_progress' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2' | 'client' | 'lost';
+// Instagram funnel (DM)
+export type InstagramStatus = 'lead' | 'm1' | 'r1' | 'r2' | 'reponse' | 'a_relancer' | 'audit_a_envoyer' | 'audit_envoye' | 'rdv';
+export type LeadStatus = ColdCallStatus | InstagramStatus;
 export type ActionType  = 'to_call' | 'callback' | 'follow_up' | 'negotiation' | 'no_action';
 export type LeadSource  = 'instagram' | 'facebook' | 'cold_call';
 
@@ -61,6 +65,22 @@ export interface Lead {
   history?:            LeadHistory[];
   created_at:          string;
   updated_at:          string;
+  // Instagram-specific
+  instagram_username?: string;
+  instagram_url?:      string;
+  a_ouvert?:           boolean;
+  niche?:              string;
+  bio?:                string;
+  followers_count?:    number;
+  ig_score?:           number;
+  // Instagram funnel dates
+  m1_date?:            string;
+  r1_date?:            string;
+  r2_date?:            string;
+  reponse_date?:       string;
+  a_relancer_date?:    string;
+  audit_date?:         string;
+  rdv_date?:           string;
 }
 
 export interface DashboardStats {

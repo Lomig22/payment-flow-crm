@@ -163,11 +163,27 @@ function Column({
   );
 }
 
+const COLUMNS_INSTAGRAM: typeof COLUMNS = [
+  { id: 'lead' as LeadStatus,             label: 'Lead',            topColor: 'border-t-gray-300',    hoverBg: 'bg-gray-50/60',    ringColor: 'ring-gray-200'    },
+  { id: 'm1' as LeadStatus,               label: 'M1 envoyé',       topColor: 'border-t-blue-300',    hoverBg: 'bg-blue-50/60',    ringColor: 'ring-blue-200'    },
+  { id: 'r1' as LeadStatus,               label: 'R1',              topColor: 'border-t-indigo-400',  hoverBg: 'bg-indigo-50/60',  ringColor: 'ring-indigo-300'  },
+  { id: 'r2' as LeadStatus,               label: 'R2',              topColor: 'border-t-violet-400',  hoverBg: 'bg-violet-50/60',  ringColor: 'ring-violet-300'  },
+  { id: 'reponse' as LeadStatus,          label: 'Réponse',         topColor: 'border-t-yellow-400',  hoverBg: 'bg-yellow-50/60',  ringColor: 'ring-yellow-300'  },
+  { id: 'a_relancer' as LeadStatus,       label: 'À relancer',      topColor: 'border-t-orange-400',  hoverBg: 'bg-orange-50/60',  ringColor: 'ring-orange-300'  },
+  { id: 'audit_a_envoyer' as LeadStatus,  label: 'Audit à envoyer', topColor: 'border-t-pink-400',    hoverBg: 'bg-pink-50/60',    ringColor: 'ring-pink-300'    },
+  { id: 'audit_envoye' as LeadStatus,     label: 'Audit envoyé',    topColor: 'border-t-rose-400',    hoverBg: 'bg-rose-50/60',    ringColor: 'ring-rose-300'    },
+  { id: 'rdv' as LeadStatus,              label: 'RDV',             topColor: 'border-t-green-500',   hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'   },
+];
+
 /* ── Board ────────────────────────────────────────────────────────── */
-export default function PipelineBoard() {
+interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook' }
+
+export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
   const qc = useQueryClient();
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
+
+  const columns = source === 'instagram' ? COLUMNS_INSTAGRAM : COLUMNS;
 
   // 8 px distance before drag activates → clicks still work normally
   const sensors = useSensors(
@@ -176,8 +192,8 @@ export default function PipelineBoard() {
   );
 
   const { data, isLoading } = useQuery({
-    queryKey: ['leads-pipeline'],
-    queryFn:  () => leadsApi.getAll({ limit: 2000 }).then((r) => r.data.data as Lead[]),
+    queryKey: ['leads-pipeline', source],
+    queryFn:  () => leadsApi.getAll({ limit: 2000, ...(source ? { source } : {}) }).then((r) => r.data.data as Lead[]),
   });
 
   const mutation = useMutation({
@@ -238,7 +254,7 @@ export default function PipelineBoard() {
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 pb-4 overflow-x-auto" style={{ minWidth: 'max-content' }}>
-        {COLUMNS.map((col) => (
+        {columns.map((col) => (
           <Column
             key={col.id}
             col={col}

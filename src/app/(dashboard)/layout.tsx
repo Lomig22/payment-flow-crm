@@ -7,15 +7,19 @@ import ShiftGuard from '@/components/shift/ShiftGuard';
 import { useAuthStore } from '@/store/authStore';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/dashboard':  'Dashboard',
-  '/leads':      'Leads',
-  '/pipeline':   'Pipeline',
-  '/import':     'Import CSV',
-  '/team':       'Équipe',
-  '/profile':    'Mon profil',
-  '/chat':       'Messages',
-  '/ressources': 'Ressources',
-  '/admin':      'Admin',
+  '/dashboard':          'Dashboard',
+  '/leads':              'Tous les leads',
+  '/leads/instagram':    '📸 Leads Instagram',
+  '/leads/cold-call':    '📞 Leads Cold Call',
+  '/pipeline':           'Pipeline global',
+  '/pipeline/instagram': '📸 Pipeline Instagram',
+  '/pipeline/cold-call': '📞 Pipeline Cold Call',
+  '/import':             'Import CSV',
+  '/team':               'Équipe',
+  '/profile':            'Mon profil',
+  '/chat':               'Messages',
+  '/ressources':         'Ressources',
+  '/admin':              'Admin',
 };
 
 const NO_PADDING_PAGES = ['/chat'];
@@ -48,7 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated) return null;
 
   const title = PAGE_TITLES[pathname] ??
-    (pathname.startsWith('/leads/') ? 'Fiche Lead' : 'Payment Flow CRM');
+    (pathname.match(/^\/leads\/[^/]+$/) ? 'Fiche Lead' : 'Payment Flow CRM');
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
