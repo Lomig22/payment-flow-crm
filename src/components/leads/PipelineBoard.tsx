@@ -177,7 +177,7 @@ export default function PipelineBoard() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['leads-pipeline'],
-    queryFn:  () => leadsApi.getAll({ limit: 200 }).then((r) => r.data.data as Lead[]),
+    queryFn:  () => leadsApi.getAll({ limit: 2000 }).then((r) => r.data.data as Lead[]),
   });
 
   const mutation = useMutation({

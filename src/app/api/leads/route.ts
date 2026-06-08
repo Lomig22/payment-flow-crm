@@ -31,7 +31,9 @@ export async function GET(request: NextRequest) {
   const source    = searchParams.get('source');
   const search    = searchParams.get('search');
   const page      = Math.max(1, parseInt(searchParams.get('page') || '1'));
-  const limit     = Math.min(100, parseInt(searchParams.get('limit') || '20'));
+  const rawLimit  = parseInt(searchParams.get('limit') || '20');
+  // Le pipeline demande toutes les données (limit élevé) — on autorise jusqu'à 2000
+  const limit     = Math.min(2000, rawLimit);
   const sort      = VALID_SORTS[searchParams.get('sort') || ''] || 'created_at';
   const asc       = searchParams.get('order') === 'asc';
   const offset    = (page - 1) * limit;
