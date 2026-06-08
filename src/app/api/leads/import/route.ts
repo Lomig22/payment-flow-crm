@@ -232,8 +232,9 @@ export async function POST(request: NextRequest) {
       }
       delete row._ig_score;
     }
-    // Apify Instagram: @username en tête des notes
+    // Apify Instagram: @username en tête des notes + fallback société si full_name vide
     if (row._ig_username) {
+      if (!row.company) row.company = row._ig_username;
       extras.unshift(`@${row._ig_username}`);
       delete row._ig_username;
     }
