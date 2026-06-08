@@ -259,32 +259,55 @@ export default function ImportPage() {
       )}
 
       {/* Format help */}
-      <div className="card p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Format attendu</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          Les colonnes suivantes sont reconnues automatiquement (noms français ou anglais) :
-        </p>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          {[
-            ['Prénom *',      'prénom, prenom, firstname'],
-            ['Nom *',         'nom, lastname'],
-            ['Société',       'société, company, entreprise'],
-            ['Téléphone',     'téléphone, phone, mobile, tel'],
-            ['Email',         'email, mail'],
-            ['Localisation',  'localisation, location, ville, city'],
-            ['Notes',         'notes, commentaire'],
-            ['Qualité',       'qualité, lead_quality (hot/warm/cold)'],
-            ['Statut',        'statut, status (in_progress/client/lost)'],
-          ].map(([field, aliases]) => (
-            <div key={field} className="text-xs">
-              <span className="font-medium text-gray-700">{field} : </span>
-              <span className="text-gray-400">{aliases}</span>
-            </div>
-          ))}
+      <div className="card p-5 space-y-5">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Format CSV standard</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Colonnes reconnues automatiquement (noms français ou anglais) :
+          </p>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[
+              ['Prénom *',      'prénom, prenom, firstname'],
+              ['Nom *',         'nom, lastname'],
+              ['Société',       'société, company, entreprise'],
+              ['Téléphone',     'téléphone, phone, mobile, tel'],
+              ['Email',         'email, mail'],
+              ['Localisation',  'localisation, location, ville, city'],
+              ['Notes',         'notes, commentaire'],
+              ['Qualité',       'qualité, lead_quality (hot/warm/cold)'],
+              ['Statut',        'statut, status (in_progress/client/lost)'],
+            ].map(([field, aliases]) => (
+              <div key={field} className="text-xs">
+                <span className="font-medium text-gray-700">{field} : </span>
+                <span className="text-gray-400">{aliases}</span>
+              </div>
+            ))}
+          </div>
+          <div className="p-2 bg-gray-50 rounded font-mono text-xs text-gray-600 whitespace-pre">
+            {`prénom,nom,société,téléphone,email,ville\nJean,Dupont,Acme SA,0612345678,jean@acme.fr,Paris`}
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mb-1">Exemple :</p>
-        <div className="p-2 bg-gray-50 rounded font-mono text-xs text-gray-600 whitespace-pre">
-          {`prénom,nom,société,téléphone,email,ville\nJean,Dupont,Acme SA,0612345678,jean@acme.fr,Paris\nMarie,Martin,,0698765432,,Lyon`}
+
+        <div className="border-t border-gray-100 pt-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">
+            📸 Format Apify Instagram Profile Scraper
+          </h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Le CSV exporté depuis Apify est reconnu directement. Sélectionnez <strong>Instagram</strong> comme canal.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['Société',      'full_name'],
+              ['Bio → Notes',  'biography'],
+              ['Notes',        '@username, profile_url, source_hashtag'],
+              ['Qualité auto', 'score ≥ 15 → hot · ≥ 8 → warm · < 8 → cold'],
+            ].map(([field, aliases]) => (
+              <div key={field} className="text-xs">
+                <span className="font-medium text-gray-700">{field} : </span>
+                <span className="text-gray-400">{aliases}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

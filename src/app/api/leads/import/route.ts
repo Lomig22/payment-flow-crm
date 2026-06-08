@@ -41,6 +41,27 @@ const COLUMN_MAP: Record<string, string> = {
   'cree le': '_ignore',
   'nombre avis': '_ignore',
   note: '_ignore',
+  // Apify Instagram Profile Scraper
+  full_name: 'company',
+  biography: '_ig_bio',
+  username: '_ig_username',
+  profile_url: '_ig_url',
+  source_hashtag: '_ig_hashtag',
+  score: '_ig_score',
+  business_category: '_ig_biz_cat',
+  followers_count: '_ignore',
+  following_count: '_ignore',
+  is_verified: '_ignore',
+  posts_count: '_ignore',
+  scraped_at: '_ignore',
+  'score_breakdown/0': '_ignore',
+  'score_breakdown/1': '_ignore',
+  'score_breakdown/2': '_ignore',
+  'score_breakdown/3': '_ignore',
+  'score_breakdown/4': '_ignore',
+  'score_breakdown/5': '_ignore',
+  'score_breakdown/6': '_ignore',
+  'score_breakdown/7': '_ignore',
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
@@ -178,6 +199,19 @@ export async function POST(request: NextRequest) {
       } else if (mapped === '_categories') {
         const cats = v.trim();
         if (cats) extras.push(cats.replace(/\|/g, ', '));
+      } else if (mapped === '_ig_bio') {
+        if (v) extras.push(v.trim().replace(/[\n\r]+/g, ' ').slice(0, 400));
+      } else if (mapped === '_ig_username') {
+        if (v) row._ig_username = v.trim();
+      } else if (mapped === '_ig_url') {
+        if (v) extras.push(`Instagram : ${v.trim()}`);
+      } else if (mapped === '_ig_hashtag') {
+        if (v) extras.push(`#${v.trim()}`);
+      } else if (mapped === '_ig_score') {
+        const n = parseInt(v, 10);
+        if (!isNaN(n)) row._ig_score = String(n);
+      } else if (mapped === '_ig_biz_cat') {
+        if (v && v !== 'None') extras.push(v.trim());
       } else {
         row[mapped] = v.trim();
       }
@@ -189,6 +223,20 @@ export async function POST(request: NextRequest) {
       if (!row.last_name) row.last_name = words.slice(1).join(' ') || '—';
     }
     delete row._dirigeant;
+
+    // Apify Instagram: score → lead_quality
+    if (row._ig_score !== undefined) {
+      const n = parseInt(row._ig_score, 10);
+      if (!isNaN(n) && !row.lead_quality) {
+        row.lead_quality = n >= 15 ? 'hot' : n >= 8 ? 'warm' : 'cold';
+      }
+      delete row._ig_score;
+    }
+    // Apify Instagram: @username en tête des notes
+    if (row._ig_username) {
+      extras.unshift(`@${row._ig_username}`);
+      delete row._ig_username;
+    }
 
     if (row.phone) row.phone = cleanPhone(row.phone);
 
