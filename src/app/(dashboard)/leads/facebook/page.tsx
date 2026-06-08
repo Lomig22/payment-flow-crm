@@ -3,7 +3,8 @@ import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone,
+  Search, Eye, RefreshCw, ExternalLink, X,
+  ChevronLeft, ChevronRight, Trash2, UserCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -11,32 +12,48 @@ import { useAuthStore } from '@/store/authStore';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import { formatDate } from '@/lib/utils';
-import type { Lead, LeadsFilters, LeadStatus, LeadQuality } from '@/types';
+import type { Lead, LeadsFilters, LeadStatus } from '@/types';
 
-const CC_STATUS_LABELS: Record<string, string> = {
-  in_progress: 'En cours', to_follow_up: 'À relancer', to_follow_up_2: 'À relancer 2',
-  appointment: 'RDV pris', r2: 'R2 pris', client: 'Client', lost: 'Perdu',
-};
-
-const CC_TABS = [
-  { label: 'Tous',          value: '' },
-  { label: 'En cours',      value: 'in_progress' },
-  { label: 'À relancer',    value: 'to_follow_up' },
-  { label: 'À relancer 2',  value: 'to_follow_up_2' },
-  { label: 'RDV pris',      value: 'appointment' },
-  { label: 'R2 pris',       value: 'r2' },
-  { label: 'Client',        value: 'client' },
-  { label: 'Perdu',         value: 'lost' },
+const NICHE_OPTIONS = [
+  'Électricien','Plombier','Couvreur','Maçon','Menuisier',
+  'Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre',
 ];
 
-export default function ColdCallLeadsPage() {
+const FB_STATUS_LABELS: Record<string, string> = {
+  lead: 'Lead', m1: 'M1 envoyé', r1: 'R1', r2: 'R2',
+  reponse: 'Réponse', a_relancer: 'À relancer',
+  audit_a_envoyer: 'Audit à envoyer', audit_envoye: 'Audit envoyé', rdv: 'RDV',
+};
+
+const RDV_OUTCOME_LABELS: Record<string, string> = {
+  present: 'Présent', vendu: 'Vendu', no_show: 'No Show', pas_qualifie: 'Non qualifié',
+};
+const RDV_OUTCOME_COLORS: Record<string, string> = {
+  vendu: 'bg-green-100 text-green-700', no_show: 'bg-red-100 text-red-600',
+  pas_qualifie: 'bg-orange-100 text-orange-600', present: 'bg-blue-100 text-blue-700',
+};
+
+const FB_TABS = [
+  { label: 'Tous',           value: '' },
+  { label: 'Lead',           value: 'lead' },
+  { label: 'M1 envoyé',      value: 'm1' },
+  { label: 'R1',             value: 'r1' },
+  { label: 'R2',             value: 'r2' },
+  { label: 'Réponse',        value: 'reponse' },
+  { label: 'À relancer',     value: 'a_relancer' },
+  { label: 'Audit à env.',   value: 'audit_a_envoyer' },
+  { label: 'Audit envoyé',   value: 'audit_envoye' },
+  { label: 'RDV',            value: 'rdv' },
+];
+
+export default function FacebookLeadsPage() {
   const router  = useRouter();
   const qc      = useQueryClient();
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
   const [activeTab,    setActiveTab]    = useState('');
-  const [filters,      setFilters]      = useState<LeadsFilters>({ page: 1, limit: 50, source: 'cold_call' });
+  const [filters,      setFilters]      = useState<LeadsFilters>({ page: 1, limit: 50, source: 'facebook' });
   const [search,       setSearch]       = useState('');
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [bulkStatus,   setBulkStatus]   = useState('');
@@ -54,18 +71,18 @@ export default function ColdCallLeadsPage() {
     setSelected(new Set());
   };
 
-  // Counts per status (tab badges)
   const { data: countsData } = useQuery({
-    queryKey: ['leads-cc-counts', filters.setter_id],
+    queryKey: ['leads-facebook-counts', filters.setter_id, filters.niche],
     queryFn: () => leadsApi.getAll({
-      source: 'cold_call', count_only: true,
+      source: 'facebook', count_only: true,
       ...(filters.setter_id ? { setter_id: filters.setter_id } : {}),
+      ...(filters.niche     ? { niche: filters.niche }         : {}),
     } as LeadsFilters).then((r) => r.data.counts as Record<string, number> | undefined),
     staleTime: 30_000,
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['leads-cold-call', filters],
+    queryKey: ['leads-facebook', filters],
     queryFn:  () => leadsApi.getAll(filters).then((r) => r.data),
   });
 
@@ -75,13 +92,40 @@ export default function ColdCallLeadsPage() {
     enabled:  isAdmin,
   });
 
+  const nicheMutation = useMutation({
+    mutationFn: ({ id, niche }: { id: string; niche: string }) =>
+      leadsApi.update(id, { niche } as any),
+    onMutate: async ({ id, niche }) => {
+      await qc.cancelQueries({ queryKey: ['leads-facebook', filters] });
+      qc.setQueryData(['leads-facebook', filters], (old: any) => ({
+        ...old,
+        data: old?.data?.map((l: Lead) => l.id === id ? { ...l, niche } : l) ?? [],
+      }));
+    },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] }); toast.error('Erreur niche'); },
+  });
+
+  const rdvOutcomeMutation = useMutation({
+    mutationFn: ({ id, rdv_outcome }: { id: string; rdv_outcome: string }) =>
+      leadsApi.update(id, { rdv_outcome } as any),
+    onMutate: async ({ id, rdv_outcome }) => {
+      await qc.cancelQueries({ queryKey: ['leads-facebook', filters] });
+      qc.setQueryData(['leads-facebook', filters], (old: any) => ({
+        ...old,
+        data: old?.data?.map((l: Lead) => l.id === id ? { ...l, rdv_outcome } : l) ?? [],
+      }));
+    },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] }); toast.error('Erreur résultat RDV'); },
+  });
+
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }: { ids: string[]; status: string }) =>
       leadsApi.bulkStatus(ids, status),
-    onSuccess: (_, { ids }) => {
-      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} mis à jour`);
+    onSuccess: (_, { ids, status }) => {
+      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${FB_STATUS_LABELS[status] ?? status}`);
       setSelected(new Set()); setBulkStatus('');
-      qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
   });
@@ -92,7 +136,7 @@ export default function ColdCallLeadsPage() {
     onSuccess: (_, { ids }) => {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set()); setBulkSetterId('');
-      qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-facebook'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -101,8 +145,8 @@ export default function ColdCallLeadsPage() {
     mutationFn: leadsApi.delete,
     onSuccess: () => {
       toast.success('Lead supprimé');
-      qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
-      qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
+      qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
     },
   });
 
@@ -132,7 +176,7 @@ export default function ColdCallLeadsPage() {
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <div className="flex border-b border-gray-100 min-w-max">
-            {CC_TABS.map((tab) => {
+            {FB_TABS.map((tab) => {
               const count = tab.value ? (countsData?.[tab.value] ?? 0) : (totalCount ?? 0);
               const isActive = activeTab === tab.value;
               return (
@@ -141,14 +185,14 @@ export default function ColdCallLeadsPage() {
                   onClick={() => handleTabChange(tab.value)}
                   className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5
                     ${isActive
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-blue-600 text-blue-700'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                 >
                   {tab.label}
                   {count > 0 && (
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold
-                      ${isActive ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                      ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
                       {count}
                     </span>
                   )}
@@ -163,8 +207,12 @@ export default function ColdCallLeadsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={(e) => debouncedSearch(e.target.value)}
-            placeholder="Rechercher nom, société…" className="input pl-9 py-2 text-sm" />
+          <input
+            value={search}
+            onChange={(e) => debouncedSearch(e.target.value)}
+            placeholder="Rechercher nom, société…"
+            className="input pl-9 py-2 text-sm"
+          />
           {search && (
             <button onClick={() => debouncedSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
               <X className="w-4 h-4 text-gray-400" />
@@ -172,25 +220,21 @@ export default function ColdCallLeadsPage() {
           )}
         </div>
 
-        <select className="select w-auto text-sm" value={filters.status ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as LeadStatus | '', page: 1 }))}>
-          <option value="">Tous les statuts</option>
-          {Object.entries(CC_STATUS_LABELS).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
-          ))}
-        </select>
-
-        <select className="select w-auto text-sm" value={filters.quality ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, quality: e.target.value as LeadQuality | '', page: 1 }))}>
-          <option value="">Toutes qualités</option>
-          <option value="hot">Chaud</option>
-          <option value="warm">Tiède</option>
-          <option value="cold">Froid</option>
+        <select
+          className="select w-auto text-sm"
+          value={filters.niche ?? ''}
+          onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 }))}
+        >
+          <option value="">Toutes niches</option>
+          {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
 
         {isAdmin && setters && (
-          <select className="select w-auto text-sm" value={filters.setter_id ?? ''}
-            onChange={(e) => setFilters((f) => ({ ...f, setter_id: e.target.value || undefined, page: 1 }))}>
+          <select
+            className="select w-auto text-sm"
+            value={filters.setter_id ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, setter_id: e.target.value || undefined, page: 1 }))}
+          >
             <option value="">Tous les setters</option>
             {(setters as any[]).map((s) => (
               <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
@@ -199,7 +243,13 @@ export default function ColdCallLeadsPage() {
         )}
 
         <div className="ml-auto">
-          <button onClick={() => qc.invalidateQueries({ queryKey: ['leads-cold-call'] })} className="btn-secondary btn-sm">
+          <button
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+              qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
+            }}
+            className="btn-secondary btn-sm"
+          >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -215,13 +265,15 @@ export default function ColdCallLeadsPage() {
             <div className="flex items-center gap-2">
               <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="select text-xs py-1 h-7">
                 <option value="">— Changer statut —</option>
-                {Object.entries(CC_STATUS_LABELS).map(([val, label]) => (
+                {Object.entries(FB_STATUS_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
-              <button onClick={() => bulkStatusMutation.mutate({ ids: Array.from(selected), status: bulkStatus })}
+              <button
+                onClick={() => bulkStatusMutation.mutate({ ids: Array.from(selected), status: bulkStatus })}
                 disabled={!bulkStatus || bulkStatusMutation.isPending}
-                className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg transition-colors">
+                className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg transition-colors"
+              >
                 Appliquer
               </button>
             </div>
@@ -233,9 +285,11 @@ export default function ColdCallLeadsPage() {
                     <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
                   ))}
                 </select>
-                <button onClick={() => bulkAssignMutation.mutate({ ids: Array.from(selected), setterId: bulkSetterId })}
+                <button
+                  onClick={() => bulkAssignMutation.mutate({ ids: Array.from(selected), setterId: bulkSetterId })}
                   disabled={!bulkSetterId || bulkAssignMutation.isPending}
-                  className="px-3 py-1 text-xs font-medium bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded-lg flex items-center gap-1">
+                  className="px-3 py-1 text-xs font-medium bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded-lg transition-colors flex items-center gap-1"
+                >
                   <UserCheck className="w-3.5 h-3.5" /> Assigner
                 </button>
               </div>
@@ -248,7 +302,7 @@ export default function ColdCallLeadsPage() {
           <div className="flex items-center justify-center h-48"><Spinner /></div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-            <p className="text-sm">Aucun lead cold call trouvé</p>
+            <p className="text-sm">Aucun lead Facebook {activeTab ? `en statut "${FB_STATUS_LABELS[activeTab]}"` : ''}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -261,9 +315,10 @@ export default function ColdCallLeadsPage() {
                   </th>
                   <th className="th">Nom</th>
                   <th className="th hidden md:table-cell">Société</th>
-                  <th className="th hidden lg:table-cell">Téléphone</th>
-                  <th className="th">Qualité</th>
+                  <th className="th hidden md:table-cell">Niche</th>
+                  <th className="th hidden sm:table-cell">Qualité</th>
                   <th className="th">Statut</th>
+                  {activeTab === 'rdv' && <th className="th">Résultat RDV</th>}
                   {isAdmin && <th className="th hidden xl:table-cell">Setter</th>}
                   <th className="th hidden md:table-cell">Créé le</th>
                   <th className="th w-16">Actions</th>
@@ -271,44 +326,80 @@ export default function ColdCallLeadsPage() {
               </thead>
               <tbody>
                 {leads.map((lead: Lead) => (
-                  <tr key={lead.id}
-                    className={`table-row cursor-pointer ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}
-                    onClick={() => router.push(`/leads/${lead.id}`)}>
-                    <td className="td" onClick={(e) => { e.stopPropagation(); toggleSelect(lead.id); }}>
+                  <tr key={lead.id} className={`table-row ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}>
+                    <td className="td" onClick={() => toggleSelect(lead.id)}>
                       <input type="checkbox" checked={selected.has(lead.id)} onChange={() => {}} className="rounded cursor-pointer" />
                     </td>
-                    <td className="td">
+
+                    <td className="td cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
                       <div className="flex items-center gap-2">
-                        {lead.called && <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" title="Appelé" />}
                         <div>
-                          <p className="font-medium text-gray-900">{lead.first_name} {lead.last_name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-gray-900 text-sm">{lead.first_name} {lead.last_name}</p>
+                            {lead.instagram_url && (
+                              <a href={lead.instagram_url} target="_blank" rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-blue-500 hover:text-blue-600 flex-shrink-0">
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
                           {lead.email && <p className="text-xs text-gray-400 truncate max-w-32">{lead.email}</p>}
                         </div>
                       </div>
                     </td>
-                    <td className="td hidden md:table-cell text-gray-500">{lead.company ?? '—'}</td>
-                    <td className="td hidden lg:table-cell">
-                      {lead.phone
-                        ? <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 text-sm text-gray-600 hover:text-primary-600">
-                            <Phone className="w-3 h-3" />{lead.phone}
-                          </a>
-                        : <span className="text-gray-300">—</span>}
+
+                    <td className="td hidden md:table-cell text-gray-500 text-sm" onClick={() => router.push(`/leads/${lead.id}`)}>
+                      {lead.company ?? <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="td">
+
+                    <td className="td hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={lead.niche ?? ''}
+                        onChange={(e) => nicheMutation.mutate({ id: lead.id, niche: e.target.value })}
+                        className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-400 cursor-pointer"
+                      >
+                        <option value="">— niche —</option>
+                        {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </td>
+
+                    <td className="td hidden sm:table-cell">
                       {lead.lead_quality ? <Badge variant={lead.lead_quality} /> : <span className="text-gray-300 text-xs">—</span>}
                     </td>
-                    <td className="td">
+
+                    <td className="td" onClick={() => router.push(`/leads/${lead.id}`)}>
                       <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
-                        {CC_STATUS_LABELS[lead.status] ?? lead.status}
+                        {FB_STATUS_LABELS[lead.status] ?? lead.status}
                       </span>
                     </td>
+
+                    {activeTab === 'rdv' && (
+                      <td className="td" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={lead.rdv_outcome ?? ''}
+                          onChange={(e) => rdvOutcomeMutation.mutate({ id: lead.id, rdv_outcome: e.target.value })}
+                          className={`text-xs border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400 cursor-pointer
+                            ${lead.rdv_outcome ? `border-transparent ${RDV_OUTCOME_COLORS[lead.rdv_outcome]}` : 'border-gray-200 bg-white text-gray-500'}`}
+                        >
+                          <option value="">— résultat —</option>
+                          {Object.entries(RDV_OUTCOME_LABELS).map(([val, label]) => (
+                            <option key={val} value={val}>{label}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+
                     {isAdmin && (
-                      <td className="td hidden xl:table-cell text-gray-500 text-xs">
+                      <td className="td hidden xl:table-cell text-gray-500 text-xs" onClick={() => router.push(`/leads/${lead.id}`)}>
                         {lead.setter ? `${lead.setter.first_name} ${lead.setter.last_name}` : <span className="text-gray-300">—</span>}
                       </td>
                     )}
-                    <td className="td hidden md:table-cell text-gray-500 text-xs">{formatDate(lead.created_at)}</td>
+
+                    <td className="td hidden md:table-cell text-gray-500 text-xs" onClick={() => router.push(`/leads/${lead.id}`)}>
+                      {formatDate(lead.created_at)}
+                    </td>
+
                     <td className="td" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button onClick={() => router.push(`/leads/${lead.id}`)}

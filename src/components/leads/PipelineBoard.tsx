@@ -46,15 +46,21 @@ const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: strin
 
 /* ── Card ─────────────────────────────────────────────────────────── */
 function LeadCardInner({ lead }: { lead: Lead }) {
+  const isSocial = lead.source === 'instagram' || lead.source === 'facebook';
+  const displayName = isSocial && lead.instagram_username
+    ? `@${lead.instagram_username}`
+    : `${lead.first_name} ${lead.last_name}`;
+  const subtitle = isSocial && lead.instagram_username && lead.company
+    ? lead.company
+    : lead.company;
+
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-gray-900 break-words">
-        {lead.first_name} {lead.last_name}
-      </p>
-      {lead.company && (
+      <p className="text-sm font-semibold text-gray-900 break-words">{displayName}</p>
+      {subtitle && (
         <p className="text-xs text-gray-500 flex items-start gap-1 mt-0.5 break-words">
           <Building className="w-3 h-3 flex-shrink-0 text-gray-400 mt-0.5" />
-          <span>{lead.company}</span>
+          <span>{subtitle}</span>
         </p>
       )}
       {lead.phone && (
@@ -63,11 +69,14 @@ function LeadCardInner({ lead }: { lead: Lead }) {
           {lead.phone}
         </p>
       )}
+      {lead.niche && (
+        <p className="text-[10px] text-gray-400 mt-0.5">{lead.niche}</p>
+      )}
       <div className="flex items-center gap-1 mt-2 flex-wrap">
         {lead.lead_quality && <Badge variant={lead.lead_quality} />}
-        {lead.called && (
-          <span className="badge bg-green-100 text-green-700 text-[10px]">Appelé</span>
-        )}
+        {lead.called && <span className="badge bg-green-100 text-green-700 text-[10px]">Appelé</span>}
+        {lead.rdv_outcome === 'vendu' && <span className="badge bg-green-100 text-green-700 text-[10px]">Vendu</span>}
+        {lead.rdv_outcome === 'no_show' && <span className="badge bg-red-100 text-red-600 text-[10px]">No Show</span>}
       </div>
     </div>
   );
@@ -175,6 +184,8 @@ const COLUMNS_INSTAGRAM: typeof COLUMNS = [
   { id: 'rdv' as LeadStatus,              label: 'RDV',             topColor: 'border-t-green-500',   hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'   },
 ];
 
+const COLUMNS_FACEBOOK = COLUMNS_INSTAGRAM;
+
 /* ── Board ────────────────────────────────────────────────────────── */
 interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook' }
 
@@ -183,7 +194,9 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
 
-  const columns = source === 'instagram' ? COLUMNS_INSTAGRAM : COLUMNS;
+  const columns = source === 'instagram' ? COLUMNS_INSTAGRAM
+    : source === 'facebook' ? COLUMNS_FACEBOOK
+    : COLUMNS;
 
   // 8 px distance before drag activates → clicks still work normally
   const sensors = useSensors(
@@ -200,11 +213,7 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
       leadsApi.update(id, { status }).then((r) => r.data),
     onSuccess: (_, { id, status }) => {
-      // Write the new status directly into the cache BEFORE clearing the
-      // optimistic override. Without this, React Query briefly re-renders
-      // with the stale cached status (e.g. "perdu") while the refetch is
-      // in-flight, making the card visually snap back.
-      qc.setQueryData<Lead[]>(['leads-pipeline'], (old) =>
+      qc.setQueryData<Lead[]>(['leads-pipeline', source], (old) =>
         old?.map((l) => (l.id === id ? { ...l, status } : l)) ?? old
       );
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
@@ -231,7 +240,7 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     if (!over) return;
     const leadId    = active.id as string;
     const newStatus = over.id as LeadStatus;
-    if (!COLUMNS.find((c) => c.id === newStatus)) return;
+    if (!columns.find((c) => c.id === newStatus)) return;
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) return;
     setOptimistic((p) => ({ ...p, [leadId]: newStatus }));

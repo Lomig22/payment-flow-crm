@@ -65,7 +65,7 @@ export interface Lead {
   history?:            LeadHistory[];
   created_at:          string;
   updated_at:          string;
-  // Instagram-specific
+  // Instagram/Facebook-specific
   instagram_username?: string;
   instagram_url?:      string;
   a_ouvert?:           boolean;
@@ -73,7 +73,9 @@ export interface Lead {
   bio?:                string;
   followers_count?:    number;
   ig_score?:           number;
-  // Instagram funnel dates
+  // RDV outcome (Sprint 3)
+  rdv_outcome?:        'present' | 'vendu' | 'no_show' | 'pas_qualifie';
+  // Instagram/Facebook funnel dates
   m1_date?:            string;
   r1_date?:            string;
   r2_date?:            string;
@@ -152,13 +154,19 @@ export interface PaginatedResponse<T> {
 }
 
 export interface LeadsFilters {
-  setter_id?: string;
-  status?:    LeadStatus | '';
-  quality?:   LeadQuality | '';
-  source?:    LeadSource | '';
-  search?:    string;
-  page?:      number;
-  limit?:     number;
-  sort?:      string;
-  order?:     'asc' | 'desc';
+  setter_id?:          string;
+  status?:             LeadStatus | '';
+  quality?:            LeadQuality | '';
+  source?:             LeadSource | '';
+  search?:             string;
+  page?:               number;
+  limit?:              number;
+  sort?:               string;
+  order?:              'asc' | 'desc';
+  // Instagram/Facebook-specific
+  niche?:              string;
+  a_ouvert?:           string;
+  instagram_username?: string;
+  // Utility
+  count_only?:         boolean;
 }

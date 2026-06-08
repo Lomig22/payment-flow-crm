@@ -26,7 +26,8 @@ const schema = z.object({
   quote_sent:         z.boolean().default(false),
   r2_planned:         z.boolean().default(false),
   r3_planned:         z.boolean().default(false),
-  status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']).default('in_progress'),
+  status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
+                              'lead', 'm1', 'r1', 'reponse', 'a_relancer', 'audit_a_envoyer', 'audit_envoye', 'rdv']).default('in_progress'),
   source:             z.enum(['instagram', 'facebook', 'cold_call']).optional().or(z.literal('')),
   notes:              z.string().optional(),
 });

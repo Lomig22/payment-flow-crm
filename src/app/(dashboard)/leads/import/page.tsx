@@ -24,12 +24,15 @@ export default function ImportPage() {
   const qc   = useQueryClient();
   const isAdmin = user?.role === 'admin';
 
-  const [file,       setFile]       = useState<File | null>(null);
-  const [mode,       setMode]       = useState<'round_robin' | 'manual'>('round_robin');
-  const [setterId,   setSetterId]   = useState('');
+  const [file,        setFile]        = useState<File | null>(null);
+  const [mode,        setMode]        = useState<'round_robin' | 'manual'>('round_robin');
+  const [setterId,    setSetterId]    = useState('');
   const [rrSetterIds, setRrSetterIds] = useState<string[]>([]);
-  const [source,     setSource]     = useState<string>('cold_call');
-  const [result,     setResult]     = useState<ImportResult | null>(null);
+  const [source,      setSource]      = useState<string>('cold_call');
+  const [batchNiche,  setBatchNiche]  = useState('');
+  const [result,      setResult]      = useState<ImportResult | null>(null);
+
+  const NICHE_OPTIONS = ['Électricien','Plombier','Couvreur','Maçon','Menuisier','Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre'];
 
   const { data: setters } = useQuery({
     queryKey: ['users-setters'],
@@ -53,6 +56,7 @@ export default function ImportPage() {
       if (mode === 'round_robin' && rrSetterIds.length > 0) formData.append('setter_ids', rrSetterIds.join(','));
       if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
       if (source) formData.append('source', source);
+      if ((source === 'instagram' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
       return leadsApi.import(formData).then((r) => r.data as ImportResult);
     },
     onSuccess: (data) => {
@@ -231,6 +235,17 @@ export default function ImportPage() {
             ))}
           </div>
         </div>
+
+        {/* Niche batch (Instagram / Facebook) */}
+        {(source === 'instagram' || source === 'facebook') && (
+          <div className="mt-5">
+            <label className="label">Niche du lot <span className="text-gray-400 font-normal">(optionnel — appliquée à tous les leads importés)</span></label>
+            <select value={batchNiche} onChange={(e) => setBatchNiche(e.target.value)} className="select">
+              <option value="">— Sans niche —</option>
+              {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
 
         <button
           onClick={() => mutation.mutate()}

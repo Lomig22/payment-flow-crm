@@ -65,7 +65,11 @@ const COLUMN_MAP: Record<string, string> = {
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
-const VALID_STATUS  = new Set(['in_progress', 'client', 'lost', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']);
+const VALID_STATUS  = new Set([
+  'in_progress', 'client', 'lost', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
+  'lead', 'm1', 'r1', 'reponse', 'a_relancer', 'audit_a_envoyer', 'audit_envoye', 'rdv',
+]);
+const VALID_NICHES  = new Set(['Électricien','Plombier','Couvreur','Maçon','Menuisier','Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre']);
 
 // Detect and fix Windows-1252 bytes misread as UTF-8 (common with scraped files)
 function decodeContent(buffer: Buffer): string {
@@ -111,6 +115,8 @@ export async function POST(request: NextRequest) {
   const VALID_SOURCE   = new Set(['instagram', 'facebook', 'cold_call']);
   const rawSource      = formData.get('source') as string | null;
   const leadSource     = rawSource && VALID_SOURCE.has(rawSource) ? rawSource : null;
+  const rawNiche       = formData.get('niche') as string | null;
+  const batchNiche     = rawNiche && VALID_NICHES.has(rawNiche) ? rawNiche : null;
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
@@ -210,12 +216,15 @@ export async function POST(request: NextRequest) {
       } else if (mapped === '_ig_username') {
         if (v) row._ig_username = v.trim();
       } else if (mapped === '_ig_url') {
-        if (v) extras.push(`Instagram : ${v.trim()}`);
+        if (v) { extras.push(`Instagram : ${v.trim()}`); row._ig_url = v.trim(); }
       } else if (mapped === '_ig_hashtag') {
         if (v) extras.push(`#${v.trim()}`);
       } else if (mapped === '_ig_score') {
         const n = parseInt(v, 10);
-        if (!isNaN(n)) row._ig_score = String(n);
+        if (!isNaN(n)) {
+          row._ig_score = String(n);
+          if (!row.lead_quality) row.lead_quality = n >= 15 ? 'hot' : n >= 8 ? 'warm' : 'cold';
+        }
       } else if (mapped === '_ig_biz_cat') {
         if (v && v !== 'None') extras.push(v.trim());
       } else {
@@ -230,19 +239,11 @@ export async function POST(request: NextRequest) {
     }
     delete row._dirigeant;
 
-    // Apify Instagram: score → lead_quality
-    if (row._ig_score !== undefined) {
-      const n = parseInt(row._ig_score, 10);
-      if (!isNaN(n) && !row.lead_quality) {
-        row.lead_quality = n >= 15 ? 'hot' : n >= 8 ? 'warm' : 'cold';
-      }
-      delete row._ig_score;
-    }
     // Apify Instagram: @username en tête des notes + fallback société si full_name vide
     if (row._ig_username) {
       if (!row.company) row.company = row._ig_username;
       extras.unshift(`@${row._ig_username}`);
-      delete row._ig_username;
+      // Keep _ig_username for DB insert (instagram_username column)
     }
 
     if (row.phone) row.phone = cleanPhone(row.phone);
@@ -337,6 +338,9 @@ export async function POST(request: NextRequest) {
       seenEmails.add(ne);
     }
 
+    const isSocial = leadSource === 'instagram' || leadSource === 'facebook';
+    const defaultStatus = isSocial ? 'lead' : 'in_progress';
+
     const { error } = await (supabase as any).from('leads').insert({
       first_name:   row.first_name,
       last_name:    row.last_name,
@@ -345,10 +349,17 @@ export async function POST(request: NextRequest) {
       email:        row.email      || null,
       location:     row.location   || null,
       lead_quality: VALID_QUALITY.has(row.lead_quality) ? row.lead_quality : null,
-      status:       VALID_STATUS.has(row.status) ? row.status : 'in_progress',
+      status:       VALID_STATUS.has(row.status) ? row.status : defaultStatus,
       source:       leadSource,
       notes:        row.notes      || null,
       setter_id:    getNextSetter(),
+      // Instagram/Facebook columns (requires Sprint 1 SQL migration)
+      ...(isSocial ? {
+        instagram_username: row._ig_username || null,
+        instagram_url:      row._ig_url      || null,
+        ig_score:           row._ig_score    ? parseInt(row._ig_score, 10) : null,
+        niche:              batchNiche        || null,
+      } : {}),
     });
 
     if (error) {

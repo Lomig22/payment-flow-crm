@@ -59,8 +59,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const allowed = ['first_name','last_name','company','phone','email','location','called',
     'action_in_progress','lead_quality','need_identified','appointment_taken','appointment_honored',
     'quote_sent','r2_planned','r3_planned','status','source','notes',
-    // Instagram
-    'instagram_username','instagram_url','a_ouvert','niche','bio','followers_count','ig_score'];
+    // Instagram/Facebook
+    'instagram_username','instagram_url','a_ouvert','niche','bio','followers_count','ig_score',
+    'rdv_outcome'];
   if (user.role === 'admin') allowed.push('setter_id');
 
   // Date automatique pour le funnel Instagram
@@ -83,8 +84,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
   }
 
-  // Si le statut change et que c'est un lead Instagram → enregistre la date
-  if (updates.status && current.source === 'instagram') {
+  // Si le statut change et que c'est un lead Instagram/Facebook → enregistre la date
+  if (updates.status && (current.source === 'instagram' || current.source === 'facebook')) {
     const dateField = IG_STATUS_DATE[updates.status as string];
     if (dateField) updates[dateField] = new Date().toISOString();
   }

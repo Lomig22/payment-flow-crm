@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   Search, Eye, RefreshCw, ExternalLink, X,
-  ChevronLeft, ChevronRight, Trash2, UserCheck,
+  ChevronLeft, ChevronRight, Trash2, UserCheck, MessageCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -15,23 +15,44 @@ import { formatDate } from '@/lib/utils';
 import type { Lead, LeadsFilters, LeadStatus } from '@/types';
 
 const NICHE_OPTIONS = [
-  '', 'Électricien', 'Plombier', 'Couvreur', 'Maçon',
-  'Menuisier', 'Peintre', 'Carreleur', 'Plaquiste',
-  'Climatisation', 'Multi-corps', 'Autre',
+  'Électricien','Plombier','Couvreur','Maçon','Menuisier',
+  'Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre',
 ];
 
 const IG_STATUS_LABELS: Record<string, string> = {
   lead: 'Lead', m1: 'M1 envoyé', r1: 'R1', r2: 'R2',
   reponse: 'Réponse', a_relancer: 'À relancer',
   audit_a_envoyer: 'Audit à envoyer', audit_envoye: 'Audit envoyé', rdv: 'RDV',
-  in_progress: 'En cours', to_follow_up: 'À relancer', client: 'Client', lost: 'Perdu',
 };
 
+const RDV_OUTCOME_LABELS: Record<string, string> = {
+  present: 'Présent', vendu: 'Vendu', no_show: 'No Show', pas_qualifie: 'Non qualifié',
+};
+const RDV_OUTCOME_COLORS: Record<string, string> = {
+  vendu:         'bg-green-100 text-green-700',
+  no_show:       'bg-red-100 text-red-600',
+  pas_qualifie:  'bg-orange-100 text-orange-600',
+  present:       'bg-blue-100 text-blue-700',
+};
+
+const IG_TABS = [
+  { label: 'Tous',           value: '' },
+  { label: 'Lead',           value: 'lead' },
+  { label: 'M1 envoyé',      value: 'm1' },
+  { label: 'R1',             value: 'r1' },
+  { label: 'R2',             value: 'r2' },
+  { label: 'Réponse',        value: 'reponse' },
+  { label: 'À relancer',     value: 'a_relancer' },
+  { label: 'Audit à env.',   value: 'audit_a_envoyer' },
+  { label: 'Audit envoyé',   value: 'audit_envoye' },
+  { label: 'RDV',            value: 'rdv' },
+];
+
 function OpenRateBar({ leads }: { leads: Lead[] }) {
-  const total   = leads.length;
-  const opened  = leads.filter((l) => l.a_ouvert).length;
-  const rate    = total > 0 ? Math.round((opened / total) * 100) : 0;
-  const color   = rate >= 50 ? 'bg-green-500' : rate >= 25 ? 'bg-yellow-400' : 'bg-red-400';
+  const total  = leads.length;
+  const opened = leads.filter((l) => l.a_ouvert).length;
+  const rate   = total > 0 ? Math.round((opened / total) * 100) : 0;
+  const color  = rate >= 50 ? 'bg-green-500' : rate >= 25 ? 'bg-yellow-400' : 'bg-red-400';
 
   return (
     <div className="card p-4 flex items-center gap-6">
@@ -49,40 +70,50 @@ function OpenRateBar({ leads }: { leads: Lead[] }) {
         </div>
       </div>
       <div className="grid grid-cols-3 gap-4 text-center">
-        <div>
-          <p className="text-lg font-semibold text-gray-800">{total}</p>
-          <p className="text-xs text-gray-400">Leads</p>
-        </div>
-        <div>
-          <p className="text-lg font-semibold text-green-600">{opened}</p>
-          <p className="text-xs text-gray-400">Ouverts</p>
-        </div>
-        <div>
-          <p className="text-lg font-semibold text-gray-400">{total - opened}</p>
-          <p className="text-xs text-gray-400">Non ouverts</p>
-        </div>
+        <div><p className="text-lg font-semibold text-gray-800">{total}</p><p className="text-xs text-gray-400">Leads</p></div>
+        <div><p className="text-lg font-semibold text-green-600">{opened}</p><p className="text-xs text-gray-400">Ouverts</p></div>
+        <div><p className="text-lg font-semibold text-gray-400">{total - opened}</p><p className="text-xs text-gray-400">Non ouverts</p></div>
       </div>
     </div>
   );
 }
 
 export default function InstagramLeadsPage() {
-  const router    = useRouter();
-  const qc        = useQueryClient();
-  const user      = useAuthStore((s) => s.user);
-  const isAdmin   = user?.role === 'admin';
+  const router  = useRouter();
+  const qc      = useQueryClient();
+  const user    = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
 
+  const [activeTab,    setActiveTab]    = useState('');
   const [filters,      setFilters]      = useState<LeadsFilters>({ page: 1, limit: 50, source: 'instagram' });
   const [search,       setSearch]       = useState('');
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [bulkStatus,   setBulkStatus]   = useState('');
   const [bulkSetterId, setBulkSetterId] = useState('');
+  const [qrInput,      setQrInput]      = useState('');
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback((val: string) => {
     setSearch(val);
     setFilters((f) => ({ ...f, search: val || undefined, page: 1 }));
   }, []);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setFilters((f) => ({ ...f, status: (tab || undefined) as LeadStatus | undefined, page: 1 }));
+    setSelected(new Set());
+  };
+
+  // Counts per status (for tab badges)
+  const { data: countsData } = useQuery({
+    queryKey: ['leads-instagram-counts', filters.setter_id, filters.niche],
+    queryFn: () => leadsApi.getAll({
+      source: 'instagram', count_only: true,
+      ...(filters.setter_id ? { setter_id: filters.setter_id } : {}),
+      ...(filters.niche     ? { niche: filters.niche }         : {}),
+    } as LeadsFilters).then((r) => r.data.counts as Record<string, number> | undefined),
+    staleTime: 30_000,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['leads-instagram', filters],
@@ -95,6 +126,32 @@ export default function InstagramLeadsPage() {
     enabled:  isAdmin,
   });
 
+  // Quick Reply: @username → status 'reponse'
+  const qrMutation = useMutation({
+    mutationFn: async (username: string) => {
+      const r = await leadsApi.getAll({ source: 'instagram', instagram_username: username, limit: 1 } as LeadsFilters);
+      const lead = r.data?.data?.[0];
+      if (!lead) throw new Error(`@${username} introuvable dans les leads Instagram`);
+      await leadsApi.update(lead.id, { status: 'reponse' as any });
+      return lead;
+    },
+    onSuccess: (lead) => {
+      const handle = lead.instagram_username ? `@${lead.instagram_username}` : `${lead.first_name} ${lead.last_name}`;
+      toast.success(`${handle} → Réponse ✓`);
+      setQrInput('');
+      qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
+    },
+    onError: (err: any) => toast.error(err.message ?? 'Erreur Quick Reply'),
+  });
+
+  const handleQuickReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    const username = qrInput.trim().replace(/^@/, '');
+    if (!username) return;
+    qrMutation.mutate(username);
+  };
+
   const toggleOuvertMutation = useMutation({
     mutationFn: ({ id, val }: { id: string; val: boolean }) =>
       leadsApi.update(id, { a_ouvert: val } as any),
@@ -105,10 +162,7 @@ export default function InstagramLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, a_ouvert: val } : l) ?? [],
       }));
     },
-    onError: () => {
-      qc.invalidateQueries({ queryKey: ['leads-instagram'] });
-      toast.error('Erreur');
-    },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur'); },
   });
 
   const nicheMutation = useMutation({
@@ -121,10 +175,20 @@ export default function InstagramLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, niche } : l) ?? [],
       }));
     },
-    onError: () => {
-      qc.invalidateQueries({ queryKey: ['leads-instagram'] });
-      toast.error('Erreur lors de la mise à jour de la niche');
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur niche'); },
+  });
+
+  const rdvOutcomeMutation = useMutation({
+    mutationFn: ({ id, rdv_outcome }: { id: string; rdv_outcome: string }) =>
+      leadsApi.update(id, { rdv_outcome } as any),
+    onMutate: async ({ id, rdv_outcome }) => {
+      await qc.cancelQueries({ queryKey: ['leads-instagram', filters] });
+      qc.setQueryData(['leads-instagram', filters], (old: any) => ({
+        ...old,
+        data: old?.data?.map((l: Lead) => l.id === id ? { ...l, rdv_outcome } : l) ?? [],
+      }));
     },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur résultat RDV'); },
   });
 
   const bulkStatusMutation = useMutation({
@@ -132,9 +196,9 @@ export default function InstagramLeadsPage() {
       leadsApi.bulkStatus(ids, status),
     onSuccess: (_, { ids, status }) => {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${IG_STATUS_LABELS[status] ?? status}`);
-      setSelected(new Set());
-      setBulkStatus('');
+      setSelected(new Set()); setBulkStatus('');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
   });
@@ -144,8 +208,7 @@ export default function InstagramLeadsPage() {
       leadsApi.assign(ids, setterId),
     onSuccess: (_, { ids }) => {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
-      setSelected(new Set());
-      setBulkSetterId('');
+      setSelected(new Set()); setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
@@ -153,7 +216,11 @@ export default function InstagramLeadsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: leadsApi.delete,
-    onSuccess:  () => { toast.success('Lead supprimé'); qc.invalidateQueries({ queryKey: ['leads-instagram'] }); },
+    onSuccess: () => {
+      toast.success('Lead supprimé');
+      qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
+    },
   });
 
   const leads      = data?.data ?? [];
@@ -174,10 +241,71 @@ export default function InstagramLeadsPage() {
   const toggleSelect = (id: string) =>
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
+  const totalCount = countsData
+    ? Object.values(countsData).reduce((a, b) => a + b, 0)
+    : undefined;
+
   return (
     <div className="space-y-4">
-      {/* Open rate stats */}
-      {!isLoading && leads.length > 0 && <OpenRateBar leads={leads} />}
+      {/* Open rate — only on "Tous" tab */}
+      {!isLoading && leads.length > 0 && activeTab === '' && <OpenRateBar leads={leads} />}
+
+      {/* Quick Reply Bar */}
+      <div className="card p-3 border-pink-100 bg-gradient-to-r from-pink-50/60 to-purple-50/60">
+        <form onSubmit={handleQuickReply} className="flex items-center gap-3">
+          <MessageCircle className="w-4 h-4 text-pink-500 flex-shrink-0" />
+          <span className="text-sm font-medium text-pink-700 whitespace-nowrap hidden sm:block">Quick Reply</span>
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">@</span>
+            <input
+              value={qrInput}
+              onChange={(e) => setQrInput(e.target.value)}
+              placeholder="username · Entre pour marquer comme Réponse"
+              className="input pl-7 py-1.5 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!qrInput.trim() || qrMutation.isPending}
+            className="btn-primary btn-sm whitespace-nowrap"
+          >
+            {qrMutation.isPending ? <Spinner className="w-3.5 h-3.5" /> : '→ Réponse'}
+          </button>
+        </form>
+      </div>
+
+      {/* Tabs */}
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="flex border-b border-gray-100 min-w-max">
+            {IG_TABS.map((tab) => {
+              const count = tab.value
+                ? (countsData?.[tab.value] ?? 0)
+                : (totalCount ?? 0);
+              const isActive = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => handleTabChange(tab.value)}
+                  className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5
+                    ${isActive
+                      ? 'border-pink-500 text-pink-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                  {tab.label}
+                  {count > 0 && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold
+                      ${isActive ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
@@ -198,28 +326,17 @@ export default function InstagramLeadsPage() {
 
         <select
           className="select w-auto text-sm"
-          value={filters.status ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as LeadStatus | '', page: 1 }))}
-        >
-          <option value="">Tous les statuts</option>
-          {Object.entries(IG_STATUS_LABELS).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
-          ))}
-        </select>
-
-        <select
-          className="select w-auto text-sm"
-          value={(filters as any).niche ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 } as any))}
+          value={filters.niche ?? ''}
+          onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 }))}
         >
           <option value="">Toutes niches</option>
-          {NICHE_OPTIONS.filter(Boolean).map((n) => <option key={n} value={n}>{n}</option>)}
+          {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
 
         <select
           className="select w-auto text-sm"
-          value={(filters as any).a_ouvert ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, a_ouvert: e.target.value || undefined, page: 1 } as any))}
+          value={filters.a_ouvert ?? ''}
+          onChange={(e) => setFilters((f) => ({ ...f, a_ouvert: e.target.value || undefined, page: 1 }))}
         >
           <option value="">Tous</option>
           <option value="true">Ouvert ✓</option>
@@ -240,7 +357,13 @@ export default function InstagramLeadsPage() {
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => qc.invalidateQueries({ queryKey: ['leads-instagram'] })} className="btn-secondary btn-sm">
+          <button
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+              qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
+            }}
+            className="btn-secondary btn-sm"
+          >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -294,7 +417,7 @@ export default function InstagramLeadsPage() {
           <div className="flex items-center justify-center h-48"><Spinner /></div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-            <p className="text-sm">Aucun lead Instagram trouvé</p>
+            <p className="text-sm">Aucun lead Instagram {activeTab ? `en statut "${IG_STATUS_LABELS[activeTab]}"` : ''}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -310,6 +433,7 @@ export default function InstagramLeadsPage() {
                   <th className="th">Ouvert ?</th>
                   <th className="th hidden sm:table-cell">Score</th>
                   <th className="th">Statut</th>
+                  {activeTab === 'rdv' && <th className="th">Résultat RDV</th>}
                   {isAdmin && <th className="th hidden xl:table-cell">Setter</th>}
                   <th className="th hidden md:table-cell">Créé le</th>
                   <th className="th w-16">Actions</th>
@@ -317,15 +441,12 @@ export default function InstagramLeadsPage() {
               </thead>
               <tbody>
                 {leads.map((lead: Lead) => (
-                  <tr
-                    key={lead.id}
-                    className={`table-row ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}
-                  >
+                  <tr key={lead.id} className={`table-row ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}>
                     <td className="td" onClick={() => toggleSelect(lead.id)}>
                       <input type="checkbox" checked={selected.has(lead.id)} onChange={() => {}} className="rounded cursor-pointer" />
                     </td>
 
-                    {/* Compte Instagram */}
+                    {/* Compte */}
                     <td className="td cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
                       <div className="flex items-center gap-2">
                         <div>
@@ -334,14 +455,10 @@ export default function InstagramLeadsPage() {
                               {lead.instagram_username ? `@${lead.instagram_username}` : `${lead.first_name} ${lead.last_name}`}
                             </p>
                             {lead.instagram_url && (
-                              <a
-                                href={lead.instagram_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <a href={lead.instagram_url} target="_blank" rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-pink-500 hover:text-pink-600 flex-shrink-0"
-                                title="Ouvrir le profil Instagram"
-                              >
+                                title="Ouvrir le profil Instagram">
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             )}
@@ -361,9 +478,7 @@ export default function InstagramLeadsPage() {
                         className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-400 cursor-pointer"
                       >
                         <option value="">— niche —</option>
-                        {NICHE_OPTIONS.filter(Boolean).map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
+                        {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>
                     </td>
 
@@ -373,7 +488,7 @@ export default function InstagramLeadsPage() {
                         onClick={() => toggleOuvertMutation.mutate({ id: lead.id, val: !lead.a_ouvert })}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none
                           ${lead.a_ouvert ? 'bg-green-500' : 'bg-gray-200'}`}
-                        title={lead.a_ouvert ? 'A ouvert le DM' : 'N\'a pas ouvert'}
+                        title={lead.a_ouvert ? 'A ouvert le DM' : "N'a pas ouvert"}
                       >
                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
                           ${lead.a_ouvert ? 'translate-x-4' : 'translate-x-0.5'}`} />
@@ -397,6 +512,23 @@ export default function InstagramLeadsPage() {
                       </span>
                     </td>
 
+                    {/* Résultat RDV (tab rdv only) */}
+                    {activeTab === 'rdv' && (
+                      <td className="td" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={lead.rdv_outcome ?? ''}
+                          onChange={(e) => rdvOutcomeMutation.mutate({ id: lead.id, rdv_outcome: e.target.value })}
+                          className={`text-xs border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-400 cursor-pointer
+                            ${lead.rdv_outcome ? `border-transparent ${RDV_OUTCOME_COLORS[lead.rdv_outcome]}` : 'border-gray-200 bg-white text-gray-500'}`}
+                        >
+                          <option value="">— résultat —</option>
+                          {Object.entries(RDV_OUTCOME_LABELS).map(([val, label]) => (
+                            <option key={val} value={val}>{label}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+
                     {/* Setter */}
                     {isAdmin && (
                       <td className="td hidden xl:table-cell text-gray-500 text-xs" onClick={() => router.push(`/leads/${lead.id}`)}>
@@ -412,17 +544,13 @@ export default function InstagramLeadsPage() {
                     {/* Actions */}
                     <td className="td" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => router.push(`/leads/${lead.id}`)}
-                          className="p-1.5 hover:bg-primary-50 rounded-lg text-primary-600"
-                        >
+                        <button onClick={() => router.push(`/leads/${lead.id}`)}
+                          className="p-1.5 hover:bg-primary-50 rounded-lg text-primary-600">
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         {isAdmin && (
-                          <button
-                            onClick={() => { if (confirm('Supprimer ?')) deleteMutation.mutate(lead.id); }}
-                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-400"
-                          >
+                          <button onClick={() => { if (confirm('Supprimer ?')) deleteMutation.mutate(lead.id); }}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-red-400">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}

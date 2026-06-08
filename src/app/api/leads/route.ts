@@ -25,18 +25,37 @@ export async function GET(request: NextRequest) {
   if (!user) return unauthorized();
 
   const { searchParams } = new URL(request.url);
-  const setter_id = searchParams.get('setter_id');
-  const status    = searchParams.get('status');
-  const quality   = searchParams.get('quality');
-  const source    = searchParams.get('source');
-  const search    = searchParams.get('search');
-  const page      = Math.max(1, parseInt(searchParams.get('page') || '1'));
-  const rawLimit  = parseInt(searchParams.get('limit') || '20');
-  // Le pipeline demande toutes les données (limit élevé) — on autorise jusqu'à 2000
-  const limit     = Math.min(2000, rawLimit);
-  const sort      = VALID_SORTS[searchParams.get('sort') || ''] || 'created_at';
-  const asc       = searchParams.get('order') === 'asc';
-  const offset    = (page - 1) * limit;
+  const setter_id   = searchParams.get('setter_id');
+  const status      = searchParams.get('status');
+  const quality     = searchParams.get('quality');
+  const source      = searchParams.get('source');
+  const search      = searchParams.get('search');
+  const niche       = searchParams.get('niche');
+  const a_ouvert    = searchParams.get('a_ouvert');
+  const ig_username = searchParams.get('instagram_username');
+  const countOnly   = searchParams.get('count_only') === 'true';
+  const page        = Math.max(1, parseInt(searchParams.get('page') || '1'));
+  const rawLimit    = parseInt(searchParams.get('limit') || '20');
+  const limit       = Math.min(2000, rawLimit);
+  const sort        = VALID_SORTS[searchParams.get('sort') || ''] || 'created_at';
+  const asc         = searchParams.get('order') === 'asc';
+  const offset      = (page - 1) * limit;
+
+  // Lightweight count-by-status endpoint (used by tab badges)
+  if (countOnly) {
+    let cq = supabase.from('leads').select('status');
+    if (user.role !== 'admin') {
+      cq = cq.eq('setter_id', user.id);
+    } else if (setter_id) {
+      cq = cq.eq('setter_id', setter_id);
+    }
+    if (source) cq = cq.eq('source', source);
+    if (niche)  cq = (cq as any).eq('niche', niche);
+    const { data: rows } = await (cq as any).limit(5000);
+    const counts: Record<string, number> = {};
+    for (const r of (rows ?? [])) { counts[r.status] = (counts[r.status] ?? 0) + 1; }
+    return NextResponse.json({ counts });
+  }
 
   let q = supabase
     .from('leads')
@@ -47,10 +66,14 @@ export async function GET(request: NextRequest) {
   } else if (setter_id) {
     q = q.eq('setter_id', setter_id);
   }
-  if (status)  q = q.eq('status', status);
-  if (quality) q = q.eq('lead_quality', quality);
-  if (source)  q = q.eq('source', source);
-  if (search)  q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`);
+  if (status)      q = q.eq('status', status);
+  if (quality)     q = q.eq('lead_quality', quality);
+  if (source)      q = q.eq('source', source);
+  if (niche)       q = (q as any).eq('niche', niche);
+  if (a_ouvert === 'true')  q = (q as any).eq('a_ouvert', true);
+  if (a_ouvert === 'false') q = (q as any).eq('a_ouvert', false);
+  if (ig_username) q = (q as any).ilike('instagram_username', `%${ig_username.replace(/^@/, '')}%`);
+  if (search)      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,instagram_username.ilike.%${search}%`);
 
   q = q.order(sort, { ascending: asc }).range(offset, offset + limit - 1);
 

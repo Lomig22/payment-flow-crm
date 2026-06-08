@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Upload, UsersRound, LogOut, Zap, User, X,
-  MessageSquare, BarChart3, BookOpen, Instagram, Phone,
+  MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
   Users, Kanban, ChevronDown,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
@@ -32,12 +32,12 @@ function NavLink({ href, icon: Icon, label, onClick }: {
   );
 }
 
-function PoleSection({ icon: Icon, label, color, children, defaultOpen = false }: {
-  icon: React.ElementType; label: string; color: string;
+function PoleSection({ icon: Icon, label, color, segment, children, defaultOpen = false }: {
+  icon: React.ElementType; label: string; color: string; segment: string;
   children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(defaultOpen || pathname.includes(label === '📸 Instagram' ? 'instagram' : 'cold-call'));
+  const [open, setOpen] = useState(defaultOpen || pathname.includes(segment));
 
   return (
     <div>
@@ -92,13 +92,19 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <NavLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} />
 
         {/* ── Pôle Instagram ── */}
-        <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" defaultOpen>
+        <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram" defaultOpen>
           <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
           <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
         </PoleSection>
 
+        {/* ── Pôle Facebook ── */}
+        <PoleSection icon={Facebook} label="Facebook" color="text-blue-600" segment="facebook">
+          <NavLink href="/leads/facebook" icon={Users} label="Leads" onClick={onClose} />
+          <NavLink href="/pipeline/facebook" icon={Kanban} label="Pipeline" onClick={onClose} />
+        </PoleSection>
+
         {/* ── Pôle Cold Call ── */}
-        <PoleSection icon={Phone} label="Cold Call" color="text-blue-500">
+        <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment="cold-call">
           <NavLink href="/leads/cold-call" icon={Users} label="Leads" onClick={onClose} />
           <NavLink href="/pipeline/cold-call" icon={Kanban} label="Pipeline" onClick={onClose} />
         </PoleSection>
