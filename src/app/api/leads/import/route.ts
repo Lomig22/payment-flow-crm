@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
   const file           = formData.get('file') as File | null;
   let assignmentMode = (formData.get('assignment_mode') as string | null) ?? 'round_robin';
   const setterIdParam  = formData.get('setter_id') as string | null;
+  const setterIdsParam = formData.get('setter_ids') as string | null;
+  const selectedSetterIds = setterIdsParam ? setterIdsParam.split(',').filter(Boolean) : [];
   const VALID_SOURCE   = new Set(['instagram', 'facebook', 'cold_call']);
   const rawSource      = formData.get('source') as string | null;
   const leadSource     = rawSource && VALID_SOURCE.has(rawSource) ? rawSource : null;
@@ -148,9 +150,13 @@ export async function POST(request: NextRequest) {
 
   if (user.role === 'admin') {
     if (assignmentMode === 'round_robin') {
-      const { data: activeSetters } = await supabase
-        .from('users').select('id').eq('role', 'setter').eq('is_active', true);
-      setterIds = (activeSetters ?? []).map((s: any) => s.id);
+      if (selectedSetterIds.length > 0) {
+        setterIds = selectedSetterIds;
+      } else {
+        const { data: activeSetters } = await supabase
+          .from('users').select('id').eq('role', 'setter').eq('is_active', true);
+        setterIds = (activeSetters ?? []).map((s: any) => s.id);
+      }
     } else if (assignmentMode === 'manual' && setterIdParam) {
       setterIds = [setterIdParam];
     }

@@ -1,8 +1,8 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, CheckCircle, AlertCircle, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -24,11 +24,12 @@ export default function ImportPage() {
   const qc   = useQueryClient();
   const isAdmin = user?.role === 'admin';
 
-  const [file,     setFile]     = useState<File | null>(null);
-  const [mode,     setMode]     = useState<'round_robin' | 'manual'>('round_robin');
-  const [setterId, setSetterId] = useState('');
-  const [source,   setSource]   = useState<string>('cold_call');
-  const [result,   setResult]   = useState<ImportResult | null>(null);
+  const [file,       setFile]       = useState<File | null>(null);
+  const [mode,       setMode]       = useState<'round_robin' | 'manual'>('round_robin');
+  const [setterId,   setSetterId]   = useState('');
+  const [rrSetterIds, setRrSetterIds] = useState<string[]>([]);
+  const [source,     setSource]     = useState<string>('cold_call');
+  const [result,     setResult]     = useState<ImportResult | null>(null);
 
   const { data: setters } = useQuery({
     queryKey: ['users-setters'],
@@ -36,12 +37,20 @@ export default function ImportPage() {
     enabled:  isAdmin,
   });
 
+  // Initialise la sélection avec tous les setters actifs au premier chargement
+  useEffect(() => {
+    if (setters && rrSetterIds.length === 0) {
+      setRrSetterIds((setters as any[]).map((s) => s.id));
+    }
+  }, [setters]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const mutation = useMutation({
     mutationFn: () => {
       if (!file) throw new Error('Fichier requis');
       const formData = new FormData();
       formData.append('file', file);
       formData.append('assignment_mode', mode);
+      if (mode === 'round_robin' && rrSetterIds.length > 0) formData.append('setter_ids', rrSetterIds.join(','));
       if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
       if (source) formData.append('source', source);
       return leadsApi.import(formData).then((r) => r.data as ImportResult);
@@ -139,12 +148,59 @@ export default function ImportPage() {
               </div>
             </div>
 
+            {mode === 'round_robin' && setters && (setters as any[]).length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">Setters inclus dans le round-robin</label>
+                  <div className="flex gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setRrSetterIds((setters as any[]).map((s) => s.id))}
+                      className="text-primary-600 hover:underline"
+                    >Tous</button>
+                    <button
+                      type="button"
+                      onClick={() => setRrSetterIds([])}
+                      className="text-gray-400 hover:underline"
+                    >Aucun</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(setters as any[]).map((s) => {
+                    const checked = rrSetterIds.includes(s.id);
+                    return (
+                      <label
+                        key={s.id}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all text-sm
+                          ${checked ? 'border-primary-400 bg-primary-50 text-primary-800' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) =>
+                            setRrSetterIds((prev) =>
+                              e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)
+                            )
+                          }
+                          className="accent-primary-600"
+                        />
+                        {s.first_name} {s.last_name}
+                      </label>
+                    );
+                  })}
+                </div>
+                {rrSetterIds.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1.5">Sélectionne au moins un setter.</p>
+                )}
+              </div>
+            )}
+
             {mode === 'manual' && (
               <div>
                 <label className="label">Setter assigné *</label>
                 <select value={setterId} onChange={(e) => setSetterId(e.target.value)} className="select">
                   <option value="">Choisir un setter…</option>
-                  {setters?.map((s: any) => (
+                  {(setters as any[] | undefined)?.map((s) => (
                     <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
                   ))}
                 </select>
@@ -178,7 +234,11 @@ export default function ImportPage() {
 
         <button
           onClick={() => mutation.mutate()}
-          disabled={!file || mutation.isPending || (isAdmin && mode === 'manual' && !setterId)}
+          disabled={
+            !file || mutation.isPending ||
+            (isAdmin && mode === 'manual' && !setterId) ||
+            (isAdmin && mode === 'round_robin' && rrSetterIds.length === 0)
+          }
           className="btn-primary w-full justify-center mt-6 py-2.5"
         >
           {mutation.isPending
