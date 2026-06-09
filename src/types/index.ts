@@ -9,14 +9,15 @@ export type ActionType  = 'to_call' | 'callback' | 'follow_up' | 'negotiation' |
 export type LeadSource  = 'instagram' | 'facebook' | 'cold_call';
 
 export interface User {
-  id:         string;
-  email:      string;
-  first_name: string;
-  last_name:  string;
-  role:       UserRole;
-  is_active:  boolean;
-  avatar_url?: string;
-  created_at: string;
+  id:                   string;
+  email:                string;
+  first_name:           string;
+  last_name:            string;
+  role:                 UserRole;
+  is_active:            boolean;
+  avatar_url?:          string;
+  created_at:           string;
+  acquisition_sources?: string[];
 }
 
 export interface Tag {

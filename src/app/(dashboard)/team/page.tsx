@@ -24,8 +24,9 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function TeamPage() {
-  const qc   = useQueryClient();
-  const user = useAuthStore((s) => s.user);
+  const qc      = useQueryClient();
+  const user    = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
   const [createOpen, setCreateOpen] = useState(false);
   const [perfUser,   setPerfUser]   = useState<User | null>(null);
 
@@ -54,6 +55,16 @@ export default function TeamPage() {
       qc.invalidateQueries({ queryKey: ['users'] });
     },
     onError: () => toast.error('Erreur lors du changement de rôle'),
+  });
+
+  const updateSources = useMutation({
+    mutationFn: ({ id, acquisition_sources }: { id: string; acquisition_sources: string[] }) =>
+      usersApi.update(id, { acquisition_sources } as any),
+    onSuccess: () => {
+      toast.success('Réseaux mis à jour');
+      qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Erreur'),
   });
 
   const createMutation = useMutation({
@@ -115,6 +126,39 @@ export default function TeamPage() {
                 </div>
               ))}
             </div>
+
+            {/* Source assignment */}
+            {isAdmin && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-400 mb-2">Réseaux d'acquisition</p>
+                <div className="flex flex-wrap gap-3">
+                  {([
+                    ['instagram', '📸 Instagram'],
+                    ['facebook',  '💬 Facebook'],
+                    ['cold_call', '📞 Cold Call'],
+                  ] as const).map(([src, label]) => {
+                    const srcs      = (u.acquisition_sources ?? []) as string[];
+                    const isChecked = srcs.includes(src);
+                    return (
+                      <label key={src} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            const next = isChecked
+                              ? srcs.filter((s) => s !== src)
+                              : [...srcs, src];
+                            updateSources.mutate({ id: u.id, acquisition_sources: next });
+                          }}
+                          className="rounded text-primary-600 w-3.5 h-3.5"
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2 mt-4">

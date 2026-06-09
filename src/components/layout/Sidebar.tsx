@@ -69,6 +69,11 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     router.push('/login');
   };
 
+  const sources       = user?.acquisition_sources ?? [];
+  const showInstagram = isAdmin || sources.length === 0 || sources.includes('instagram');
+  const showFacebook  = isAdmin || sources.length === 0 || sources.includes('facebook');
+  const showColdCall  = isAdmin || sources.length === 0 || sources.includes('cold_call');
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -92,22 +97,28 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <NavLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} />
 
         {/* ── Pôle Instagram ── */}
-        <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram" defaultOpen>
-          <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
-          <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
-        </PoleSection>
+        {showInstagram && (
+          <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram" defaultOpen>
+            <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
 
         {/* ── Pôle Facebook ── */}
-        <PoleSection icon={Facebook} label="Facebook" color="text-blue-600" segment="facebook">
-          <NavLink href="/leads/facebook" icon={Users} label="Leads" onClick={onClose} />
-          <NavLink href="/pipeline/facebook" icon={Kanban} label="Pipeline" onClick={onClose} />
-        </PoleSection>
+        {showFacebook && (
+          <PoleSection icon={Facebook} label="Facebook" color="text-blue-600" segment="facebook">
+            <NavLink href="/leads/facebook" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/pipeline/facebook" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
 
         {/* ── Pôle Cold Call ── */}
-        <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment="cold-call">
-          <NavLink href="/leads/cold-call" icon={Users} label="Leads" onClick={onClose} />
-          <NavLink href="/pipeline/cold-call" icon={Kanban} label="Pipeline" onClick={onClose} />
-        </PoleSection>
+        {showColdCall && (
+          <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment="cold-call">
+            <NavLink href="/leads/cold-call" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/pipeline/cold-call" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
 
         {/* Séparateur */}
         <div className="pt-1 pb-0.5">

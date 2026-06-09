@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
     let cq = supabase.from('leads').select('status');
     if (user.role !== 'admin') {
       cq = cq.eq('setter_id', user.id);
+      if (user.acquisition_sources?.length) cq = (cq as any).in('source', user.acquisition_sources);
     } else if (setter_id) {
       cq = cq.eq('setter_id', setter_id);
     }
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
 
   if (user.role !== 'admin') {
     q = q.eq('setter_id', user.id);
+    if (user.acquisition_sources?.length) q = (q as any).in('source', user.acquisition_sources);
   } else if (setter_id) {
     q = q.eq('setter_id', setter_id);
   }

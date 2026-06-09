@@ -3,13 +3,15 @@ import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone,
+  Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone, Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
+import Modal from '@/components/ui/Modal';
+import LeadForm from '@/components/leads/LeadForm';
 import { formatDate } from '@/lib/utils';
 import type { Lead, LeadsFilters, LeadStatus, LeadQuality } from '@/types';
 
@@ -41,6 +43,7 @@ export default function ColdCallLeadsPage() {
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [bulkStatus,   setBulkStatus]   = useState('');
   const [bulkSetterId, setBulkSetterId] = useState('');
+  const [createOpen,   setCreateOpen]   = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback((val: string) => {
@@ -198,9 +201,13 @@ export default function ColdCallLeadsPage() {
           </select>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <button onClick={() => qc.invalidateQueries({ queryKey: ['leads-cold-call'] })} className="btn-secondary btn-sm">
             <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setCreateOpen(true)} className="btn-primary btn-sm">
+            <Plus className="w-3.5 h-3.5" />
+            Nouveau lead
           </button>
         </div>
       </div>
@@ -348,6 +355,19 @@ export default function ColdCallLeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Create lead modal */}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nouveau lead Cold Call" size="lg">
+        <LeadForm
+          defaultSource="cold_call"
+          onSuccess={() => {
+            setCreateOpen(false);
+            qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+            qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
+          }}
+          onCancel={() => setCreateOpen(false)}
+        />
+      </Modal>
     </div>
   );
 }

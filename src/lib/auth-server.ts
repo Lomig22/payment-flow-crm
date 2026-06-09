@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export interface AuthUser {
-  id:         string;
-  email:      string;
-  first_name: string;
-  last_name:  string;
-  role:       'admin' | 'setter';
-  is_active:  boolean;
+  id:                  string;
+  email:               string;
+  first_name:          string;
+  last_name:           string;
+  role:                'admin' | 'setter';
+  is_active:           boolean;
+  acquisition_sources: string[];
 }
 
 export async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
@@ -21,7 +22,7 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
 
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, first_name, last_name, role, is_active')
+      .select('id, email, first_name, last_name, role, is_active, acquisition_sources')
       .eq('id', decoded.userId)
       .single();
 

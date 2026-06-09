@@ -35,12 +35,13 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 interface LeadFormProps {
-  lead?:      Lead;
-  onSuccess:  (lead: Lead) => void;
-  onCancel:   () => void;
+  lead?:          Lead;
+  defaultSource?: LeadSource;
+  onSuccess:      (lead: Lead) => void;
+  onCancel:       () => void;
 }
 
-export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
+export default function LeadForm({ lead, defaultSource, onSuccess, onCancel }: LeadFormProps) {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
@@ -74,7 +75,9 @@ export default function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           source:              lead.source ?? '' as any,
           notes:               lead.notes ?? '',
         }
-      : undefined,
+      : defaultSource
+        ? { source: defaultSource, status: (defaultSource === 'cold_call' ? 'in_progress' : 'lead') as any }
+        : undefined,
   });
 
   const mutation = useMutation({

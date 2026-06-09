@@ -47,6 +47,7 @@ export const leadsApi = {
   delete:      (id: string) => api.delete(`/leads/${id}`),
   bulkDelete:  (ids: string[]) => api.post('/leads/bulk-delete', { ids }),
   bulkStatus:  (ids: string[], status: string) => api.patch('/leads/bulk-status', { ids, status }),
+  bulkSource:  (ids: string[], source: string) => api.patch('/leads/bulk-source', { ids, source }),
   import:   (formData: FormData) =>
     api.post('/leads/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   assign:   (leadIds: string[], setterId: string) =>

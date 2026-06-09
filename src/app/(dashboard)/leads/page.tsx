@@ -27,6 +27,7 @@ export default function LeadsPage() {
   const [createOpen,    setCreateOpen]    = useState(false);
   const [selected,      setSelected]      = useState<Set<string>>(new Set());
   const [bulkSetterId,  setBulkSetterId]  = useState('');
+  const [bulkSourceVal, setBulkSourceVal] = useState('');
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const debouncedSearch = useCallback((val: string) => {
@@ -81,6 +82,19 @@ export default function LeadsPage() {
       qc.invalidateQueries({ queryKey: ['leads'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
+  });
+
+  const bulkSourceMutation = useMutation({
+    mutationFn: ({ ids, source }: { ids: string[]; source: string }) =>
+      leadsApi.bulkSource(ids, source),
+    onSuccess: (_, { ids, source }) => {
+      const label = source === 'instagram' ? 'Instagram' : source === 'facebook' ? 'Facebook' : 'Cold Call';
+      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${label}`);
+      setSelected(new Set());
+      setBulkSourceVal('');
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+    onError: () => toast.error('Erreur lors du changement de source'),
   });
 
   const handleBulkAssign = () => {
@@ -279,6 +293,27 @@ export default function LeadsPage() {
               >
                 <UserCheck className="w-3.5 h-3.5" />
                 Assigner
+              </button>
+            </div>
+
+            {/* Bulk source */}
+            <div className="flex items-center gap-2">
+              <select
+                value={bulkSourceVal}
+                onChange={(e) => setBulkSourceVal(e.target.value)}
+                className="select text-xs py-1 h-7"
+              >
+                <option value="">— Changer source —</option>
+                <option value="instagram">📸 Instagram</option>
+                <option value="facebook">💬 Facebook</option>
+                <option value="cold_call">📞 Cold Call</option>
+              </select>
+              <button
+                onClick={() => bulkSourceMutation.mutate({ ids: Array.from(selected), source: bulkSourceVal })}
+                disabled={!bulkSourceVal || bulkSourceMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white rounded-lg transition-colors"
+              >
+                Assigner source
               </button>
             </div>
 

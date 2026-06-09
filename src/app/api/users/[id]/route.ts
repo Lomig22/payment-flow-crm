@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, email, first_name, last_name, role, is_active, avatar_url, created_at')
+    .select('id, email, first_name, last_name, role, is_active, avatar_url, created_at, acquisition_sources')
     .eq('id', params.id)
     .single();
 
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const updates: Record<string, unknown> = {};
 
   const selfFields = ['first_name', 'last_name', 'avatar_url'];
-  const adminFields = ['role', 'is_active'];
+  const adminFields = ['role', 'is_active', 'acquisition_sources'];
   const allowed = user.role === 'admin' ? [...selfFields, ...adminFields] : selfFields;
 
   for (const field of allowed) {
@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     .from('users')
     .update(updates)
     .eq('id', params.id)
-    .select('id, email, first_name, last_name, role, is_active, avatar_url')
+    .select('id, email, first_name, last_name, role, is_active, avatar_url, acquisition_sources')
     .single();
 
   if (error || !data) return notFound('Utilisateur introuvable');
