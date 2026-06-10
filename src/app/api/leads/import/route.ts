@@ -273,38 +273,44 @@ export async function POST(request: NextRequest) {
   // Normalize phone for comparison (digits only, no spaces/dashes)
   const normPhone = (p: string) => p.replace(/[\s.\-\(\)\/]/g, '');
 
-  // Collect phones and emails present in this CSV
-  const csvPhones  = parsedRows.map(r => r.phone).filter(Boolean).map(normPhone);
-  const csvEmails  = parsedRows.map(r => r.email).filter(Boolean).map(e => e.toLowerCase());
+  // Collect phones, emails, and instagram usernames present in this CSV
+  const csvPhones      = parsedRows.map(r => r.phone).filter(Boolean).map(normPhone);
+  const csvEmails      = parsedRows.map(r => r.email).filter(Boolean).map(e => e.toLowerCase());
+  const csvIgUsernames = parsedRows.map(r => r._ig_username).filter(Boolean).map(u => u.toLowerCase());
 
   // Sets of values already in DB
   const dbPhoneSet = new Set<string>();
   const dbEmailSet = new Set<string>();
+  const dbIgSet    = new Set<string>();
   // Map value → "Prénom Nom" for display in warning message
   const dbPhoneLabel: Record<string, string> = {};
   const dbEmailLabel: Record<string, string> = {};
+  const dbIgLabel:    Record<string, string> = {};
 
-  if (csvPhones.length > 0 || csvEmails.length > 0) {
+  if (csvPhones.length > 0 || csvEmails.length > 0 || csvIgUsernames.length > 0) {
     const db = supabase as any;
     const orParts: string[] = [];
-    if (csvPhones.length > 0) orParts.push(`phone.in.(${csvPhones.join(',')})`);
-    if (csvEmails.length > 0) orParts.push(`email.in.(${csvEmails.join(',')})`);
+    if (csvPhones.length > 0)      orParts.push(`phone.in.(${csvPhones.join(',')})`);
+    if (csvEmails.length > 0)      orParts.push(`email.in.(${csvEmails.join(',')})`);
+    if (csvIgUsernames.length > 0) orParts.push(`instagram_username.in.(${csvIgUsernames.join(',')})`);
 
     const { data: existing } = await db
       .from('leads')
-      .select('first_name, last_name, phone, email')
+      .select('first_name, last_name, phone, email, instagram_username')
       .or(orParts.join(','));
 
     for (const lead of existing ?? []) {
       const label = `${lead.first_name} ${lead.last_name}`.trim();
-      if (lead.phone) { const np = normPhone(lead.phone); dbPhoneSet.add(np); dbPhoneLabel[np] = label; }
-      if (lead.email) { const ne = lead.email.toLowerCase(); dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
+      if (lead.phone)             { const np = normPhone(lead.phone);                    dbPhoneSet.add(np); dbPhoneLabel[np] = label; }
+      if (lead.email)             { const ne = lead.email.toLowerCase();                 dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
+      if (lead.instagram_username){ const ni = lead.instagram_username.toLowerCase();    dbIgSet.add(ni);    dbIgLabel[ni]    = label; }
     }
   }
 
-  // Track intra-CSV duplicates (same phone/email appears twice in the file)
-  const seenPhones = new Set<string>();
-  const seenEmails = new Set<string>();
+  // Track intra-CSV duplicates (same value appears twice in the file)
+  const seenPhones      = new Set<string>();
+  const seenEmails      = new Set<string>();
+  const seenIgUsernames = new Set<string>();
 
   // ── Pass 3 : insert with duplicate tagging ────────────────────────────────
   let imported = 0;
@@ -336,6 +342,17 @@ export async function POST(request: NextRequest) {
         duplicates.push(`Ligne ${lineNum} (${label}) : email ${row.email} en doublon dans ce fichier`);
       }
       seenEmails.add(ne);
+    }
+
+    // Check instagram_username duplicates
+    if (row._ig_username) {
+      const ni = row._ig_username.toLowerCase();
+      if (dbIgSet.has(ni)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : @${row._ig_username} déjà présent — ${dbIgLabel[ni]}`);
+      } else if (seenIgUsernames.has(ni)) {
+        duplicates.push(`Ligne ${lineNum} (${label}) : @${row._ig_username} en doublon dans ce fichier`);
+      }
+      seenIgUsernames.add(ni);
     }
 
     const isSocial = leadSource === 'instagram' || leadSource === 'facebook';

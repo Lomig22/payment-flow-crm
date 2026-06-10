@@ -317,7 +317,7 @@ Cordialement,
           <p className="text-sm font-bold text-pink-800 flex items-center gap-2">
             <span className="text-base">⭐</span> RÈGLE D'OR
           </p>
-          <p className="text-sm text-pink-700">Peu importe ce que le client répond, l'objectif est <strong>TOUJOURS</strong> de l'amener vers le call Calendly.</p>
+          <p className="text-sm text-pink-700">Peu importe ce que le client répond, l'objectif est <strong>TOUJOURS</strong> de l'amener vers le call.</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
             {[
               { trigger: 'Il dit OUI', action: 'Copie-colle le Message 2 directement', color: 'bg-green-100 text-green-800 border-green-300' },
@@ -329,6 +329,16 @@ Cordialement,
                 <p>{action}</p>
               </div>
             ))}
+          </div>
+          <div className="pt-2 border-t border-pink-200 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="rounded-lg bg-white border border-pink-200 p-2.5 text-xs text-gray-700">
+              <p className="font-semibold text-gray-800 mb-0.5">📌 CAS 1 — Sans site</p>
+              <p>Accroche maquette → <strong>Calendly</strong> (prévisualisation site web)</p>
+            </div>
+            <div className="rounded-lg bg-white border border-blue-200 p-2.5 text-xs text-gray-700">
+              <p className="font-semibold text-gray-800 mb-0.5">📌 CAS 2 — Avec site</p>
+              <p>Partage ressource d'abord → la ressource déclenche le <strong>Lemcal</strong> (consultation gratuite)</p>
+            </div>
           </div>
         </div>
 
@@ -406,12 +416,12 @@ Sinon, 10 minutes suffisent : (Lien Calendly)`} />
                 </div>
               ))}
             </div>
-            <Script label="Prompt ChatGPT — Copie-colle ce texte exact" color="border-purple-300" text={`Tu es un expert en prospection commerciale sur Instagram et Facebook DM.
+            <Script label="Prompt ChatGPT — CAS 1 (sans site)" color="border-purple-300" text={`Tu es un expert en prospection commerciale sur Instagram et Facebook DM.
 Je prospecte des entreprises locales pour leur vendre des sites web.
 
-Voici ma trame de prospection :
+Voici ma trame de prospection (CAS 1 — prospect SANS site web) :
 - Message 1 : je leur dis que j'ai créé un aperçu de site spécialement pour eux et je demande si je peux le montrer
-- Si oui : je propose un call de 10 min via Calendly pour leur présenter
+- Si oui : je partage le lien de la maquette + je les invite à un call de 15 min via Calendly
 - Objectif final : toujours amener le prospect vers le call Calendly
 
 Voici mon échange avec le prospect jusqu'ici :
@@ -420,6 +430,22 @@ LUI : (colle exactement ce qu'il a répondu)
 
 Rédige-moi une réponse courte, naturelle et chaleureuse qui respecte ma trame et qui ramène doucement vers le call Calendly.
 Ton décontracté, pas trop commercial. En français.`} />
+            <div className="mt-3">
+            <Script label="Prompt ChatGPT — CAS 2 (avec site)" color="border-blue-300" text={`Tu es un expert en prospection commerciale sur Instagram et Facebook DM.
+Je prospecte des entreprises locales pour améliorer leur présence en ligne (SEO, refonte).
+
+Voici ma trame de prospection (CAS 2 — prospect AVEC site web existant) :
+- Message 1 : je leur dis que j'ai quelque chose d'utile à leur partager (un guide sur l'acquisition digitale) et je demande si je peux l'envoyer
+- Si oui : je partage le guide PDF + je les invite à un call de 15 min via Lemcal pour voir comment l'appliquer à leur cas
+- Objectif final : la ressource crée l'envie → le prospect vient au call de lui-même
+
+Voici mon échange avec le prospect jusqu'ici :
+MOI : (colle ton Message 1 ici)
+LUI : (colle exactement ce qu'il a répondu)
+
+Rédige-moi une réponse courte, naturelle et chaleureuse qui respecte ma trame et qui ramène doucement vers le call Lemcal.
+Ton décontracté, pas trop commercial. En français.`} />
+            </div>
             <InfoBox type="info">Si la réponse te semble trop longue, dis à ChatGPT <strong>"plus court"</strong> ou <strong>"plus simple"</strong> et il refait.</InfoBox>
           </div>
         </div>
@@ -430,38 +456,82 @@ Ton décontracté, pas trop commercial. En français.`} />
             <span className="w-5 h-5 bg-blue-100 text-blue-700 rounded text-xs font-bold flex items-center justify-center">2</span>
             CAS 2 — Prospect avec site web existant
           </h3>
+
+          {/* Logique CAS 2 */}
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 space-y-2">
+            <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
+              <span className="text-base">💡</span> Logique de ce cas
+            </p>
+            <p className="text-sm text-blue-700">
+              Ici on ne garde <strong>rien en secret</strong>. On partage d'abord une ressource à valeur réelle — c'est elle qui crée l'envie d'aller plus loin et déclenche naturellement la prise de RDV.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              {[
+                { step: 'MSG 1', label: 'Accroche', desc: 'On annonce qu\'on a quelque chose d\'utile pour eux', color: 'bg-green-100 text-green-800 border-green-300' },
+                { step: 'MSG 2', label: 'La ressource', desc: 'On partage le guide/e-book + on invite au call', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+                { step: 'MSG 3', label: 'Booking', desc: 'Ils ont lu → ils veulent en savoir plus → call', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+              ].map(({ step, label, desc, color }) => (
+                <div key={step} className={`rounded-lg border p-2.5 text-xs ${color}`}>
+                  <p className="font-bold">{step} — {label}</p>
+                  <p className="mt-0.5">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <Script label="Message 1 — À envoyer en premier" color="border-green-300" text={`Salut (Prénom),
 
-J'ai pris quelques minutes pour regarder (Entreprise).
-J'ai remarqué un point intéressant sur votre présence en ligne.
-Juste un retour si ça peut être utile.
+J'ai pris quelques minutes pour regarder (Entreprise) en ligne.
 
-Je vous le partage ?`} />
-          <InfoBox type="warning"><strong>AVANT D'ENVOYER :</strong> note quelque chose de concret que tu as vu sur leur site (page lente, pas de bouton contact, mauvais affichage mobile...). Tu en auras besoin pour le call.</InfoBox>
+J'ai un guide pratique qui correspond exactement à ce que je voulais vous partager — des stratégies concrètes utilisées par des entreprises du bâtiment pour générer plus de chantiers via leur site.
 
-          <Script label="Message 2 — Quand il dit OUI" color="border-yellow-300" text={`Super !
+Je vous l'envoie ?`} />
+          <InfoBox type="warning"><strong>AVANT D'ENVOYER :</strong> note un point concret que tu as observé sur leur site (lenteur, pas de bouton contact, mauvais rendu mobile, pas référencé...). Tu t'en serviras dans le Message 2.</InfoBox>
 
-Je vous propose que l'on planifie ensemble un moment d'échange pour en discuter ?
+          <Script label="Message 2 — Partage de la ressource (quand il dit OUI)" color="border-yellow-300" text={`Super !
 
-Quel horaire vous conviendrait le plus (Prénom) ?
-(Lien Calendly)`} />
-          <InfoBox type="danger"><strong>NE RÉVÈLE PAS</strong> le "point" par message ! Garde-le pour le call. C'est ton argument de vente principal.</InfoBox>
+Voici notre guide "Acquisition Digitale 2026" — pensé spécifiquement pour les entreprises du bâtiment :
+📄 [Lien e-book — /docs/ebook-acquisition.pdf]
+
+Dedans vous trouverez exactement les leviers que des boîtes comme (Entreprise) activent pour recevoir des demandes de devis en automatique — sans prospecter.
+
+Ce que j'avais remarqué sur votre site correspond pile à l'un de ces points.
+
+Vous le lisez et on en parle 15 minutes ? Je vous montre comment l'appliquer concrètement à votre cas.
+
+👉 (Lien Lemcal)`} />
+          <InfoBox type="info">
+            <strong>Pourquoi partager la ressource maintenant ?</strong> Elle crée de la valeur réelle avant le call. Le prospect arrive motivé, curieux, et a déjà une raison de vous écouter — le call est beaucoup plus facile à convertir.
+          </InfoBox>
+
+          <Script label="Message 3 — Booking si pas de réponse après le guide" color="border-indigo-300" text={`(Prénom), avez-vous eu le temps de jeter un œil au guide ?
+
+Le point que j'avais repéré sur votre site est précisément l'un des leviers dont il parle — et c'est l'un des plus simples à activer.
+
+En 15 minutes de visio, je vous montre exactement quoi faire en premier pour (Entreprise).
+
+👉 (Lien Lemcal)`} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Script label="Relance 1 — J+2" color="border-red-200" text={`Bonjour (Prénom)
+            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom),
 
-Je voulais m'assurer que vous aviez bien vu mon message !
-Le point que j'ai remarqué sur (Entreprise) peut vraiment faire la différence, ça vaut 10 minutes d'échange.
+Je voulais m'assurer que vous aviez bien reçu le guide !
 
-On se cale un moment cette semaine ?`} />
-            <Script label="Relance 2 — J+5 (dernière)" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message
+Ce que vous trouverez à l'intérieur s'applique directement à (Entreprise) — et le point que j'avais remarqué peut vraiment faire la différence.
 
-J'ai quelque chose de concret à vous partager sur votre présence en ligne, pas du blabla, un vrai retour terrain.
-Si ce n'est pas le bon moment, dites-le moi et je n'insiste plus.
+On se cale 15 min cette semaine ?
+(Lien Lemcal)`} />
+            <Script label="Relance 2 — J+5 (dernière)" color="border-red-200" text={`(Prénom), je vous laisse ce dernier message.
 
-Sinon : (Lien Calendly)`} />
+Le guide que je vous ai envoyé est un bon point de départ — mais je voulais vous montrer quelque chose de spécifique à (Entreprise).
+
+Si ce n'est pas le bon moment, dites-le moi et je n'insiste pas.
+
+Sinon, 15 minutes suffisent :
+(Lien Lemcal)`} />
           </div>
-          <InfoBox type="info">Même réflexe que le Cas 1 si il répond autre chose : va sur ChatGPT avec le même prompt, en adaptant juste la description de ta trame.</InfoBox>
+          <InfoBox type="danger">Après la Relance 2, même sans réponse → <strong>STOP</strong>. Passe à la personne suivante.</InfoBox>
+          <InfoBox type="info">Même réflexe si il répond autre chose : va sur ChatGPT avec le prompt ci-dessous, en décrivant que tu as partagé un guide et que tu l'invites au call.</InfoBox>
         </div>
 
         {/* Schéma parcours */}
@@ -485,12 +555,13 @@ Sinon : (Lien Calendly)`} />
           </div>
         </div>
 
-        {/* 4 règles d'or */}
+        {/* 5 règles d'or */}
         <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-4 space-y-2">
-          <p className="text-sm font-bold text-amber-800">📋 Rappel des 4 règles d'or</p>
+          <p className="text-sm font-bold text-amber-800">📋 Rappel des 5 règles d'or</p>
           {[
-            'Toujours remplacer (Prénom), (Entreprise) et (Lien Calendly) avant d\'envoyer.',
-            'Ne jamais donner le prix ou tous les détails par message — l\'objectif est toujours le call.',
+            'Toujours remplacer (Prénom), (Entreprise) et le lien (Calendly ou Lemcal selon le cas) avant d\'envoyer.',
+            'CAS 1 (sans site) : ne pas révéler le prix ni les détails avant le call — l\'objectif est la maquette → call.',
+            'CAS 2 (avec site) : partager le guide e-book AVANT le call — c\'est la ressource qui déclenche l\'envie de réserver.',
             'Maximum 2 relances. Après ça, passe à la personne suivante.',
             'Toujours rester poli même si la personne dit non.',
           ].map((rule, i) => (
