@@ -356,24 +356,26 @@ Rien à vendre ici - juste un visuel que j'aimerais vous montrer.
 Je vous le montre ?`} />
           <InfoBox type="info">Remplace <strong>(Prénom)</strong> par le vrai prénom et <strong>(Entreprise)</strong> par le nom du commerce. Ne change rien d'autre.</InfoBox>
 
-          <Script label="Message 2 — Ancrage + curiosité (quand il dit OUI)" color="border-yellow-300" text={`Super 😊
+          <Script label="Message 2 — Envoi de la maquette (quand il dit OUI)" color="border-yellow-300" text={`Super 😊
 
 Voici l'aperçu que j'ai préparé pour (Entreprise) : (Lien maquette)
-
-Ce que vous voyez là, c'est une base volontairement simplifiée.
-En échange de 15 minutes de votre temps, je vous explique concrètement comment ce site peut vous ramener des chantiers — sans que vous ayez à décrocher le téléphone pour chercher des clients.
 
 👉 Qu'est-ce que vous en pensez ?`} />
           <InfoBox type="warning">Remplace <strong>(Entreprise)</strong> et <strong>(Lien maquette)</strong> avant d'envoyer. Envoie dès qu'il dit oui, ne tarde pas.</InfoBox>
 
-          <Script label="Message 3 — Booking du call (quand il réagit positivement)" color="border-indigo-300" text={`Content que ça vous plaise 😊
+          <Script label="Message 3 — Proposition d'appel (quand il réagit)" color="border-indigo-300" text={`Merci pour votre retour 😊
 
-En 15 minutes d'appel, je vous montre précisément comment ce site travaille pour vous — les demandes de devis qui arrivent, les clients qui vous trouvent sur Google, sans effort supplémentaire de votre part.
+Je vous propose de vous expliquer concrètement comment ce site peut vous ramener des chantiers — sans que vous ayez à décrocher le téléphone pour chercher des clients.
 
-Pas de présentation commerciale. Juste du concret.
+On peut se faire un rapide appel dans la semaine pour en discuter et voir comment on pourrait vous accompagner`} />
+          <InfoBox type="info">Envoie le message suivant <strong>~1 minute après</strong>, dans la même conversation.</InfoBox>
 
-👉 On se cale ça quand vous voulez : (Lien Calendly)`} />
-          <InfoBox type="warning">Remplace <strong>(Lien Calendly)</strong> avant d'envoyer.</InfoBox>
+          <Script label="Message 3b — À envoyer 1 minute après (dans la foulée)" color="border-indigo-300" text={`Par ailleurs, l'appel est offert, pas de pièges, pas de vente, juste une session de scaling pour vous aider dans votre business ;)
+
+PS : durant l'appel on construira une roadmap ensemble !
+
+On se réserve ça ?`} />
+          <InfoBox type="warning">Quand il répond positivement → envoie le lien Calendly directement : <strong>https://calendly.com/paymentfloww/prevuesiteweb</strong></InfoBox>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom)
@@ -536,20 +538,26 @@ Sinon, 15 minutes suffisent :
 
         {/* Schéma parcours */}
         <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">📊 Schéma du parcours de contact</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">📊 Schéma du parcours de contact — CAS 1</h3>
           <div className="flex items-center gap-2 text-xs text-center overflow-x-auto pb-1">
             {[
-              { label: 'MSG 1', sub: 'J0', color: 'bg-green-100 text-green-700 border-green-300' },
-              { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
-              { label: 'RELANCE 1', sub: 'J+2', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-              { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
-              { label: 'RELANCE 2', sub: 'J+5', color: 'bg-red-100 text-red-700 border-red-300' },
-              { label: '→', sub: '', color: 'bg-transparent text-gray-400 border-transparent' },
+              { label: 'MSG 1', sub: 'J0 — Accroche', color: 'bg-green-100 text-green-700 border-green-300' },
+              { label: '→', sub: '', color: '' },
+              { label: 'MSG 2', sub: 'Si OUI — Maquette', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+              { label: '→', sub: '', color: '' },
+              { label: 'MSG 3+3b', sub: 'Réaction — Appel', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+              { label: '→', sub: '', color: '' },
+              { label: 'CALENDLY', sub: 'Répond OUI', color: 'bg-pink-100 text-pink-700 border-pink-300' },
+              { label: '→', sub: '', color: '' },
+              { label: 'RELANCE 1', sub: 'J+2 si silence', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+              { label: '→', sub: '', color: '' },
+              { label: 'RELANCE 2', sub: 'J+5 dernière', color: 'bg-red-100 text-red-700 border-red-300' },
+              { label: '→', sub: '', color: '' },
               { label: 'STOP', sub: 'Personne suivante', color: 'bg-gray-100 text-gray-600 border-gray-300' },
             ].map(({ label, sub, color }, i) => (
-              <div key={i} className={`flex-shrink-0 ${label === '→' ? 'text-gray-400 font-bold' : `rounded-lg border px-3 py-2 ${color}`}`}>
+              <div key={i} className={`flex-shrink-0 ${label === '→' ? 'text-gray-400 font-bold text-sm' : `rounded-lg border px-2.5 py-2 ${color}`}`}>
                 <p className="font-bold">{label}</p>
-                {sub && <p className="text-gray-500 text-xs">{sub}</p>}
+                {sub && <p className="text-gray-500 text-[10px] mt-0.5">{sub}</p>}
               </div>
             ))}
           </div>
@@ -560,7 +568,7 @@ Sinon, 15 minutes suffisent :
           <p className="text-sm font-bold text-amber-800">📋 Rappel des 5 règles d'or</p>
           {[
             'Toujours remplacer (Prénom), (Entreprise) et le lien (Calendly ou Lemcal selon le cas) avant d\'envoyer.',
-            'CAS 1 (sans site) : ne pas révéler le prix ni les détails avant le call — l\'objectif est la maquette → call.',
+            'CAS 1 (sans site) : MSG1 → maquette (MSG2) → proposition appel (MSG3 + MSG3b, 1 min d\'écart) → Calendly quand il dit oui.',
             'CAS 2 (avec site) : partager le guide e-book AVANT le call — c\'est la ressource qui déclenche l\'envie de réserver.',
             'Maximum 2 relances. Après ça, passe à la personne suivante.',
             'Toujours rester poli même si la personne dit non.',
