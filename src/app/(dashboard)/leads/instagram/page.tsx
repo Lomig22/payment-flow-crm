@@ -50,11 +50,9 @@ const IG_TABS = [
   { label: 'RDV',            value: 'rdv' },
 ];
 
-function OpenRateBar({ leads }: { leads: Lead[] }) {
-  const total  = leads.length;
-  const opened = leads.filter((l) => l.a_ouvert).length;
-  const rate   = total > 0 ? Math.round((opened / total) * 100) : 0;
-  const color  = rate >= 50 ? 'bg-green-500' : rate >= 25 ? 'bg-yellow-400' : 'bg-red-400';
+function OpenRateBar({ openCount, totalCount }: { openCount: number; totalCount: number }) {
+  const rate  = totalCount > 0 ? Math.round((openCount / totalCount) * 100) : 0;
+  const color = rate >= 50 ? 'bg-green-500' : rate >= 25 ? 'bg-yellow-400' : 'bg-red-400';
 
   return (
     <div className="card p-4 flex items-center gap-6">
@@ -64,17 +62,17 @@ function OpenRateBar({ leads }: { leads: Lead[] }) {
       </div>
       <div className="flex-1">
         <div className="flex justify-between text-xs text-gray-500 mb-1">
-          <span>{opened} ouverts</span>
-          <span>{total} total</span>
+          <span>{openCount} ouverts</span>
+          <span>{totalCount} total</span>
         </div>
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
           <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${rate}%` }} />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-4 text-center">
-        <div><p className="text-lg font-semibold text-gray-800">{total}</p><p className="text-xs text-gray-400">Leads</p></div>
-        <div><p className="text-lg font-semibold text-green-600">{opened}</p><p className="text-xs text-gray-400">Ouverts</p></div>
-        <div><p className="text-lg font-semibold text-gray-400">{total - opened}</p><p className="text-xs text-gray-400">Non ouverts</p></div>
+        <div><p className="text-lg font-semibold text-gray-800">{totalCount}</p><p className="text-xs text-gray-400">Leads</p></div>
+        <div><p className="text-lg font-semibold text-green-600">{openCount}</p><p className="text-xs text-gray-400">Ouverts</p></div>
+        <div><p className="text-lg font-semibold text-gray-400">{totalCount - openCount}</p><p className="text-xs text-gray-400">Non ouverts</p></div>
       </div>
     </div>
   );
@@ -115,7 +113,7 @@ export default function InstagramLeadsPage() {
       source: 'instagram', count_only: true,
       ...(filters.setter_id ? { setter_id: filters.setter_id } : {}),
       ...(filters.niche     ? { niche: filters.niche }         : {}),
-    } as LeadsFilters).then((r) => r.data.counts as Record<string, number> | undefined),
+    } as LeadsFilters).then((r) => r.data as { counts: Record<string, number>; open_count: number; total_count: number } | undefined),
     staleTime: 30_000,
   });
 
@@ -252,14 +250,16 @@ export default function InstagramLeadsPage() {
   const toggleSelect = (id: string) =>
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const totalCount = countsData
-    ? Object.values(countsData).reduce((a, b) => a + b, 0)
+  const totalCount = countsData?.counts
+    ? Object.values(countsData.counts).reduce((a, b) => a + b, 0)
     : undefined;
 
   return (
     <div className="space-y-4">
-      {/* Open rate — only on "Tous" tab */}
-      {!isLoading && leads.length > 0 && activeTab === '' && <OpenRateBar leads={leads} />}
+      {/* Open rate — based on full dataset from count_only, not just current page */}
+      {countsData && countsData.total_count > 0 && activeTab === '' && (
+        <OpenRateBar openCount={countsData.open_count ?? 0} totalCount={countsData.total_count} />
+      )}
 
       {/* Duplicate warning banner */}
       {dupData && dupData.count > 0 && (
@@ -340,7 +340,7 @@ export default function InstagramLeadsPage() {
           <div className="flex border-b border-gray-100 min-w-max">
             {IG_TABS.map((tab) => {
               const count = tab.value
-                ? (countsData?.[tab.value] ?? 0)
+                ? (countsData?.counts?.[tab.value] ?? 0)
                 : (totalCount ?? 0);
               const isActive = activeTab === tab.value;
               return (

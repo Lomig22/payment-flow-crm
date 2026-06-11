@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   // Lightweight count-by-status endpoint (used by tab badges)
   if (countOnly) {
-    let cq = supabase.from('leads').select('status');
+    let cq = supabase.from('leads').select('status, a_ouvert');
     if (user.role !== 'admin') {
       cq = cq.eq('setter_id', user.id);
       if (user.acquisition_sources?.length) cq = (cq as any).in('source', user.acquisition_sources);
@@ -54,8 +54,14 @@ export async function GET(request: NextRequest) {
     if (niche)  cq = (cq as any).eq('niche', niche);
     const { data: rows } = await (cq as any).limit(5000);
     const counts: Record<string, number> = {};
-    for (const r of (rows ?? [])) { counts[r.status] = (counts[r.status] ?? 0) + 1; }
-    return NextResponse.json({ counts });
+    let open_count = 0;
+    let total_count = 0;
+    for (const r of (rows ?? [])) {
+      counts[r.status] = (counts[r.status] ?? 0) + 1;
+      total_count++;
+      if (r.a_ouvert) open_count++;
+    }
+    return NextResponse.json({ counts, open_count, total_count });
   }
 
   let q = supabase
