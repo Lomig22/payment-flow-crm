@@ -3,13 +3,19 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import {
-  ArrowLeft, Upload, FileSpreadsheet, Download, Loader2, AlertCircle, CheckCircle2, Globe,
+  ArrowLeft, Upload, FileSpreadsheet, Loader2, AlertCircle, Globe, Instagram, Phone,
 } from 'lucide-react';
 
 interface PreviewResult {
   headers: string[];
   suggested: string | null;
   total: number;
+}
+
+interface Counts {
+  no_website: number;
+  instagram: number;
+  website: number;
 }
 
 export default function CsvWebsiteFilterPage() {
@@ -20,36 +26,62 @@ export default function CsvWebsiteFilterPage() {
     if (user && user.role !== 'admin') router.replace('/dashboard');
   }, [user, router]);
 
-  const [file, setFile]         = useState<File | null>(null);
-  const [preview, setPreview]   = useState<PreviewResult | null>(null);
-  const [column, setColumn]     = useState('');
+  const [file, setFile]           = useState<File | null>(null);
+  const [preview, setPreview]     = useState<PreviewResult | null>(null);
+  const [column, setColumn]       = useState('');
+  const [counts, setCounts]       = useState<Counts | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [done, setDone]         = useState(false);
+  const [categorizing, setCategorizing] = useState(false);
+  const [exporting, setExporting] = useState<'no_website' | 'instagram' | null>(null);
+  const [error, setError]         = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  async function callApi(fd: FormData) {
+    const res = await fetch('/api/admin/csv-website-filter', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${localStorage.getItem('pf_token')}` },
+      body: fd,
+    });
+    return res;
+  }
 
   async function analyze(selected: File) {
     setError(null);
-    setDone(false);
     setPreview(null);
+    setCounts(null);
     setAnalyzing(true);
     try {
       const fd = new FormData();
       fd.append('file', selected);
-      const res = await fetch('/api/admin/csv-website-filter', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('pf_token')}` },
-        body: fd,
-      });
+      const res = await callApi(fd);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || 'Erreur lors de l\'analyse');
       setPreview(json);
       setColumn(json.suggested ?? '');
+      if (json.suggested) categorize(selected, json.suggested);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function categorize(selected: File, col: string) {
+    setError(null);
+    setCounts(null);
+    setCategorizing(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', selected);
+      fd.append('column', col);
+      const res = await callApi(fd);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Erreur lors de l\'analyse');
+      setCounts(json);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setCategorizing(false);
     }
   }
 
@@ -60,19 +92,22 @@ export default function CsvWebsiteFilterPage() {
     analyze(f);
   }
 
-  async function handleExport() {
+  function handleColumnChange(col: string) {
+    setColumn(col);
+    if (file && col) categorize(file, col);
+    else setCounts(null);
+  }
+
+  async function handleExport(type: 'no_website' | 'instagram') {
     if (!file || !column) return;
-    setExporting(true);
+    setExporting(type);
     setError(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('column', column);
-      const res = await fetch('/api/admin/csv-website-filter', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('pf_token')}` },
-        body: fd,
-      });
+      fd.append('export', type);
+      const res = await callApi(fd);
       if (!res.ok) {
         const json = await res.json();
         throw new Error(json.message || 'Erreur lors de l\'export');
@@ -81,16 +116,15 @@ export default function CsvWebsiteFilterPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'sans_site_web.csv';
+      a.download = type === 'no_website' ? 'sans_site_web.csv' : 'instagram_sourcing.csv';
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setDone(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
@@ -98,8 +132,8 @@ export default function CsvWebsiteFilterPage() {
     setFile(null);
     setPreview(null);
     setColumn('');
+    setCounts(null);
     setError(null);
-    setDone(false);
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -119,9 +153,9 @@ export default function CsvWebsiteFilterPage() {
           <Globe className="w-5 h-5 text-indigo-500" />
         </div>
         <div>
-          <h1 className="text-base font-bold text-gray-900">Filtrer les leads sans site web</h1>
+          <h1 className="text-base font-bold text-gray-900">Trier les leads par site web</h1>
           <p className="text-sm text-gray-500">
-            Importe un CSV (Instant Data Scraper) et récupère uniquement les lignes sans site web.
+            Importe un CSV scrappé et sépare les leads sans site, avec profil Instagram, ou avec un vrai site.
           </p>
         </div>
       </div>
@@ -168,11 +202,11 @@ export default function CsvWebsiteFilterPage() {
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Quelle colonne correspond au site web ?
+                Quelle colonne correspond au site web / lien ?
               </label>
               <select
                 value={column}
-                onChange={(e) => setColumn(e.target.value)}
+                onChange={(e) => handleColumnChange(e.target.value)}
                 className="select w-full"
               >
                 <option value="">— Choisir une colonne —</option>
@@ -187,25 +221,57 @@ export default function CsvWebsiteFilterPage() {
               )}
             </div>
 
-            {done && (
-              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> Fichier exporté avec succès.
+            {categorizing && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" /> Tri des lignes…
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button onClick={reset} className="btn-secondary flex-1 justify-center">
-                Nouveau fichier
-              </button>
-              <button
-                onClick={handleExport}
-                disabled={!column || exporting}
-                className="btn-primary flex-1 justify-center gap-1.5 disabled:opacity-50"
-              >
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Télécharger le CSV filtré
-              </button>
-            </div>
+            {counts && !categorizing && (
+              <>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="card p-3 bg-amber-50">
+                    <p className="text-xl font-bold text-amber-700">{counts.no_website}</p>
+                    <p className="text-gray-500 mt-0.5">Sans site</p>
+                  </div>
+                  <div className="card p-3 bg-pink-50">
+                    <p className="text-xl font-bold text-pink-700">{counts.instagram}</p>
+                    <p className="text-gray-500 mt-0.5">Profil Instagram</p>
+                  </div>
+                  <div className="card p-3 bg-gray-50">
+                    <p className="text-xl font-bold text-gray-700">{counts.website}</p>
+                    <p className="text-gray-500 mt-0.5">Vrai site (exclus)</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleExport('no_website')}
+                    disabled={exporting !== null || counts.no_website === 0}
+                    className="btn-primary justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {exporting === 'no_website'
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Phone className="w-4 h-4" />}
+                    Télécharger "sans site web" ({counts.no_website})
+                  </button>
+                  <button
+                    onClick={() => handleExport('instagram')}
+                    disabled={exporting !== null || counts.instagram === 0}
+                    className="btn-secondary justify-center gap-1.5 disabled:opacity-50 border-pink-200 text-pink-700 hover:bg-pink-50"
+                  >
+                    {exporting === 'instagram'
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Instagram className="w-4 h-4" />}
+                    Télécharger "Instagram sourcing" ({counts.instagram})
+                  </button>
+                </div>
+              </>
+            )}
+
+            <button onClick={reset} className="btn-secondary w-full justify-center">
+              Nouveau fichier
+            </button>
           </div>
         )}
       </div>
