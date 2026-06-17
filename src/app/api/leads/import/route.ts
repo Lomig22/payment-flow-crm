@@ -62,6 +62,28 @@ const COLUMN_MAP: Record<string, string> = {
   'score_breakdown/5': '_ignore',
   'score_breakdown/6': '_ignore',
   'score_breakdown/7': '_ignore',
+  // Google Maps card scraper (Instant Data Scraper — alternate CSS classes)
+  'hfpxzc href': '_ignore',     // Google Maps place URL
+  qbf1pd: 'company',            // business name
+  mw4etd: '_ignore',            // rating
+  uy7f9: '_ignore',             // review count
+  w4efsd: '_gmaps_extra',       // category / address / hours — position shifts per row
+  'w4efsd 2': '_gmaps_extra',
+  'w4efsd 3': '_gmaps_extra',
+  'w4efsd 4': '_gmaps_extra',
+  'w4efsd 5': '_gmaps_extra',
+  'w4efsd 6': '_gmaps_extra',
+  usdlk: 'phone',
+  'lcr4fd href': '_website',    // website link, may be an Instagram profile
+  cw1rxd: '_ignore',
+  r8c4qb: '_ignore',
+  'cw1rxd 2': '_ignore',
+  'r8c4qb 2': '_ignore',
+  'jn12ke src': '_ignore',      // review author avatar
+  ah5ghc: '_gmaps_extra',       // review snippet
+  'ah5ghc 2': '_gmaps_extra',
+  'ah5ghc 3': '_gmaps_extra',
+  instagram_username: '_ig_username', // from our own "Instagram sourcing" export
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
@@ -227,6 +249,9 @@ export async function POST(request: NextRequest) {
         }
       } else if (mapped === '_ig_biz_cat') {
         if (v && v !== 'None') extras.push(v.trim());
+      } else if (mapped === '_gmaps_extra') {
+        const val = v.trim();
+        if (val && !/^[·•\-–]+$/.test(val)) extras.push(val);
       } else {
         row[mapped] = v.trim();
       }
