@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   for (const lead of leads) {
     if (!lead.phone) continue;
     const key = normPhone(lead.phone);
-    if (!key) continue;
+    if (!key || !/\d/.test(key)) continue; // skip placeholders like "—", "-", "N/A"
     if (!phoneMap.has(key)) phoneMap.set(key, []);
     phoneMap.get(key)!.push(lead);
   }
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   for (const lead of leads) {
     if (!lead.email) continue;
     const key = lead.email.toLowerCase().trim();
-    if (!key) continue;
+    if (!key || !key.includes('@')) continue; // skip placeholders without @
     if (!emailMap.has(key)) emailMap.set(key, []);
     emailMap.get(key)!.push(lead);
   }

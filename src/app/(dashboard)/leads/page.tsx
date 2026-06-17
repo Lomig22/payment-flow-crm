@@ -172,10 +172,12 @@ export default function LeadsPage() {
                 {dupData.groups.map((g, i) => (
                   <li key={i} className="text-xs text-amber-800 flex items-start gap-2">
                     <span className="shrink-0 font-semibold bg-amber-200 text-amber-900 rounded px-1.5 py-0.5">
-                      {g.field === 'phone' ? 'Tél' : 'Email'}
+                      {g.field === 'phone' ? 'Tél' : g.field === 'instagram_username' ? '@IG' : 'Email'}
                     </span>
                     <span>
-                      <span className="font-medium">{g.value}</span>
+                      <span className="font-medium">
+                        {g.field === 'instagram_username' ? `@${g.value}` : g.value}
+                      </span>
                       {' — '}
                       {g.leads.map((l) => `${l.first_name} ${l.last_name}`).join(' · ')}
                     </span>
