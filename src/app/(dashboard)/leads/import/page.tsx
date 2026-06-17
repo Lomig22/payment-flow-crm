@@ -19,6 +19,14 @@ interface ImportResult {
   message:          string;
 }
 
+interface DryRunResult {
+  dry_run:          true;
+  total:            number;
+  duplicate_count:  number;
+  errors:           string[];
+  duplicates:       string[];
+}
+
 export default function ImportPage() {
   const user = useAuthStore((s) => s.user);
   const qc   = useQueryClient();
@@ -31,6 +39,7 @@ export default function ImportPage() {
   const [source,      setSource]      = useState<string>('cold_call');
   const [batchNiche,  setBatchNiche]  = useState('');
   const [result,      setResult]      = useState<ImportResult | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<DryRunResult | null>(null);
 
   const NICHE_OPTIONS = ['Électricien','Plombier','Couvreur','Maçon','Menuisier','Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre'];
 
@@ -47,18 +56,21 @@ export default function ImportPage() {
     }
   }, [setters]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const buildFormData = (dryRun: boolean) => {
+    if (!file) throw new Error('Fichier requis');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('assignment_mode', mode);
+    if (mode === 'round_robin' && rrSetterIds.length > 0) formData.append('setter_ids', rrSetterIds.join(','));
+    if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
+    if (source) formData.append('source', source);
+    if ((source === 'instagram' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
+    if (dryRun) formData.append('dry_run', 'true');
+    return formData;
+  };
+
   const mutation = useMutation({
-    mutationFn: () => {
-      if (!file) throw new Error('Fichier requis');
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('assignment_mode', mode);
-      if (mode === 'round_robin' && rrSetterIds.length > 0) formData.append('setter_ids', rrSetterIds.join(','));
-      if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
-      if (source) formData.append('source', source);
-      if ((source === 'instagram' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
-      return leadsApi.import(formData).then((r) => r.data as ImportResult);
-    },
+    mutationFn: () => leadsApi.import(buildFormData(false)).then((r) => r.data as ImportResult),
     onSuccess: (data) => {
       setResult(data);
       if (data.imported > 0) {
@@ -73,8 +85,22 @@ export default function ImportPage() {
     },
   });
 
+  const previewMutation = useMutation({
+    mutationFn: () => leadsApi.import(buildFormData(true)).then((r) => r.data as DryRunResult),
+    onSuccess: (data) => {
+      if (data.duplicate_count > 0) {
+        setPendingPreview(data);
+      } else {
+        mutation.mutate();
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message ?? 'Erreur lors de l\'analyse');
+    },
+  });
+
   const onDrop = useCallback((accepted: File[]) => {
-    if (accepted[0]) { setFile(accepted[0]); setResult(null); }
+    if (accepted[0]) { setFile(accepted[0]); setResult(null); setPendingPreview(null); }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -248,20 +274,48 @@ export default function ImportPage() {
         )}
 
         <button
-          onClick={() => mutation.mutate()}
+          onClick={() => previewMutation.mutate()}
           disabled={
-            !file || mutation.isPending ||
+            !file || mutation.isPending || previewMutation.isPending ||
             (isAdmin && mode === 'manual' && !setterId) ||
             (isAdmin && mode === 'round_robin' && rrSetterIds.length === 0)
           }
           className="btn-primary w-full justify-center mt-6 py-2.5"
         >
-          {mutation.isPending
-            ? <><Spinner className="w-4 h-4" /> Import en cours…</>
-            : <><Upload className="w-4 h-4" /> Lancer l'import</>
+          {previewMutation.isPending
+            ? <><Spinner className="w-4 h-4" /> Analyse…</>
+            : mutation.isPending
+              ? <><Spinner className="w-4 h-4" /> Import en cours…</>
+              : <><Upload className="w-4 h-4" /> Lancer l'import</>
           }
         </button>
       </div>
+
+      {/* Duplicate confirmation */}
+      {pendingPreview && (
+        <div className="card p-6 border-amber-200 bg-amber-50">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertTriangle className="w-6 h-6 text-amber-600" />
+            <h3 className="font-semibold text-amber-800">
+              {pendingPreview.duplicate_count} doublon{pendingPreview.duplicate_count > 1 ? 's' : ''} détecté{pendingPreview.duplicate_count > 1 ? 's' : ''} sur {pendingPreview.total} ligne{pendingPreview.total > 1 ? 's' : ''}
+            </h3>
+          </div>
+          <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside mb-4 max-h-40 overflow-y-auto">
+            {pendingPreview.duplicates.map((d, i) => <li key={i}>{d}</li>)}
+          </ul>
+          <div className="flex gap-3">
+            <button onClick={() => setPendingPreview(null)} className="btn-secondary flex-1 justify-center">
+              Annuler
+            </button>
+            <button
+              onClick={() => { setPendingPreview(null); mutation.mutate(); }}
+              className="btn-primary flex-1 justify-center"
+            >
+              Importer quand même
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Result */}
       {result && (

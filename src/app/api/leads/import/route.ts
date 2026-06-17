@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
   const leadSource     = rawSource && VALID_SOURCE.has(rawSource) ? rawSource : null;
   const rawNiche       = formData.get('niche') as string | null;
   const batchNiche     = rawNiche && VALID_NICHES.has(rawNiche) ? rawNiche : null;
+  const dryRun         = (formData.get('dry_run') as string | null) === 'true';
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
@@ -208,6 +209,10 @@ export async function POST(request: NextRequest) {
 
   for (let i = 0; i < records.length; i++) {
     const raw = records[i];
+
+    // Skip rows with no data at all (blank lines left over from manual cleanup)
+    if (Object.values(raw).every((v) => !v || !v.trim())) continue;
+
     const row: Record<string, string> = {};
     const extras: string[] = [];
 
@@ -380,6 +385,8 @@ export async function POST(request: NextRequest) {
       seenIgUsernames.add(ni);
     }
 
+    if (dryRun) continue;
+
     const isSocial = leadSource === 'instagram' || leadSource === 'facebook';
     const defaultStatus = isSocial ? 'lead' : 'in_progress';
 
@@ -410,6 +417,17 @@ export async function POST(request: NextRequest) {
     } else {
       imported++;
     }
+  }
+
+  // Dry run: report what would happen, without having written anything to the DB
+  if (dryRun) {
+    return NextResponse.json({
+      dry_run:         true,
+      total:           parsedRows.length,
+      duplicate_count: duplicates.length,
+      errors:          errors.slice(0, 10),
+      duplicates:      duplicates.slice(0, 20),
+    });
   }
 
   return NextResponse.json({
