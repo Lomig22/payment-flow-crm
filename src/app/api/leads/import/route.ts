@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
   const rawNiche       = formData.get('niche') as string | null;
   const batchNiche     = rawNiche && VALID_NICHES.has(rawNiche) ? rawNiche : null;
   const dryRun         = (formData.get('dry_run') as string | null) === 'true';
+  const skipDuplicates = (formData.get('skip_duplicates') as string | null) === 'true';
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
@@ -351,14 +352,17 @@ export async function POST(request: NextRequest) {
   for (const row of parsedRows) {
     const lineNum = Number(row._lineNum);
     const label   = `${row.first_name} ${row.last_name}`.trim();
+    let isDuplicateRow = false;
 
     // Check phone duplicates
     if (row.phone) {
       const np = normPhone(row.phone);
       if (dbPhoneSet.has(np)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : téléphone ${row.phone} déjà présent — ${dbPhoneLabel[np]}`);
+        isDuplicateRow = true;
       } else if (seenPhones.has(np)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : téléphone ${row.phone} en doublon dans ce fichier`);
+        isDuplicateRow = true;
       }
       seenPhones.add(np);
     }
@@ -368,8 +372,10 @@ export async function POST(request: NextRequest) {
       const ne = row.email.toLowerCase();
       if (dbEmailSet.has(ne)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : email ${row.email} déjà présent — ${dbEmailLabel[ne]}`);
+        isDuplicateRow = true;
       } else if (seenEmails.has(ne)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : email ${row.email} en doublon dans ce fichier`);
+        isDuplicateRow = true;
       }
       seenEmails.add(ne);
     }
@@ -379,13 +385,20 @@ export async function POST(request: NextRequest) {
       const ni = row._ig_username.toLowerCase();
       if (dbIgSet.has(ni)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : @${row._ig_username} déjà présent — ${dbIgLabel[ni]}`);
+        isDuplicateRow = true;
       } else if (seenIgUsernames.has(ni)) {
         duplicates.push(`Ligne ${lineNum} (${label}) : @${row._ig_username} en doublon dans ce fichier`);
+        isDuplicateRow = true;
       }
       seenIgUsernames.add(ni);
     }
 
     if (dryRun) continue;
+
+    if (skipDuplicates && isDuplicateRow) {
+      skipped++;
+      continue;
+    }
 
     const isSocial = leadSource === 'instagram' || leadSource === 'facebook';
     const defaultStatus = isSocial ? 'lead' : 'in_progress';

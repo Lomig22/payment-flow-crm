@@ -56,7 +56,7 @@ export default function ImportPage() {
     }
   }, [setters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const buildFormData = (dryRun: boolean) => {
+  const buildFormData = (dryRun: boolean, skipDuplicates = false) => {
     if (!file) throw new Error('Fichier requis');
     const formData = new FormData();
     formData.append('file', file);
@@ -66,11 +66,13 @@ export default function ImportPage() {
     if (source) formData.append('source', source);
     if ((source === 'instagram' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
     if (dryRun) formData.append('dry_run', 'true');
+    if (skipDuplicates) formData.append('skip_duplicates', 'true');
     return formData;
   };
 
   const mutation = useMutation({
-    mutationFn: () => leadsApi.import(buildFormData(false)).then((r) => r.data as ImportResult),
+    mutationFn: (skipDuplicates: boolean = false) =>
+      leadsApi.import(buildFormData(false, skipDuplicates)).then((r) => r.data as ImportResult),
     onSuccess: (data) => {
       setResult(data);
       if (data.imported > 0) {
@@ -91,7 +93,7 @@ export default function ImportPage() {
       if (data.duplicate_count > 0) {
         setPendingPreview(data);
       } else {
-        mutation.mutate();
+        mutation.mutate(false);
       }
     },
     onError: (err: any) => {
@@ -303,16 +305,24 @@ export default function ImportPage() {
           <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside mb-4 max-h-40 overflow-y-auto">
             {pendingPreview.duplicates.map((d, i) => <li key={i}>{d}</li>)}
           </ul>
-          <div className="flex gap-3">
-            <button onClick={() => setPendingPreview(null)} className="btn-secondary flex-1 justify-center">
-              Annuler
-            </button>
+          <div className="flex flex-col gap-2">
             <button
-              onClick={() => { setPendingPreview(null); mutation.mutate(); }}
-              className="btn-primary flex-1 justify-center"
+              onClick={() => { setPendingPreview(null); mutation.mutate(true); }}
+              className="btn-primary justify-center"
             >
-              Importer quand même
+              Importer sans les doublons ({pendingPreview.total - pendingPreview.duplicate_count})
             </button>
+            <div className="flex gap-3">
+              <button onClick={() => setPendingPreview(null)} className="btn-secondary flex-1 justify-center">
+                Annuler
+              </button>
+              <button
+                onClick={() => { setPendingPreview(null); mutation.mutate(false); }}
+                className="btn-secondary flex-1 justify-center"
+              >
+                Importer quand même
+              </button>
+            </div>
           </div>
         </div>
       )}
