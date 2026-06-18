@@ -148,10 +148,12 @@ function SocialAccountForm({
 
 function SocialAccountCard({
   account,
+  isOwner,
   onEdit,
   onDelete,
 }: {
   account: SocialAccount;
+  isOwner: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -163,7 +165,14 @@ function SocialAccountCard({
         <div className="flex items-center gap-2 min-w-0">
           <cfg.Icon className={`w-4 h-4 ${cfg.color} flex-shrink-0`} />
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 text-sm truncate">{account.account_name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-gray-900 text-sm truncate">{account.account_name}</p>
+              {!isOwner && (
+                <span className="shrink-0 text-[10px] font-medium bg-indigo-50 text-indigo-600 rounded px-1.5 py-0.5">
+                  Attribué par l'admin
+                </span>
+              )}
+            </div>
             {account.username && <p className="text-xs text-gray-400">{account.username}</p>}
           </div>
         </div>
@@ -174,12 +183,16 @@ function SocialAccountCard({
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
-          <button onClick={onEdit} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {isOwner && (
+            <>
+              <button onClick={onEdit} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={onDelete} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -213,6 +226,7 @@ function SocialAccountCard({
 
 function MySocialAccountsSection() {
   const qc = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<SocialAccount | null>(null);
 
@@ -255,6 +269,7 @@ function MySocialAccountsSection() {
             <SocialAccountCard
               key={a.id}
               account={a}
+              isOwner={a.created_by === user?.id}
               onEdit={() => { setEditing(a); setShowForm(true); }}
               onDelete={() => {
                 if (confirm(`Supprimer "${a.account_name}" ?`)) deleteMutation.mutate(a.id);

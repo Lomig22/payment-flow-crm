@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
     .order('platform')
     .order('account_name');
 
-  // Setters only see their own accounts
+  // Setters see accounts they created, plus accounts an admin assigned to them
   if (user.role !== 'admin') {
-    query = query.eq('created_by', user.id);
+    const fullName = `${user.first_name} ${user.last_name}`;
+    query = query.or(`created_by.eq.${user.id},assigned_to.eq.${fullName}`);
   }
 
   if (platform) query = query.eq('platform', platform);
