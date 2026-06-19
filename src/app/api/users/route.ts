@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   const { data } = await supabase
     .from('users')
-    .select('id, email, first_name, last_name, role, is_active, avatar_url, created_at')
+    .select('id, email, first_name, last_name, role, is_active, avatar_url, created_at, acquisition_sources')
     .order('created_at', { ascending: false });
 
   return NextResponse.json(data || []);
