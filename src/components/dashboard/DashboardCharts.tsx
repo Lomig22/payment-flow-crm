@@ -100,20 +100,20 @@ export function InstagramTimelineChart({ data }: { data: IgTimelineItem[] }) {
 
 export function InstagramSetterBarChart({ data }: { data: IgSetterItem[] }) {
   return (
-    <ResponsiveContainer width="100%" height={Math.max(220, data.length * 40)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} tickLine={false} width={100} />
+        <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} />
+        <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="M1"            fill="#3b82f6" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="R1"            fill="#f97316" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="R2"            fill="#10b981" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="Réponses"      fill="#06b6d4" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="Audit à env."  fill="#eab308" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="Audit envoyé" fill="#a855f7" radius={[0, 4, 4, 0]} />
-        <Bar dataKey="RDV"          fill="#ef4444" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="M1"            fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="R1"            fill="#f97316" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="R2"            fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Réponses"      fill="#06b6d4" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Audit à env."  fill="#eab308" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Audit envoyé" fill="#a855f7" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="RDV"          fill="#ef4444" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
