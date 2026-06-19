@@ -204,6 +204,11 @@ export default function RessourcesPage() {
                 url: 'https://www.youtube.com/watch?v=s4zTxGgRNcY',
                 desc: 'Regarder en priorité avant de commencer',
               },
+              {
+                label: 'Vidéo onboarding CRM (Loom)',
+                url: 'https://www.loom.com/share/1c295210215444b88d3f704bdf26a03c',
+                desc: 'Prise en main du CRM Payment Flow',
+              },
             ].map(({ label, url, desc }) => (
               <a key={url} href={url} target="_blank" rel="noopener noreferrer"
                 className="flex items-start gap-2 p-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors group">
