@@ -9,7 +9,7 @@ interface SetterItem   { name: string; Leads: number; Appelés: number; Clients:
 interface QualityItem  { name: string; value: number; }
 interface StatusItem   { name: string; value: number; fill: string; }
 interface IgTimelineItem { date: string; m1: number; r1: number; r2: number; reponse: number; audit_envoye: number; rdv: number; }
-interface IgSetterItem   { name: string; M1: number; R1: number; R2: number; 'Réponses': number; 'Audit à env.': number; 'Audit envoyé': number; RDV: number; }
+interface IgSetterItem   { name: string; M1: number; R1: number; R2: number; 'Réponses': number; 'Audit envoyé': number; RDV: number; }
 interface FunnelItem     { name: string; value: number; }
 interface NicheItem      { name: string; value: number; }
 
@@ -111,7 +111,6 @@ export function InstagramSetterBarChart({ data }: { data: IgSetterItem[] }) {
         <Bar dataKey="R1"            fill="#f97316" radius={[4, 4, 0, 0]} />
         <Bar dataKey="R2"            fill="#10b981" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Réponses"      fill="#06b6d4" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Audit à env."  fill="#eab308" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Audit envoyé" fill="#a855f7" radius={[4, 4, 0, 0]} />
         <Bar dataKey="RDV"          fill="#ef4444" radius={[4, 4, 0, 0]} />
       </BarChart>

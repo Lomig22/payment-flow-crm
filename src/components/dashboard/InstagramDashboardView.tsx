@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -32,6 +33,7 @@ const FUNNEL_ORDER = ['lead', 'm1', 'r1', 'r2', 'reponse', 'a_relancer', 'audit_
 export default function InstagramDashboardView() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
+  const [dayIndex, setDayIndex] = useState(0);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['instagram-dashboard-stats'],
@@ -54,7 +56,7 @@ export default function InstagramDashboardView() {
     );
   }
 
-  const { overview, by_status, by_niche, by_setter, timeline } = data;
+  const { overview, by_status, by_niche, by_setter_daily, timeline } = data;
 
   const funnelData = FUNNEL_ORDER
     .map((key) => ({ name: FUNNEL_LABELS[key], value: Number(by_status?.[key] ?? 0) }))
@@ -67,13 +69,15 @@ export default function InstagramDashboardView() {
     date: formatDate(t.date),
   }));
 
-  const setterChartData = (by_setter ?? []).map((s) => ({
+  const dayOptions = (by_setter_daily ?? []).map((d) => d.date);
+  const selectedDay = by_setter_daily?.[dayIndex];
+
+  const setterChartData = (selectedDay?.setters ?? []).map((s) => ({
     name:              s.name.split(' ')[0],
     'M1':              Number(s.m1),
     'R1':              Number(s.r1),
     'R2':              Number(s.r2),
     'Réponses':        Number(s.reponse),
-    'Audit à env.':    Number(s.audit_a_envoyer),
     'Audit envoyé':    Number(s.audit_envoye),
     'RDV':             Number(s.rdv),
   }));
@@ -108,13 +112,30 @@ export default function InstagramDashboardView() {
 
       {/* Setter activity + Niche */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {isAdmin && by_setter && by_setter.length > 0 && (
+        {isAdmin && dayOptions.length > 0 && (
           <div className="card p-5 lg:col-span-2">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité par setter</h3>
-            <InstagramSetterBarChart data={setterChartData} />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">Activité par setter</h3>
+              <div className="flex gap-1.5">
+                {dayOptions.map((date, i) => (
+                  <button
+                    key={date}
+                    onClick={() => setDayIndex(i)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      dayIndex === i ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {i === 0 ? "Aujourd'hui" : `J-${i}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {setterChartData.length > 0
+              ? <InstagramSetterBarChart data={setterChartData} />
+              : <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">Aucune activité ce jour-là</div>}
           </div>
         )}
-        <div className={`card p-5 ${isAdmin && by_setter && by_setter.length > 0 ? '' : 'lg:col-span-3'}`}>
+        <div className={`card p-5 ${isAdmin && dayOptions.length > 0 ? '' : 'lg:col-span-3'}`}>
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Répartition par niche</h3>
           <NicheBarChart data={nicheData} />
         </div>

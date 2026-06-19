@@ -132,16 +132,18 @@ export interface InstagramDashboardStats {
   };
   by_status: Record<string, number>;
   by_niche:  Array<{ niche: string; count: number }>;
-  by_setter: Array<{
-    setter_id:        string;
-    name:             string;
-    m1:               number;
-    r1:               number;
-    r2:               number;
-    reponse:          number;
-    audit_a_envoyer:  number;
-    audit_envoye:     number;
-    rdv:              number;
+  by_setter_daily: Array<{
+    date:    string;
+    setters: Array<{
+      setter_id:     string;
+      name:          string;
+      m1:            number;
+      r1:            number;
+      r2:            number;
+      reponse:       number;
+      audit_envoye:  number;
+      rdv:           number;
+    }>;
   }>;
   timeline: Array<{
     date:           string;
