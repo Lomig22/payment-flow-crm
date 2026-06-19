@@ -225,6 +225,22 @@ export default function FacebookLeadsPage() {
 
         <select
           className="select w-auto text-sm"
+          value={filters.status ?? ''}
+          onChange={(e) => {
+            const val = e.target.value as LeadStatus | '';
+            setActiveTab(val);
+            setFilters((f) => ({ ...f, status: (val || undefined) as LeadStatus | undefined, page: 1 }));
+            setSelected(new Set());
+          }}
+        >
+          <option value="">Tous les statuts</option>
+          {Object.entries(FB_STATUS_LABELS).map(([val, label]) => (
+            <option key={val} value={val}>{label}</option>
+          ))}
+        </select>
+
+        <select
+          className="select w-auto text-sm"
           value={filters.niche ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 }))}
         >
