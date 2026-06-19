@@ -115,6 +115,46 @@ export interface DashboardStats {
   }>;
 }
 
+export interface InstagramDashboardStats {
+  overview: {
+    total_leads:         number;
+    m1_sent:              number;
+    r1:                   number;
+    r2:                   number;
+    reponse:              number;
+    a_relancer:           number;
+    audit_a_envoyer:      number;
+    audit_envoye:         number;
+    rdv:                  number;
+    open_count:           number;
+    open_rate:            number;
+    rdv_conversion_rate:  number;
+  };
+  by_status: Record<string, number>;
+  by_niche:  Array<{ niche: string; count: number }>;
+  by_setter: Array<{
+    setter_id:        string;
+    name:             string;
+    m1:               number;
+    r1:               number;
+    r2:               number;
+    reponse:          number;
+    audit_a_envoyer:  number;
+    audit_envoye:     number;
+    rdv:              number;
+  }>;
+  timeline: Array<{
+    date:           string;
+    leads_created:  number;
+    m1:             number;
+    r1:             number;
+    r2:             number;
+    reponse:        number;
+    audit_envoye:   number;
+    rdv:            number;
+  }>;
+}
+
 export interface ConversationMember {
   user_id: string;
   users: { id: string; first_name: string; last_name: string } | null;

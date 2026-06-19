@@ -73,8 +73,9 @@ export const usersApi = {
 };
 
 export const dashboardApi = {
-  getStats:       () => api.get('/dashboard/stats'),
-  getLeaderboard: () => api.get('/dashboard/leaderboard'),
+  getStats:          () => api.get('/dashboard/stats'),
+  getLeaderboard:    () => api.get('/dashboard/leaderboard'),
+  getInstagramStats: () => api.get('/dashboard/instagram-stats'),
 };
 
 export const notificationsApi = {
