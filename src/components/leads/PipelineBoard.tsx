@@ -249,10 +249,15 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     if (!lead || lead.status === newStatus) return;
 
     const updates: Partial<Lead> = { status: newStatus };
-    // Cold call : sortir un lead de « En cours » vers un autre statut signifie
-    // forcément qu'on l'a appelé → on coche « Appelé » automatiquement.
-    if (source === 'cold_call' && lead.status === 'in_progress' && !lead.called) {
-      updates.called = true;
+    if (source === 'cold_call') {
+      // Sortir un lead de « En cours » vers un autre statut signifie forcément
+      // qu'on l'a appelé → on coche « Appelé » automatiquement.
+      if (lead.status === 'in_progress' && !lead.called) updates.called = true;
+      // Les colonnes « RDV pris » / « R2 pris » impliquent qu'un RDV a été pris
+      // → on coche « RDV pris » pour que le dashboard reflète le pipeline.
+      if ((newStatus === 'appointment' || newStatus === 'r2') && !lead.appointment_taken) {
+        updates.appointment_taken = true;
+      }
     }
 
     setOptimistic((p) => ({ ...p, [leadId]: newStatus }));
