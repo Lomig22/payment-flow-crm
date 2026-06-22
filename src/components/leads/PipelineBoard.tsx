@@ -210,14 +210,18 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
-      leadsApi.update(id, { status }).then((r) => r.data),
-    onSuccess: (_, { id, status }) => {
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Lead> }) =>
+      leadsApi.update(id, updates).then((r) => r.data),
+    onSuccess: (_, { id, updates }) => {
       qc.setQueryData<Lead[]>(['leads-pipeline', source], (old) =>
-        old?.map((l) => (l.id === id ? { ...l, status } : l)) ?? old
+        old?.map((l) => (l.id === id ? { ...l, ...updates } : l)) ?? old
       );
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
       qc.invalidateQueries({ queryKey: ['leads'] });
+      // Le déplacement modifie l'activité agrégée → rafraîchir les dashboards.
+      qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      qc.invalidateQueries({ queryKey: ['leaderboard'] });
+      qc.invalidateQueries({ queryKey: ['instagram-dashboard-stats'] });
     },
     onError: (_, { id }) => {
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
@@ -243,8 +247,16 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     if (!columns.find((c) => c.id === newStatus)) return;
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) return;
+
+    const updates: Partial<Lead> = { status: newStatus };
+    // Cold call : sortir un lead de « En cours » vers un autre statut signifie
+    // forcément qu'on l'a appelé → on coche « Appelé » automatiquement.
+    if (source === 'cold_call' && lead.status === 'in_progress' && !lead.called) {
+      updates.called = true;
+    }
+
     setOptimistic((p) => ({ ...p, [leadId]: newStatus }));
-    mutation.mutate({ id: leadId, status: newStatus });
+    mutation.mutate({ id: leadId, updates });
   };
 
   if (isLoading) {
