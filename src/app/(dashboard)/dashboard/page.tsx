@@ -18,11 +18,13 @@ import type { DashboardStats } from '@/types';
 const TimelineChart  = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.TimelineChart),  { ssr: false });
 const QualityChart   = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.QualityChart),   { ssr: false });
 const SetterBarChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.SetterBarChart), { ssr: false });
+const ColdCallSetterDailyBarChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.ColdCallSetterDailyBarChart), { ssr: false });
 
 export default function DashboardPage() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
   const [view, setView] = useState<'cold_call' | 'instagram'>('cold_call');
+  const [dayIndex, setDayIndex] = useState(0);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -53,6 +55,17 @@ export default function DashboardPage() {
     'Leads':   Number(s.total),
     'Clients': Number(s.clients),
     'Appelés': Number(s.called),
+  }));
+
+  const dayOptions  = (data?.by_setter_daily ?? []).map((d) => d.date);
+  const selectedDay = data?.by_setter_daily?.[dayIndex];
+  const setterDailyData = (selectedDay?.setters ?? []).map((s) => ({
+    name:      s.name.split(' ')[0],
+    'Leads':   Number(s.leads_created),
+    'Appelés': Number(s.called),
+    'RDV':     Number(s.appointments),
+    'Devis':   Number(s.quotes),
+    'Clients': Number(s.clients),
   }));
 
   return (
@@ -127,6 +140,31 @@ export default function DashboardPage() {
             <div className="card p-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance par setter</h3>
               <SetterBarChart data={setterChartData} />
+            </div>
+          )}
+
+          {/* Activité par setter — jour par jour (aujourd'hui, J-1, J-2) */}
+          {isAdmin && dayOptions.length > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">Activité par setter</h3>
+                <div className="flex gap-1.5">
+                  {dayOptions.map((date, i) => (
+                    <button
+                      key={date}
+                      onClick={() => setDayIndex(i)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                        dayIndex === i ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {i === 0 ? "Aujourd'hui" : `J-${i}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {setterDailyData.length > 0
+                ? <ColdCallSetterDailyBarChart data={setterDailyData} />
+                : <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">Aucune activité ce jour-là</div>}
             </div>
           )}
 

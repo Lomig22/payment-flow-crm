@@ -107,6 +107,18 @@ export interface DashboardStats {
     clients:         number;
     conversion_rate: number;
   }>;
+  by_setter_daily: Array<{
+    date:    string;
+    setters: Array<{
+      setter_id:      string;
+      name:           string;
+      leads_created:  number;
+      called:         number;
+      appointments:   number;
+      quotes:         number;
+      clients:        number;
+    }>;
+  }>;
   timeline: Array<{
     date:           string;
     leads_created:  number;
