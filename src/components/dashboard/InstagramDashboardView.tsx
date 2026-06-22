@@ -17,18 +17,18 @@ const InstagramSetterBarChart = dynamic(() => import('@/components/dashboard/Das
 const StatusFunnelChart       = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.StatusFunnelChart),        { ssr: false });
 const NicheBarChart           = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.NicheBarChart),            { ssr: false });
 
-const FUNNEL_LABELS: Record<string, string> = {
-  lead:            'Lead',
-  m1:              'M1 envoyé',
-  r1:              'R1',
-  r2:              'R2',
-  reponse:         'Réponse',
-  a_relancer:      'À relancer',
-  audit_a_envoyer: 'Audit à envoyer',
-  audit_envoye:    'Audit envoyé',
-  rdv:             'RDV',
-};
-const FUNNEL_ORDER = ['lead', 'm1', 'r1', 'r2', 'reponse', 'a_relancer', 'audit_a_envoyer', 'audit_envoye', 'rdv'];
+const FUNNEL_STEPS = [
+  { key: 'lead',            label: 'Lead',            source: 'status'   as const },
+  { key: 'm1',               label: 'M1 envoyé',       source: 'status'   as const },
+  { key: 'open_count',       label: 'Ouverture',       source: 'overview' as const },
+  { key: 'r1',               label: 'R1',              source: 'status'   as const },
+  { key: 'r2',               label: 'R2',              source: 'status'   as const },
+  { key: 'reponse',          label: 'Réponse',         source: 'status'   as const },
+  { key: 'a_relancer',       label: 'À relancer',      source: 'status'   as const },
+  { key: 'audit_a_envoyer',  label: 'Audit à envoyer', source: 'status'   as const },
+  { key: 'audit_envoye',     label: 'Audit envoyé',    source: 'status'   as const },
+  { key: 'rdv',              label: 'RDV',             source: 'status'   as const },
+];
 
 export default function InstagramDashboardView() {
   const user    = useAuthStore((s) => s.user);
@@ -58,8 +58,11 @@ export default function InstagramDashboardView() {
 
   const { overview, by_status, by_niche, by_setter_daily, timeline } = data;
 
-  const funnelData = FUNNEL_ORDER
-    .map((key) => ({ name: FUNNEL_LABELS[key], value: Number(by_status?.[key] ?? 0) }))
+  const funnelData = FUNNEL_STEPS
+    .map(({ key, label, source }) => ({
+      name:  label,
+      value: Number(source === 'overview' ? overview.open_count : by_status?.[key] ?? 0),
+    }))
     .filter((d) => d.value > 0);
 
   const nicheData = (by_niche ?? []).map((n) => ({ name: n.niche, value: Number(n.count) }));
