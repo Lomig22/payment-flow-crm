@@ -98,9 +98,9 @@ export interface DashboardStats {
     no_show_rate:          number;
   };
   by_quality: { hot: number; warm: number; cold: number; unqualified: number };
-  by_status:  { in_progress: number; client: number; lost: number };
+  by_status:  Record<string, number>;
   by_setter:  Array<{
-    setter_id:       string;
+    setter_id:       string | null;
     name:            string;
     total:           number;
     called:          number;
@@ -110,7 +110,7 @@ export interface DashboardStats {
   by_setter_daily: Array<{
     date:    string;
     setters: Array<{
-      setter_id:      string;
+      setter_id:      string | null;
       name:           string;
       leads_created:  number;
       called:         number;

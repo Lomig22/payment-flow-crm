@@ -19,6 +19,21 @@ const TimelineChart  = dynamic(() => import('@/components/dashboard/DashboardCha
 const QualityChart   = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.QualityChart),   { ssr: false });
 const SetterBarChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.SetterBarChart), { ssr: false });
 const ColdCallSetterDailyBarChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.ColdCallSetterDailyBarChart), { ssr: false });
+const StatusFunnelChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then(m => m.StatusFunnelChart), { ssr: false });
+
+// Funnel Cold Call — même ordre que les colonnes du pipeline cold call
+const COLD_CALL_FUNNEL_STEPS: { key: string; label: string }[] = [
+  { key: 'in_progress',    label: 'En cours'     },
+  { key: 'to_follow_up',   label: 'À relancer'   },
+  { key: 'to_follow_up_2', label: 'À relancer 2' },
+  { key: 'appointment',    label: 'RDV pris'     },
+  { key: 'r2',             label: 'R2 pris'      },
+  { key: 'client',         label: 'Client'       },
+  { key: 'lost',           label: 'Perdu'        },
+];
+
+// Affiche le prénom du setter, mais garde « Non assigné » entier
+const shortName = (n: string) => (n === 'Non assigné' ? n : n.split(' ')[0]);
 
 export default function DashboardPage() {
   const user    = useAuthStore((s) => s.user);
@@ -51,16 +66,20 @@ export default function DashboardPage() {
   }));
 
   const setterChartData = (data?.by_setter ?? []).map((s) => ({
-    name:      s.name.split(' ')[0],
+    name:      shortName(s.name),
     'Leads':   Number(s.total),
     'Clients': Number(s.clients),
     'Appelés': Number(s.called),
   }));
 
+  const funnelData = COLD_CALL_FUNNEL_STEPS
+    .map(({ key, label }) => ({ name: label, value: Number(data?.by_status?.[key] ?? 0) }))
+    .filter((d) => d.value > 0);
+
   const dayOptions  = (data?.by_setter_daily ?? []).map((d) => d.date);
   const selectedDay = data?.by_setter_daily?.[dayIndex];
   const setterDailyData = (selectedDay?.setters ?? []).map((s) => ({
-    name:      s.name.split(' ')[0],
+    name:      shortName(s.name),
     'Leads':   Number(s.leads_created),
     'Appelés': Number(s.called),
     'RDV':     Number(s.appointments),
@@ -124,24 +143,33 @@ export default function DashboardPage() {
             <StatCard title="RDV honorés"       value={data.overview.appointments_honored} icon={Award}      color="purple" />
           </div>
 
-          {/* Charts */}
+          {/* Timeline + Funnel par statut */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="card p-5 lg:col-span-2">
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité — 30 derniers jours</h3>
               <TimelineChart data={timelineFormatted} />
             </div>
             <div className="card p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Funnel par statut</h3>
+              {funnelData.length > 0
+                ? <StatusFunnelChart data={funnelData} />
+                : <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">Aucune donnée</div>}
+            </div>
+          </div>
+
+          {/* Performance par setter + Qualité des leads */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {isAdmin && data.by_setter && data.by_setter.length > 0 && (
+              <div className="card p-5 lg:col-span-2">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance par setter — 30 derniers jours</h3>
+                <SetterBarChart data={setterChartData} />
+              </div>
+            )}
+            <div className={`card p-5 ${isAdmin && data.by_setter && data.by_setter.length > 0 ? '' : 'lg:col-span-3'}`}>
               <h3 className="text-sm font-semibold text-gray-900 mb-4">Qualité des leads</h3>
               <QualityChart data={qualityChartData} />
             </div>
           </div>
-
-          {isAdmin && data.by_setter && data.by_setter.length > 0 && (
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance par setter</h3>
-              <SetterBarChart data={setterChartData} />
-            </div>
-          )}
 
           {/* Activité par setter — jour par jour (aujourd'hui, J-1, J-2) */}
           {isAdmin && dayOptions.length > 0 && (
