@@ -167,7 +167,7 @@ export default function ColdCallLeadsPage() {
         <div className="relative flex-1 min-w-48 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={(e) => debouncedSearch(e.target.value)}
-            placeholder="Rechercher nom, société…" className="input pl-9 py-2 text-sm" />
+            placeholder="Rechercher nom, société, téléphone…" className="input pl-9 py-2 text-sm" />
           {search && (
             <button onClick={() => debouncedSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
               <X className="w-4 h-4 text-gray-400" />

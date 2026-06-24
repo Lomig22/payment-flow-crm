@@ -81,7 +81,27 @@ export async function GET(request: NextRequest) {
   if (a_ouvert === 'true')  q = (q as any).eq('a_ouvert', true);
   if (a_ouvert === 'false') q = (q as any).eq('a_ouvert', false);
   if (ig_username) q = (q as any).ilike('instagram_username', `%${ig_username.replace(/^@/, '')}%`);
-  if (search)      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,instagram_username.ilike.%${search}%`);
+  if (search) {
+    const orParts = [
+      `first_name.ilike.%${search}%`,
+      `last_name.ilike.%${search}%`,
+      `company.ilike.%${search}%`,
+      `email.ilike.%${search}%`,
+      `phone.ilike.%${search}%`,
+      `instagram_username.ilike.%${search}%`,
+    ];
+    // Recherche par téléphone insensible au format : les numéros sont stockés
+    // tantôt collés, tantôt séparés par des espaces ou des points. On part des
+    // chiffres saisis et on teste les variantes de format les plus courantes.
+    const digits = search.replace(/\D/g, '');
+    if (digits.length >= 3) {
+      const pairs = digits.match(/.{1,2}/g) ?? [];
+      orParts.push(`phone.ilike.%${digits}%`);          // collé : 0660294491
+      orParts.push(`phone.ilike.%${pairs.join(' ')}%`); // espaces : 06 60 29 44 91
+      orParts.push(`phone.ilike.%${pairs.join('.')}%`); // points : 06.60.29.44.91
+    }
+    q = q.or(orParts.join(','));
+  }
 
   q = q.order(sort, { ascending: asc }).range(offset, offset + limit - 1);
 
