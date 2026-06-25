@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 
 interface TimelineItem { date: string; leads_created: number; clients: number; appointments: number; }
-interface SetterItem   { name: string; Leads: number; Appelés: number; Relances: number; 'Relances 2': number; Perdus: number; Clients: number; }
+interface SetterItem   { name: string; Leads: number; Appelés: number; Relances: number; 'Relances 2': number; RDV: number; Perdus: number; Clients: number; }
 interface SetterDailyItem { name: string; 'Leads': number; 'Appelés': number; 'Relances': number; 'Relances 2': number; 'RDV': number; 'Devis': number; 'Perdus': number; 'Clients': number; }
 interface QualityItem  { name: string; value: number; }
 interface StatusItem   { name: string; value: number; fill: string; }
@@ -75,6 +75,7 @@ export function SetterBarChart({ data }: { data: SetterItem[] }) {
         <Bar dataKey="Appelés"    fill="#6366f1" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Relances"   fill="#f59e0b" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Relances 2" fill="#a855f7" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="RDV"        fill="#f97316" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Perdus"     fill="#ef4444" radius={[4, 4, 0, 0]} />
         <Bar dataKey="Clients"    fill="#10b981" radius={[4, 4, 0, 0]} />
       </BarChart>

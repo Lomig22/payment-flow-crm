@@ -106,6 +106,7 @@ export interface DashboardStats {
     called:          number;
     follow_ups:      number;
     follow_ups_2:    number;
+    appointments:    number;
     lost:            number;
     clients:         number;
     conversion_rate: number;

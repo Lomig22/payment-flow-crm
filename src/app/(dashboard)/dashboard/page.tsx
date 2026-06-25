@@ -71,6 +71,7 @@ export default function DashboardPage() {
     'Appelés':    Number(s.called),
     'Relances':   Number(s.follow_ups),
     'Relances 2': Number(s.follow_ups_2),
+    'RDV':        Number(s.appointments),
     'Perdus':     Number(s.lost),
     'Clients':    Number(s.clients),
   }));

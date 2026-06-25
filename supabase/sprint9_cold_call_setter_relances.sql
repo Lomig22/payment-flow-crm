@@ -74,6 +74,7 @@ BEGIN
             COUNT(l.id) FILTER (WHERE l.called = true) as called,
             COUNT(l.id) FILTER (WHERE l.status = 'to_follow_up') as follow_ups,
             COUNT(l.id) FILTER (WHERE l.status = 'to_follow_up_2') as follow_ups_2,
+            COUNT(l.id) FILTER (WHERE l.appointment_taken = true) as appointments,
             COUNT(l.id) FILTER (WHERE l.status = 'lost') as lost,
             COUNT(l.id) FILTER (WHERE l.status = 'client') as clients,
             ROUND(CASE WHEN COUNT(l.id) > 0 THEN COUNT(l.id) FILTER (WHERE l.status = 'client')::numeric / COUNT(l.id) * 100 ELSE 0 END, 1) as conversion_rate
@@ -92,6 +93,7 @@ BEGIN
             COUNT(l.id) FILTER (WHERE l.called = true) as called,
             COUNT(l.id) FILTER (WHERE l.status = 'to_follow_up') as follow_ups,
             COUNT(l.id) FILTER (WHERE l.status = 'to_follow_up_2') as follow_ups_2,
+            COUNT(l.id) FILTER (WHERE l.appointment_taken = true) as appointments,
             COUNT(l.id) FILTER (WHERE l.status = 'lost') as lost,
             COUNT(l.id) FILTER (WHERE l.status = 'client') as clients,
             ROUND(CASE WHEN COUNT(l.id) > 0 THEN COUNT(l.id) FILTER (WHERE l.status = 'client')::numeric / COUNT(l.id) * 100 ELSE 0 END, 1) as conversion_rate
