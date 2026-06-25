@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, UserX, BarChart2, Loader2, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -12,7 +13,26 @@ import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import { getInitials, formatDate } from '@/lib/utils';
-import type { User } from '@/types';
+import type { User, UserPerformance } from '@/types';
+
+// Recharts accède à ResizeObserver (browser-only) — chargement côté client
+const UserMonthlyChart = dynamic(
+  () => import('@/components/dashboard/DashboardCharts').then((m) => m.UserMonthlyChart),
+  { ssr: false },
+);
+
+// Périodes proposées dans la modale Stats
+const PERF_PERIODS: { label: string; days: number }[] = [
+  { label: '30 jours', days: 30 },
+  { label: '90 jours', days: 90 },
+  { label: '12 mois',  days: 365 },
+];
+
+// Libellés FR des canaux d'acquisition
+const SOURCE_LABELS: Record<string, string> = {
+  cold_call: 'Cold Call',
+  instagram: 'Instagram',
+};
 
 const schema = z.object({
   first_name: z.string().min(1),
@@ -29,15 +49,16 @@ export default function TeamPage() {
   const isAdmin = user?.role === 'admin';
   const [createOpen, setCreateOpen] = useState(false);
   const [perfUser,   setPerfUser]   = useState<User | null>(null);
+  const [perfDays,   setPerfDays]   = useState(30);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn:  () => usersApi.getAll().then((r) => r.data),
   });
 
-  const { data: perf } = useQuery({
-    queryKey: ['perf', perfUser?.id],
-    queryFn:  () => usersApi.getPerformance(perfUser!.id).then((r) => r.data),
+  const { data: perf, isFetching: perfLoading } = useQuery({
+    queryKey: ['perf', perfUser?.id, perfDays],
+    queryFn:  () => usersApi.getPerformance(perfUser!.id, perfDays).then((r) => r.data as UserPerformance),
     enabled:  !!perfUser,
   });
 
@@ -163,7 +184,7 @@ export default function TeamPage() {
             {/* Actions */}
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => setPerfUser(u)}
+                onClick={() => { setPerfDays(30); setPerfUser(u); }}
                 className="btn-secondary btn-sm flex-1 justify-center"
               >
                 <BarChart2 className="w-3.5 h-3.5" />
@@ -246,32 +267,111 @@ export default function TeamPage() {
         open={!!perfUser}
         onClose={() => setPerfUser(null)}
         title={perfUser ? `Stats — ${perfUser.first_name} ${perfUser.last_name}` : ''}
-        size="md"
+        size="xl"
       >
-        {perf ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              ['Total leads',    perf.total_leads],
-              ['Appelés',        perf.called_leads],
-              ['RDV pris',       perf.appointments_taken],
-              ['RDV honorés',    perf.appointments_honored],
-              ['Devis envoyés',  perf.quotes_sent],
-              ['Clients',        perf.clients_signed],
-              ['Leads perdus',   perf.lost],
-              ['Leads chauds',   perf.hot_leads],
-            ].map(([label, val]) => (
-              <div key={label as string} className="card p-3 text-center">
-                <p className="text-2xl font-bold text-gray-900">{val ?? 0}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-              </div>
+        {/* Sélecteur de période */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-medium text-gray-500">Activité du membre</p>
+          <div className="flex gap-1.5">
+            {PERF_PERIODS.map(({ label, days }) => (
+              <button
+                key={days}
+                onClick={() => setPerfDays(days)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  perfDays === days ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {label}
+              </button>
             ))}
-            <div className="card p-3 text-center col-span-2">
-              <p className="text-2xl font-bold text-green-600">{perf.conversion_rate ?? 0}%</p>
-              <p className="text-xs text-gray-500 mt-0.5">Taux de conversion</p>
+          </div>
+        </div>
+
+        {!perf ? (
+          <div className="flex items-center justify-center h-40"><Spinner /></div>
+        ) : (
+          <div className={`space-y-5 ${perfLoading ? 'opacity-60' : ''}`}>
+            {/* KPI grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {([
+                ['Total leads',   perf.stats.total_leads,          'text-gray-900'],
+                ['Appelés',       perf.stats.leads_called,         'text-gray-900'],
+                ['Relances',      perf.stats.follow_ups,           'text-amber-600'],
+                ['Relances 2',    perf.stats.follow_ups_2,         'text-purple-600'],
+                ['RDV pris',      perf.stats.appointments_taken,   'text-orange-600'],
+                ['RDV honorés',   perf.stats.appointments_honored, 'text-orange-600'],
+                ['Devis envoyés', perf.stats.quotes_sent,          'text-cyan-600'],
+                ['Perdus',        perf.stats.lost,                 'text-red-600'],
+                ['Clients',       perf.stats.clients_signed,       'text-green-600'],
+              ] as [string, number, string][]).map(([label, val, color]) => (
+                <div key={label} className="card p-3 text-center">
+                  <p className={`text-2xl font-bold ${color}`}>{val ?? 0}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Taux */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="card p-3 text-center">
+                <p className="text-2xl font-bold text-green-600">{perf.stats.conversion_rate ?? 0}%</p>
+                <p className="text-xs text-gray-500 mt-0.5">Taux de conversion</p>
+              </div>
+              <div className="card p-3 text-center">
+                <p className="text-2xl font-bold text-red-500">{perf.stats.no_show_rate ?? 0}%</p>
+                <p className="text-xs text-gray-500 mt-0.5">Taux de no-show</p>
+              </div>
+            </div>
+
+            {/* Qualité des leads */}
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-2">Qualité des leads</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="card p-3 text-center">
+                  <p className="text-xl font-bold text-red-500">{perf.stats.hot_leads ?? 0}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Chauds</p>
+                </div>
+                <div className="card p-3 text-center">
+                  <p className="text-xl font-bold text-orange-500">{perf.stats.warm_leads ?? 0}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Tièdes</p>
+                </div>
+                <div className="card p-3 text-center">
+                  <p className="text-xl font-bold text-blue-500">{perf.stats.cold_leads ?? 0}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Froids</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Répartition par canal */}
+            {perf.by_source.length > 1 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">Par canal</p>
+                <div className="space-y-1.5">
+                  {perf.by_source.map((s) => (
+                    <div key={s.source} className="flex items-center justify-between text-sm card px-3 py-2">
+                      <span className="font-medium text-gray-700">{SOURCE_LABELS[s.source] ?? s.source}</span>
+                      <span className="text-gray-500">
+                        {s.total} lead{s.total > 1 ? 's' : ''} · <span className="text-green-600 font-medium">{s.clients} client{s.clients > 1 ? 's' : ''}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Évolution mensuelle (6 mois) */}
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-2">Évolution — 6 derniers mois</p>
+              <UserMonthlyChart
+                data={[...perf.monthly].reverse().map((m) => ({
+                  month:     m.month.slice(5),
+                  Leads:     Number(m.total),
+                  RDV:       Number(m.appointments),
+                  Clients:   Number(m.clients),
+                }))}
+              />
             </div>
           </div>
-        ) : (
-          <div className="flex items-center justify-center h-32"><Spinner /></div>
         )}
       </Modal>
     </div>

@@ -134,6 +134,27 @@ export interface DashboardStats {
   }>;
 }
 
+export interface UserPerformance {
+  stats: {
+    total_leads:          number;
+    leads_called:         number;
+    follow_ups:           number;
+    follow_ups_2:         number;
+    appointments_taken:   number;
+    appointments_honored: number;
+    quotes_sent:          number;
+    clients_signed:       number;
+    lost:                 number;
+    hot_leads:            number;
+    warm_leads:           number;
+    cold_leads:           number;
+    conversion_rate:      number;
+    no_show_rate:         number;
+  };
+  by_source: Array<{ source: string; total: number; clients: number }>;
+  monthly:   Array<{ month: string; total: number; clients: number; appointments: number }>;
+}
+
 export interface InstagramDashboardStats {
   overview: {
     total_leads:         number;

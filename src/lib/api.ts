@@ -69,7 +69,8 @@ export const usersApi = {
   update:         (id: string, data: Partial<User> & { password?: string }) =>
     api.put<User>(`/users/${id}`, data),
   deactivate:     (id: string) => api.delete(`/users/${id}`),
-  getPerformance: (id: string) => api.get(`/users/${id}/performance`),
+  getPerformance: (id: string, days?: number) =>
+    api.get(`/users/${id}/performance${days ? `?period=${days}` : ''}`),
 };
 
 export const dashboardApi = {
