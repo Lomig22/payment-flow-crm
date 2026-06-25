@@ -66,10 +66,13 @@ export default function DashboardPage() {
   }));
 
   const setterChartData = (data?.by_setter ?? []).map((s) => ({
-    name:      shortName(s.name),
-    'Leads':   Number(s.total),
-    'Clients': Number(s.clients),
-    'Appelés': Number(s.called),
+    name:         shortName(s.name),
+    'Leads':      Number(s.total),
+    'Appelés':    Number(s.called),
+    'Relances':   Number(s.follow_ups),
+    'Relances 2': Number(s.follow_ups_2),
+    'Perdus':     Number(s.lost),
+    'Clients':    Number(s.clients),
   }));
 
   const funnelData = COLD_CALL_FUNNEL_STEPS
@@ -79,12 +82,15 @@ export default function DashboardPage() {
   const dayOptions  = (data?.by_setter_daily ?? []).map((d) => d.date);
   const selectedDay = data?.by_setter_daily?.[dayIndex];
   const setterDailyData = (selectedDay?.setters ?? []).map((s) => ({
-    name:      shortName(s.name),
-    'Leads':   Number(s.leads_created),
-    'Appelés': Number(s.called),
-    'RDV':     Number(s.appointments),
-    'Devis':   Number(s.quotes),
-    'Clients': Number(s.clients),
+    name:         shortName(s.name),
+    'Leads':      Number(s.leads_created),
+    'Appelés':    Number(s.called),
+    'Relances':   Number(s.follow_ups),
+    'Relances 2': Number(s.follow_ups_2),
+    'RDV':        Number(s.appointments),
+    'Devis':      Number(s.quotes),
+    'Perdus':     Number(s.lost),
+    'Clients':    Number(s.clients),
   }));
 
   return (
@@ -208,7 +214,10 @@ export default function DashboardPage() {
                       <th className="th">Setter</th>
                       <th className="th text-right">Total</th>
                       <th className="th text-right">Appelés</th>
+                      <th className="th text-right">Relances</th>
+                      <th className="th text-right">Relances 2</th>
                       <th className="th text-right">RDV</th>
+                      <th className="th text-right">Perdus</th>
                       <th className="th text-right">Clients</th>
                       <th className="th text-right">Conversion</th>
                     </tr>
@@ -220,7 +229,10 @@ export default function DashboardPage() {
                         <td className="td font-medium">{s.first_name} {s.last_name}</td>
                         <td className="td text-right">{s.total_leads}</td>
                         <td className="td text-right">{s.called}</td>
+                        <td className="td text-right">{s.follow_ups}</td>
+                        <td className="td text-right">{s.follow_ups_2}</td>
                         <td className="td text-right">{s.appointments}</td>
+                        <td className="td text-right text-red-600">{s.lost}</td>
                         <td className="td text-right text-green-600 font-medium">{s.clients}</td>
                         <td className="td text-right">
                           <span className={`font-semibold ${Number(s.conversion_rate) >= 20 ? 'text-green-600' : 'text-gray-600'}`}>

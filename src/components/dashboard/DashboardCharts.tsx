@@ -5,8 +5,8 @@ import {
 } from 'recharts';
 
 interface TimelineItem { date: string; leads_created: number; clients: number; appointments: number; }
-interface SetterItem   { name: string; Leads: number; Appelés: number; Clients: number; }
-interface SetterDailyItem { name: string; 'Leads': number; 'Appelés': number; 'RDV': number; 'Devis': number; 'Clients': number; }
+interface SetterItem   { name: string; Leads: number; Appelés: number; Relances: number; 'Relances 2': number; Perdus: number; Clients: number; }
+interface SetterDailyItem { name: string; 'Leads': number; 'Appelés': number; 'Relances': number; 'Relances 2': number; 'RDV': number; 'Devis': number; 'Perdus': number; 'Clients': number; }
 interface QualityItem  { name: string; value: number; }
 interface StatusItem   { name: string; value: number; fill: string; }
 interface IgTimelineItem { date: string; m1: number; r1: number; r2: number; reponse: number; audit_envoye: number; rdv: number; }
@@ -71,9 +71,12 @@ export function SetterBarChart({ data }: { data: SetterItem[] }) {
         <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="Leads"   fill="#e0e7ff" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Appelés" fill="#6366f1" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Clients" fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Leads"      fill="#e0e7ff" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Appelés"    fill="#6366f1" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Relances"   fill="#f59e0b" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Relances 2" fill="#a855f7" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Perdus"     fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Clients"    fill="#10b981" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -88,11 +91,14 @@ export function ColdCallSetterDailyBarChart({ data }: { data: SetterDailyItem[] 
         <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="Leads"   fill="#e0e7ff" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Appelés" fill="#6366f1" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="RDV"     fill="#f97316" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Devis"   fill="#06b6d4" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Clients" fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Leads"      fill="#e0e7ff" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Appelés"    fill="#6366f1" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Relances"   fill="#f59e0b" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Relances 2" fill="#a855f7" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="RDV"        fill="#f97316" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Devis"      fill="#06b6d4" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Perdus"     fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Clients"    fill="#10b981" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

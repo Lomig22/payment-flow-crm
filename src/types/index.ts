@@ -104,6 +104,9 @@ export interface DashboardStats {
     name:            string;
     total:           number;
     called:          number;
+    follow_ups:      number;
+    follow_ups_2:    number;
+    lost:            number;
     clients:         number;
     conversion_rate: number;
   }>;
@@ -114,8 +117,11 @@ export interface DashboardStats {
       name:           string;
       leads_created:  number;
       called:         number;
+      follow_ups:     number;
+      follow_ups_2:   number;
       appointments:   number;
       quotes:         number;
+      lost:           number;
       clients:        number;
     }>;
   }>;
