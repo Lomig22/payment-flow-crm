@@ -48,8 +48,9 @@ export default function TeamPage() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
   const [createOpen, setCreateOpen] = useState(false);
-  const [perfUser,   setPerfUser]   = useState<User | null>(null);
-  const [perfDays,   setPerfDays]   = useState(30);
+  const [perfUser,    setPerfUser]    = useState<User | null>(null);
+  const [perfDays,    setPerfDays]    = useState(30);
+  const [perfChannel, setPerfChannel] = useState<'cold_call' | 'instagram'>('cold_call');
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -61,6 +62,15 @@ export default function TeamPage() {
     queryFn:  () => usersApi.getPerformance(perfUser!.id, perfDays).then((r) => r.data as UserPerformance),
     enabled:  !!perfUser,
   });
+
+  // Canaux à afficher : ceux assignés au membre, ou ceux où il a des leads.
+  const perfSources = perfUser?.acquisition_sources ?? [];
+  const hasCold = perfSources.includes('cold_call') || (perf?.cold_call.stats.total_leads ?? 0) > 0;
+  const hasIg   = perfSources.includes('instagram') || (perf?.instagram.stats.total_leads ?? 0) > 0;
+  const bothChannels = hasCold && hasIg;
+  // Canal effectif : on retombe sur le canal disponible si le sélectionné ne l'est pas.
+  const channel: 'cold_call' | 'instagram' =
+    bothChannels ? perfChannel : (hasIg && !hasCold ? 'instagram' : 'cold_call');
 
   const deactivate = useMutation({
     mutationFn: (id: string) => usersApi.deactivate(id),
@@ -184,7 +194,13 @@ export default function TeamPage() {
             {/* Actions */}
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => { setPerfDays(30); setPerfUser(u); }}
+                onClick={() => {
+                  setPerfDays(30);
+                  // Canal par défaut : Instagram si le membre ne fait que ça
+                  const srcs = u.acquisition_sources ?? [];
+                  setPerfChannel(srcs.includes('cold_call') || !srcs.includes('instagram') ? 'cold_call' : 'instagram');
+                  setPerfUser(u);
+                }}
                 className="btn-secondary btn-sm flex-1 justify-center"
               >
                 <BarChart2 className="w-3.5 h-3.5" />
@@ -269,9 +285,25 @@ export default function TeamPage() {
         title={perfUser ? `Stats — ${perfUser.first_name} ${perfUser.last_name}` : ''}
         size="xl"
       >
-        {/* Sélecteur de période */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-medium text-gray-500">Activité du membre</p>
+        {/* Sélecteur de canal (si le membre fait les deux) + période */}
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+          {bothChannels ? (
+            <div className="flex gap-1.5">
+              {([['cold_call', 'Cold Call'], ['instagram', 'Instagram']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setPerfChannel(key)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    channel === key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs font-medium text-gray-500">{SOURCE_LABELS[channel]}</p>
+          )}
           <div className="flex gap-1.5">
             {PERF_PERIODS.map(({ label, days }) => (
               <button
@@ -289,20 +321,20 @@ export default function TeamPage() {
 
         {!perf ? (
           <div className="flex items-center justify-center h-40"><Spinner /></div>
-        ) : (
+        ) : channel === 'cold_call' ? (
           <div className={`space-y-5 ${perfLoading ? 'opacity-60' : ''}`}>
-            {/* KPI grid */}
+            {/* KPI Cold Call */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {([
-                ['Total leads',   perf.stats.total_leads,          'text-gray-900'],
-                ['Appelés',       perf.stats.leads_called,         'text-gray-900'],
-                ['Relances',      perf.stats.follow_ups,           'text-amber-600'],
-                ['Relances 2',    perf.stats.follow_ups_2,         'text-purple-600'],
-                ['RDV pris',      perf.stats.appointments_taken,   'text-orange-600'],
-                ['RDV honorés',   perf.stats.appointments_honored, 'text-orange-600'],
-                ['Devis envoyés', perf.stats.quotes_sent,          'text-cyan-600'],
-                ['Perdus',        perf.stats.lost,                 'text-red-600'],
-                ['Clients',       perf.stats.clients_signed,       'text-green-600'],
+                ['Total leads',   perf.cold_call.stats.total_leads,          'text-gray-900'],
+                ['Appelés',       perf.cold_call.stats.leads_called,         'text-gray-900'],
+                ['Relances',      perf.cold_call.stats.follow_ups,           'text-amber-600'],
+                ['Relances 2',    perf.cold_call.stats.follow_ups_2,         'text-purple-600'],
+                ['RDV pris',      perf.cold_call.stats.appointments_taken,   'text-orange-600'],
+                ['RDV honorés',   perf.cold_call.stats.appointments_honored, 'text-orange-600'],
+                ['Devis envoyés', perf.cold_call.stats.quotes_sent,          'text-cyan-600'],
+                ['Perdus',        perf.cold_call.stats.lost,                 'text-red-600'],
+                ['Clients',       perf.cold_call.stats.clients_signed,       'text-green-600'],
               ] as [string, number, string][]).map(([label, val, color]) => (
                 <div key={label} className="card p-3 text-center">
                   <p className={`text-2xl font-bold ${color}`}>{val ?? 0}</p>
@@ -314,11 +346,11 @@ export default function TeamPage() {
             {/* Taux */}
             <div className="grid grid-cols-2 gap-3">
               <div className="card p-3 text-center">
-                <p className="text-2xl font-bold text-green-600">{perf.stats.conversion_rate ?? 0}%</p>
+                <p className="text-2xl font-bold text-green-600">{perf.cold_call.stats.conversion_rate ?? 0}%</p>
                 <p className="text-xs text-gray-500 mt-0.5">Taux de conversion</p>
               </div>
               <div className="card p-3 text-center">
-                <p className="text-2xl font-bold text-red-500">{perf.stats.no_show_rate ?? 0}%</p>
+                <p className="text-2xl font-bold text-red-500">{perf.cold_call.stats.no_show_rate ?? 0}%</p>
                 <p className="text-xs text-gray-500 mt-0.5">Taux de no-show</p>
               </div>
             </div>
@@ -328,46 +360,74 @@ export default function TeamPage() {
               <p className="text-xs font-semibold text-gray-700 mb-2">Qualité des leads</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="card p-3 text-center">
-                  <p className="text-xl font-bold text-red-500">{perf.stats.hot_leads ?? 0}</p>
+                  <p className="text-xl font-bold text-red-500">{perf.cold_call.stats.hot_leads ?? 0}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Chauds</p>
                 </div>
                 <div className="card p-3 text-center">
-                  <p className="text-xl font-bold text-orange-500">{perf.stats.warm_leads ?? 0}</p>
+                  <p className="text-xl font-bold text-orange-500">{perf.cold_call.stats.warm_leads ?? 0}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Tièdes</p>
                 </div>
                 <div className="card p-3 text-center">
-                  <p className="text-xl font-bold text-blue-500">{perf.stats.cold_leads ?? 0}</p>
+                  <p className="text-xl font-bold text-blue-500">{perf.cold_call.stats.cold_leads ?? 0}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Froids</p>
                 </div>
               </div>
             </div>
 
-            {/* Répartition par canal */}
-            {perf.by_source.length > 1 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-2">Par canal</p>
-                <div className="space-y-1.5">
-                  {perf.by_source.map((s) => (
-                    <div key={s.source} className="flex items-center justify-between text-sm card px-3 py-2">
-                      <span className="font-medium text-gray-700">{SOURCE_LABELS[s.source] ?? s.source}</span>
-                      <span className="text-gray-500">
-                        {s.total} lead{s.total > 1 ? 's' : ''} · <span className="text-green-600 font-medium">{s.clients} client{s.clients > 1 ? 's' : ''}</span>
-                      </span>
-                    </div>
-                  ))}
+            {/* Évolution mensuelle (6 mois) */}
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-2">Évolution — 6 derniers mois</p>
+              <UserMonthlyChart
+                data={[...perf.cold_call.monthly].reverse().map((m) => ({
+                  month:   m.month.slice(5),
+                  Leads:   Number(m.total),
+                  RDV:     Number(m.appointments),
+                  Clients: Number(m.clients),
+                }))}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className={`space-y-5 ${perfLoading ? 'opacity-60' : ''}`}>
+            {/* KPI Instagram */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {([
+                ['Total leads',   perf.instagram.stats.total_leads,  'text-gray-900'],
+                ['M1 envoyés',    perf.instagram.stats.m1_sent,      'text-blue-600'],
+                ['R1',            perf.instagram.stats.r1,           'text-amber-600'],
+                ['R2',            perf.instagram.stats.r2,           'text-purple-600'],
+                ['Réponses',      perf.instagram.stats.reponse,      'text-cyan-600'],
+                ['Audit envoyé',  perf.instagram.stats.audit_envoye, 'text-indigo-600'],
+                ['RDV',           perf.instagram.stats.rdv,          'text-orange-600'],
+                ['Ouverts',       perf.instagram.stats.open_count,   'text-gray-900'],
+              ] as [string, number, string][]).map(([label, val, color]) => (
+                <div key={label} className="card p-3 text-center">
+                  <p className={`text-2xl font-bold ${color}`}>{val ?? 0}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{label}</p>
                 </div>
+              ))}
+            </div>
+
+            {/* Taux */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="card p-3 text-center">
+                <p className="text-2xl font-bold text-blue-600">{perf.instagram.stats.open_rate ?? 0}%</p>
+                <p className="text-xs text-gray-500 mt-0.5">Taux d'ouverture</p>
               </div>
-            )}
+              <div className="card p-3 text-center">
+                <p className="text-2xl font-bold text-green-600">{perf.instagram.stats.rdv_conversion_rate ?? 0}%</p>
+                <p className="text-xs text-gray-500 mt-0.5">Taux de conversion RDV</p>
+              </div>
+            </div>
 
             {/* Évolution mensuelle (6 mois) */}
             <div>
               <p className="text-xs font-semibold text-gray-700 mb-2">Évolution — 6 derniers mois</p>
               <UserMonthlyChart
-                data={[...perf.monthly].reverse().map((m) => ({
-                  month:     m.month.slice(5),
-                  Leads:     Number(m.total),
-                  RDV:       Number(m.appointments),
-                  Clients:   Number(m.clients),
+                data={[...perf.instagram.monthly].reverse().map((m) => ({
+                  month: m.month.slice(5),
+                  Leads: Number(m.total),
+                  RDV:   Number(m.rdv),
                 }))}
               />
             </div>

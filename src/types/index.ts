@@ -134,7 +134,7 @@ export interface DashboardStats {
   }>;
 }
 
-export interface UserPerformance {
+export interface ColdCallPerformance {
   stats: {
     total_leads:          number;
     leads_called:         number;
@@ -151,8 +151,28 @@ export interface UserPerformance {
     conversion_rate:      number;
     no_show_rate:         number;
   };
-  by_source: Array<{ source: string; total: number; clients: number }>;
-  monthly:   Array<{ month: string; total: number; clients: number; appointments: number }>;
+  monthly: Array<{ month: string; total: number; clients: number; appointments: number }>;
+}
+
+export interface InstagramPerformance {
+  stats: {
+    total_leads:         number;
+    m1_sent:             number;
+    r1:                  number;
+    r2:                  number;
+    reponse:             number;
+    audit_envoye:        number;
+    rdv:                 number;
+    open_count:          number;
+    open_rate:           number;
+    rdv_conversion_rate: number;
+  };
+  monthly: Array<{ month: string; total: number; rdv: number }>;
+}
+
+export interface UserPerformance {
+  cold_call: ColdCallPerformance;
+  instagram: InstagramPerformance;
 }
 
 export interface InstagramDashboardStats {

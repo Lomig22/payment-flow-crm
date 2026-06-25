@@ -145,12 +145,13 @@ export function InstagramSetterBarChart({ data }: { data: IgSetterItem[] }) {
   );
 }
 
-interface UserMonthlyItem { month: string; Leads: number; RDV: number; Clients: number; }
+interface UserMonthlyItem { month: string; Leads: number; RDV: number; Clients?: number; }
 
 export function UserMonthlyChart({ data }: { data: UserMonthlyItem[] }) {
   if (!data.length) return (
     <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">Aucune donnée</div>
   );
+  const showClients = data.some((d) => d.Clients !== undefined);
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
@@ -161,7 +162,7 @@ export function UserMonthlyChart({ data }: { data: UserMonthlyItem[] }) {
         <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
         <Bar dataKey="Leads"   fill="#e0e7ff" radius={[4, 4, 0, 0]} />
         <Bar dataKey="RDV"     fill="#f97316" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Clients" fill="#10b981" radius={[4, 4, 0, 0]} />
+        {showClients && <Bar dataKey="Clients" fill="#10b981" radius={[4, 4, 0, 0]} />}
       </BarChart>
     </ResponsiveContainer>
   );
