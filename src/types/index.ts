@@ -129,8 +129,12 @@ export interface DashboardStats {
   timeline: Array<{
     date:           string;
     leads_created:  number;
-    clients:        number;
+    called:         number;
+    follow_ups:     number;
+    follow_ups_2:   number;
     appointments:   number;
+    lost:           number;
+    clients:        number;
   }>;
 }
 
