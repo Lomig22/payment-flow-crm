@@ -18,11 +18,16 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-function NavLink({ href, icon: Icon, label, onClick }: {
-  href: string; icon: React.ElementType; label: string; onClick?: () => void;
+function NavLink({ href, icon: Icon, label, onClick, exact = false }: {
+  href: string; icon: React.ElementType; label: string; onClick?: () => void; exact?: boolean;
 }) {
   const pathname = usePathname();
-  const isActive = pathname === href || (href.length > 1 && pathname.startsWith(href));
+  // `exact` pour les liens globaux (ex. /leads) qui sont préfixes de leurs
+  // sous-pages (/leads/qualiopi…). Sinon match avec frontière « / » pour ne pas
+  // déborder sur les pôles voisins.
+  const isActive = exact
+    ? pathname === href
+    : pathname === href || (href.length > 1 && pathname.startsWith(href + '/'));
   return (
     <Link href={href} onClick={onClick} className={cn('nav-link', isActive && 'active')}>
       <Icon className="w-4 h-4 flex-shrink-0" />
@@ -99,7 +104,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         {/* ── Pôle Instagram ── */}
         {showInstagram && (
-          <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram" defaultOpen>
+          <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram">
             <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
           </PoleSection>
@@ -137,8 +142,8 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {/* Global (admin) */}
         {isAdmin && (
           <>
-            <NavLink href="/leads" icon={Users} label="Tous les leads" onClick={onClose} />
-            <NavLink href="/pipeline" icon={Kanban} label="Pipeline global" onClick={onClose} />
+            <NavLink href="/leads" icon={Users} label="Tous les leads" onClick={onClose} exact />
+            <NavLink href="/pipeline" icon={Kanban} label="Pipeline global" onClick={onClose} exact />
           </>
         )}
 
