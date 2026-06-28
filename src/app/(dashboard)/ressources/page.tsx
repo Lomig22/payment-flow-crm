@@ -315,20 +315,86 @@ Cordialement,
 
       {/* ── 2bis. Scripts Qualiopi ───────────────────────────────── */}
       <Section id="qualiopi" icon={<Target className="w-5 h-5 text-teal-600" />}
-        title="Scripts Qualiopi" badge="À compléter" color="border-teal-300">
+        title="Scripts Qualiopi" badge="Script Rémi" color="border-teal-300">
 
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Contexte / cible */}
           <div className="flex items-start gap-2 text-sm text-teal-800 bg-teal-50 border border-teal-200 rounded-lg p-3">
-            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <Flame className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <p>
-              Cible : organismes de formation visant la certification Qualiopi (souvent sans site web).
-              Les scripts d'appel et ressources dédiés seront ajoutés ici — contenu à fournir.
+              <strong>Cible 3a — la plus chaude :</strong> 718 organismes de formation non certifiés Qualiopi
+              en PACA, <strong>sans site web + téléphone fiable</strong>. On leur présente directement une maquette.
+              Le dirigeant est nommé dans 95 % des cas → demande directement la bonne personne, évite le standard.
             </p>
           </div>
 
-          <Script label="Script d'appel Qualiopi — à compléter" color="border-teal-300" text={`Bonjour [Prénom],
+          {/* Script d'appel — 4 étapes */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <Phone className="w-4 h-4 text-teal-600" />
+              Script d'appel — pitch formateur (4 étapes)
+            </h3>
+            <Script label="Script Qualiopi — Rémi" color="border-teal-300" text={`1 · ACCROCHE
+"Bonjour, je contacte les organismes de formation certifiés Qualiopi — votre audit de surveillance approche-t-il ?"
 
-[Script d'appel à définir pour la cible Qualiopi]`} />
+2 · DOULEUR
+"Savez-vous que votre site web doit respecter 32 indicateurs précis pour être conforme Qualiopi — dont l'affichage obligatoire du certificat depuis 2023 ?"
+
+3 · CRÉDIBILITÉ
+"Nous avons déjà accompagné plus de 100 formateurs et coachs pour passer leur audit sans non-conformité sur le site. On a le cahier des charges exact."
+
+4 · OFFRE
+"On vous livre un site conforme en 5 à 7 jours, avec devis gratuit sous 24h. Puis-je vous envoyer un aperçu de ce que ça donne ?"`} />
+          </div>
+
+          {/* Pourquoi l'angle fait mouche */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">Pourquoi l'angle fait mouche</h3>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {[
+                ['Un besoin concret', "OF non certifiés : le Critère 1 impose un site conforme. Un site prêt pour l'audit répond à une obligation réelle, pas un gadget."],
+                ['On passe le barrage', 'Le dirigeant est nommé dans 95 % des cas → on demande directement la bonne personne.'],
+                ['Un discours universel', 'Activités très variées → rester générique, centré Qualiopi + inscriptions. Jamais de discours sectoriel.'],
+              ].map(([t, d]) => (
+                <div key={t} className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-sm font-semibold text-gray-800 mb-1">{t}</p>
+                  <p className="text-xs text-gray-500">{d}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* L'offre & tarifs */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">L'offre Payment Flow & tarifs</h3>
+            <div className="grid sm:grid-cols-3 gap-3 mb-3">
+              {[
+                ['Essentiel', '799 €', 'Site one-page conforme 32 indicateurs · certificat affiché · formulaire contact/devis · RGPD/CGU/mentions · livraison 7 j'],
+                ['Pro ⭐', '1 290 €', "Tout l'Essentiel + multi-pages (1 page/formation) · SEO local · blog/ressources (option) · livraison 10 j"],
+                ['Premium', 'Sur devis', 'Tout le Pro + espace apprenant · intégration LMS · maintenance annuelle · accompagnement audit'],
+              ].map(([t, p, d]) => (
+                <div key={t} className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-sm font-semibold text-gray-800">{t}</p>
+                  <p className="text-lg font-bold text-teal-600 my-0.5">{p}</p>
+                  <p className="text-xs text-gray-500">{d}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              Arguments clés : <strong>100+ formateurs accompagnés</strong>, cahier des charges validé par des auditeurs,
+              conformité garantie ou on corrige, livraison 5–7 jours, devis gratuit sous 24h.
+            </p>
+          </div>
+
+          {/* Contexte marché à garder en tête */}
+          <div className="flex items-start gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+            <p>
+              <strong>À garder en tête :</strong> 100 000+ OF en France · le site Qualiopi exige 32 indicateurs
+              (36× un site ordinaire) · audit de surveillance entre le 14ᵉ et 22ᵉ mois après certification ·
+              sans Qualiopi = plus d'accès CPF, OPCO, France Travail.
+            </p>
+          </div>
         </div>
       </Section>
 
