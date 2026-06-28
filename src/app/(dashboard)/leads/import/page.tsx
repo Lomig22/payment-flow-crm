@@ -4,7 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, FileText, CheckCircle, AlertCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { leadsApi, usersApi } from '@/lib/api';
+import { leadsApi, qualiopiLeadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import Spinner from '@/components/ui/Spinner';
 
@@ -70,14 +70,17 @@ export default function ImportPage() {
     return formData;
   };
 
+  const importApi = source === 'qualiopi' ? qualiopiLeadsApi.import : leadsApi.import;
+
   const mutation = useMutation({
     mutationFn: (skipDuplicates: boolean = false) =>
-      leadsApi.import(buildFormData(false, skipDuplicates)).then((r) => r.data as ImportResult),
+      importApi(buildFormData(false, skipDuplicates)).then((r) => r.data as ImportResult),
     onSuccess: (data) => {
       setResult(data);
       if (data.imported > 0) {
         toast.success(`${data.imported} lead${data.imported > 1 ? 's' : ''} importé${data.imported > 1 ? 's' : ''} !`);
         qc.invalidateQueries({ queryKey: ['leads'] });
+        qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
       } else {
         toast.error('Aucun lead importé — vérifiez le format du fichier');
       }
@@ -88,7 +91,7 @@ export default function ImportPage() {
   });
 
   const previewMutation = useMutation({
-    mutationFn: () => leadsApi.import(buildFormData(true)).then((r) => r.data as DryRunResult),
+    mutationFn: () => importApi(buildFormData(true)).then((r) => r.data as DryRunResult),
     onSuccess: (data) => {
       if (data.duplicate_count > 0) {
         setPendingPreview(data);
@@ -244,11 +247,12 @@ export default function ImportPage() {
         {/* Source channel */}
         <div className="mt-5">
           <label className="label">Canal d'acquisition</label>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {([
               ['cold_call', '📞 Cold call',  'Prospection téléphonique'],
               ['instagram', '📸 Instagram',  'Leads depuis Instagram'],
               ['facebook',  '💬 Facebook',   'Leads depuis Facebook'],
+              ['qualiopi',  '🎓 Qualiopi',   'Tableur Qualiopi → table dédiée'],
             ] as const).map(([val, title, desc]) => (
               <label
                 key={val}
@@ -263,6 +267,15 @@ export default function ImportPage() {
             ))}
           </div>
         </div>
+
+        {/* Qualiopi format hint */}
+        {source === 'qualiopi' && (
+          <div className="mt-5 p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800">
+            Colonnes attendues : <strong>nom_entreprise</strong>, <strong>dirigeant</strong>, <strong>activite</strong>,{' '}
+            <strong>telephone</strong>, <strong>ville</strong>. Les leads sont créés dans la table Qualiopi dédiée
+            (doublons détectés par téléphone).
+          </div>
+        )}
 
         {/* Niche batch (Instagram / Facebook) */}
         {(source === 'instagram' || source === 'facebook') && (

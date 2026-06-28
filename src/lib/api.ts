@@ -89,6 +89,8 @@ export const qualiopiLeadsApi = {
   bulkStatus: (ids: string[], status: string) => api.patch('/qualiopi-leads/bulk-status', { ids, status }),
   assign:     (leadIds: string[], setterId: string) =>
     api.post('/qualiopi-leads/assign', { lead_ids: leadIds, setter_id: setterId }),
+  import:     (formData: FormData) =>
+    api.post('/qualiopi-leads/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 export const qualiopiDashboardApi = {
