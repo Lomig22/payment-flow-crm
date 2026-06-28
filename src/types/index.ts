@@ -86,6 +86,46 @@ export interface Lead {
   rdv_date?:           string;
 }
 
+// ─── Qualiopi (table dédiée qualiopi_leads) ───
+export type QualiopiStatus = ColdCallStatus;
+
+export interface QualiopiLead {
+  id:                  string;
+  company:             string;   // nom_entreprise
+  dirigeant?:          string;
+  activite?:           string;
+  phone?:              string;
+  email?:              string;
+  city?:               string;   // ville
+  has_website:         boolean;
+  called:              boolean;
+  lead_quality?:       LeadQuality;
+  need_identified?:    string;
+  setter_id?:          string;
+  setter?:             Pick<User, 'id' | 'first_name' | 'last_name' | 'email'> | null;
+  appointment_taken:   boolean;
+  appointment_honored: boolean;
+  quote_sent:          boolean;
+  status:              QualiopiStatus;
+  notes?:              string;
+  import_batch_id?:    string;
+  history?:            LeadHistory[];
+  created_at:          string;
+  updated_at:          string;
+}
+
+export interface QualiopiLeadsFilters {
+  setter_id?:  string;
+  status?:     QualiopiStatus | '';
+  quality?:    LeadQuality | '';
+  search?:     string;
+  page?:       number;
+  limit?:      number;
+  sort?:       string;
+  order?:      'asc' | 'desc';
+  count_only?: boolean;
+}
+
 export interface DashboardStats {
   overview: {
     total_leads:           number;

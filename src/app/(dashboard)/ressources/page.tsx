@@ -313,6 +313,25 @@ Cordialement,
         </div>
       </Section>
 
+      {/* ── 2bis. Scripts Qualiopi ───────────────────────────────── */}
+      <Section id="qualiopi" icon={<Target className="w-5 h-5 text-teal-600" />}
+        title="Scripts Qualiopi" badge="À compléter" color="border-teal-300">
+
+        <div className="space-y-4">
+          <div className="flex items-start gap-2 text-sm text-teal-800 bg-teal-50 border border-teal-200 rounded-lg p-3">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <p>
+              Cible : organismes de formation visant la certification Qualiopi (souvent sans site web).
+              Les scripts d'appel et ressources dédiés seront ajoutés ici — contenu à fournir.
+            </p>
+          </div>
+
+          <Script label="Script d'appel Qualiopi — à compléter" color="border-teal-300" text={`Bonjour [Prénom],
+
+[Script d'appel à définir pour la cible Qualiopi]`} />
+        </div>
+      </Section>
+
       {/* ── 3. Scripts DM Chatting ───────────────────────────────── */}
       <Section id="chatting" icon={<MessageSquare className="w-5 h-5 text-pink-600" />}
         title="Scripts DM Chatting" badge="Instagram / Facebook" color="border-pink-300">

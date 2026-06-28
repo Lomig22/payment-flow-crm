@@ -10,10 +10,14 @@ import {
 import { Phone, Building } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { leadsApi } from '@/lib/api';
+import { leadsApi, qualiopiLeadsApi } from '@/lib/api';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import type { Lead, LeadStatus } from '@/types';
+
+// Le board accepte aussi bien un Lead que un QualiopiLead (champs proches mais
+// pas identiques : dirigeant/activite vs first_name/niche). On reste souple.
+type BoardLead = Lead & { dirigeant?: string; activite?: string };
 
 // Detect the column whose horizontal center is closest to the pointer X.
 // This is more predictable than pointerWithin: the card always lands in
@@ -45,14 +49,17 @@ const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: strin
 ];
 
 /* ── Card ─────────────────────────────────────────────────────────── */
-function LeadCardInner({ lead }: { lead: Lead }) {
+function LeadCardInner({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boolean }) {
   const isSocial = lead.source === 'instagram' || lead.source === 'facebook';
-  const displayName = isSocial && lead.instagram_username
-    ? `@${lead.instagram_username}`
-    : `${lead.first_name} ${lead.last_name}`;
-  const subtitle = isSocial && lead.instagram_username && lead.company
-    ? lead.company
+  const displayName = isQualiopi
+    ? (lead.dirigeant || lead.company || '—')
+    : isSocial && lead.instagram_username
+      ? `@${lead.instagram_username}`
+      : `${lead.first_name} ${lead.last_name}`;
+  const subtitle = isQualiopi
+    ? (lead.dirigeant ? lead.company : undefined)
     : lead.company;
+  const tagline = isQualiopi ? lead.activite : lead.niche;
 
   return (
     <div className="flex-1 min-w-0">
@@ -69,8 +76,8 @@ function LeadCardInner({ lead }: { lead: Lead }) {
           {lead.phone}
         </p>
       )}
-      {lead.niche && (
-        <p className="text-[10px] text-gray-400 mt-0.5">{lead.niche}</p>
+      {tagline && (
+        <p className="text-[10px] text-gray-400 mt-0.5">{tagline}</p>
       )}
       <div className="flex items-center gap-1 mt-2 flex-wrap">
         {lead.lead_quality && <Badge variant={lead.lead_quality} />}
@@ -82,7 +89,7 @@ function LeadCardInner({ lead }: { lead: Lead }) {
   );
 }
 
-function DraggableCard({ lead }: { lead: Lead }) {
+function DraggableCard({ lead, detailBase, isQualiopi }: { lead: BoardLead; detailBase: string; isQualiopi?: boolean }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: lead.id,
@@ -98,33 +105,35 @@ function DraggableCard({ lead }: { lead: Lead }) {
       className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm
                  hover:shadow-md hover:border-indigo-200 transition-all
                  cursor-grab active:cursor-grabbing select-none"
-      onClick={() => { if (!isDragging) router.push(`/leads/${lead.id}`); }}
+      onClick={() => { if (!isDragging) router.push(`${detailBase}/${lead.id}`); }}
     >
-      <LeadCardInner lead={lead} />
+      <LeadCardInner lead={lead} isQualiopi={isQualiopi} />
     </div>
   );
 }
 
 /* Floating card shown while dragging */
-function OverlayCard({ lead }: { lead: Lead }) {
+function OverlayCard({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boolean }) {
   return (
     <div
       className="bg-white rounded-lg border-2 border-indigo-400 p-3 shadow-2xl
                  cursor-grabbing select-none"
       style={{ width: 272 }}
     >
-      <LeadCardInner lead={lead} />
+      <LeadCardInner lead={lead} isQualiopi={isQualiopi} />
     </div>
   );
 }
 
 /* ── Column ───────────────────────────────────────────────────────── */
 function Column({
-  col, leads, isTargeted,
+  col, leads, isTargeted, detailBase, isQualiopi,
 }: {
   col: typeof COLUMNS[number];
-  leads: Lead[];
+  leads: BoardLead[];
   isTargeted: boolean;
+  detailBase: string;
+  isQualiopi?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   const active = isOver && isTargeted;
@@ -152,7 +161,7 @@ function Column({
           ${active ? `ring-2 ring-inset ${col.ringColor}` : ''}
         `}
       >
-        {leads.map((lead) => <DraggableCard key={lead.id} lead={lead} />)}
+        {leads.map((lead) => <DraggableCard key={lead.id} lead={lead} detailBase={detailBase} isQualiopi={isQualiopi} />)}
 
         {leads.length === 0 && (
           <div
@@ -187,14 +196,20 @@ const COLUMNS_INSTAGRAM: typeof COLUMNS = [
 const COLUMNS_FACEBOOK = COLUMNS_INSTAGRAM;
 
 /* ── Board ────────────────────────────────────────────────────────── */
-interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook' }
+interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook'; variant?: 'qualiopi' }
 
-export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
+export default function PipelineBoard({ source, variant }: PipelineBoardProps = {}) {
   const qc = useQueryClient();
-  const [activeLead, setActiveLead] = useState<Lead | null>(null);
+  const isQualiopi = variant === 'qualiopi';
+  const api = isQualiopi ? qualiopiLeadsApi : leadsApi;
+  const detailBase = isQualiopi ? '/qualiopi' : '/leads';
+  const queryKey = ['leads-pipeline', source, variant];
+  const [activeLead, setActiveLead] = useState<BoardLead | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
 
-  const columns = source === 'instagram' ? COLUMNS_INSTAGRAM
+  // Qualiopi suit le funnel cold call (mêmes statuts).
+  const columns = isQualiopi ? COLUMNS
+    : source === 'instagram' ? COLUMNS_INSTAGRAM
     : source === 'facebook' ? COLUMNS_FACEBOOK
     : COLUMNS;
 
@@ -205,23 +220,25 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
   );
 
   const { data, isLoading } = useQuery({
-    queryKey: ['leads-pipeline', source],
-    queryFn:  () => leadsApi.getAll({ limit: 2000, ...(source ? { source } : {}) }).then((r) => r.data.data as Lead[]),
+    queryKey,
+    queryFn:  () => (api as any).getAll({ limit: 2000, ...(source && !isQualiopi ? { source } : {}) }).then((r: any) => r.data.data as BoardLead[]),
   });
 
   const mutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Lead> }) =>
-      leadsApi.update(id, updates).then((r) => r.data),
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<BoardLead> }) =>
+      (api as any).update(id, updates).then((r: any) => r.data),
     onSuccess: (_, { id, updates }) => {
-      qc.setQueryData<Lead[]>(['leads-pipeline', source], (old) =>
+      qc.setQueryData<BoardLead[]>(queryKey, (old) =>
         old?.map((l) => (l.id === id ? { ...l, ...updates } : l)) ?? old
       );
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
       // Le déplacement modifie l'activité agrégée → rafraîchir les dashboards.
       qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
       qc.invalidateQueries({ queryKey: ['leaderboard'] });
       qc.invalidateQueries({ queryKey: ['instagram-dashboard-stats'] });
+      qc.invalidateQueries({ queryKey: ['qualiopi-dashboard-stats'] });
     },
     onError: (_, { id }) => {
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
@@ -229,8 +246,8 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     },
   });
 
-  const rawLeads = data ?? [];
-  const leads = rawLeads.map((l) =>
+  const rawLeads: BoardLead[] = (data as BoardLead[] | undefined) ?? [];
+  const leads: BoardLead[] = rawLeads.map((l) =>
     optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l
   );
   const getColumn = (s: LeadStatus) => leads.filter((l) => l.status === s);
@@ -248,8 +265,8 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) return;
 
-    const updates: Partial<Lead> = { status: newStatus };
-    if (source === 'cold_call') {
+    const updates: Partial<BoardLead> = { status: newStatus };
+    if (source === 'cold_call' || isQualiopi) {
       // Sortir un lead de « En cours » vers un autre statut signifie forcément
       // qu'on l'a appelé → on coche « Appelé » automatiquement.
       if (lead.status === 'in_progress' && !lead.called) updates.called = true;
@@ -286,12 +303,14 @@ export default function PipelineBoard({ source }: PipelineBoardProps = {}) {
             col={col}
             leads={getColumn(col.id)}
             isTargeted={activeLead !== null && activeLead.status !== col.id}
+            detailBase={detailBase}
+            isQualiopi={isQualiopi}
           />
         ))}
       </div>
 
       <DragOverlay dropAnimation={{ duration: 150, easing: 'cubic-bezier(0.18,0.67,0.6,1.22)' }}>
-        {activeLead ? <OverlayCard lead={activeLead} /> : null}
+        {activeLead ? <OverlayCard lead={activeLead} isQualiopi={isQualiopi} /> : null}
       </DragOverlay>
     </DndContext>
   );

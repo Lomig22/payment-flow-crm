@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Lead, User, Tag, LeadsFilters } from '@/types';
+import type { Lead, User, Tag, LeadsFilters, QualiopiLead, QualiopiLeadsFilters } from '@/types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -77,6 +77,23 @@ export const dashboardApi = {
   getStats:          () => api.get('/dashboard/stats'),
   getLeaderboard:    () => api.get('/dashboard/leaderboard'),
   getInstagramStats: () => api.get('/dashboard/instagram-stats'),
+};
+
+export const qualiopiLeadsApi = {
+  getAll:     (params?: QualiopiLeadsFilters) => api.get('/qualiopi-leads', { params }),
+  getOne:     (id: string) => api.get<QualiopiLead>(`/qualiopi-leads/${id}`),
+  create:     (data: Partial<QualiopiLead>) => api.post<QualiopiLead>('/qualiopi-leads', data),
+  update:     (id: string, data: Partial<QualiopiLead>) => api.put<QualiopiLead>(`/qualiopi-leads/${id}`, data),
+  delete:     (id: string) => api.delete(`/qualiopi-leads/${id}`),
+  bulkDelete: (ids: string[]) => api.post('/qualiopi-leads/bulk-delete', { ids }),
+  bulkStatus: (ids: string[], status: string) => api.patch('/qualiopi-leads/bulk-status', { ids, status }),
+  assign:     (leadIds: string[], setterId: string) =>
+    api.post('/qualiopi-leads/assign', { lead_ids: leadIds, setter_id: setterId }),
+};
+
+export const qualiopiDashboardApi = {
+  getStats:       () => api.get('/qualiopi-dashboard/stats'),
+  getLeaderboard: () => api.get('/qualiopi-dashboard/leaderboard'),
 };
 
 export const notificationsApi = {

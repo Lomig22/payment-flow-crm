@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Upload, UsersRound, LogOut, Zap, User, X,
   MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
-  Users, Kanban, ChevronDown,
+  Users, Kanban, ChevronDown, Award,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -73,6 +73,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const showInstagram = isAdmin || sources.length === 0 || sources.includes('instagram');
   const showFacebook  = isAdmin || sources.length === 0 || sources.includes('facebook');
   const showColdCall  = isAdmin || sources.length === 0 || sources.includes('cold_call');
+  const showQualiopi  = isAdmin || sources.includes('qualiopi');
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -117,6 +118,14 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment="cold-call">
             <NavLink href="/leads/cold-call" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/cold-call" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
+
+        {/* ── Pôle Qualiopi ── */}
+        {showQualiopi && (
+          <PoleSection icon={Award} label="Qualiopi" color="text-teal-500" segment="qualiopi">
+            <NavLink href="/leads/qualiopi" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/pipeline/qualiopi" icon={Kanban} label="Pipeline" onClick={onClose} />
           </PoleSection>
         )}
 

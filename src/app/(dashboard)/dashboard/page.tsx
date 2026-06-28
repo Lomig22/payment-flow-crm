@@ -6,7 +6,7 @@ import {
   Users, PhoneCall, CalendarCheck, TrendingUp,
   UserCheck, XCircle, Award, BarChart3, Instagram,
 } from 'lucide-react';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi, qualiopiDashboardApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import StatCard from '@/components/ui/StatCard';
 import Spinner from '@/components/ui/Spinner';
@@ -38,19 +38,22 @@ const shortName = (n: string) => (n === 'Non assigné' ? n : n.split(' ')[0]);
 export default function DashboardPage() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
-  const [view, setView] = useState<'cold_call' | 'instagram'>('cold_call');
+  const [view, setView] = useState<'cold_call' | 'instagram' | 'qualiopi'>('cold_call');
   const [dayIndex, setDayIndex] = useState(0);
 
+  const statsApi = view === 'qualiopi' ? qualiopiDashboardApi : dashboardApi;
+  const isChartView = view === 'cold_call' || view === 'qualiopi';
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn:  () => dashboardApi.getStats().then((r) => r.data as DashboardStats),
-    enabled:  view === 'cold_call',
+    queryKey: [view === 'qualiopi' ? 'qualiopi-dashboard-stats' : 'dashboard-stats'],
+    queryFn:  () => statsApi.getStats().then((r) => r.data as DashboardStats),
+    enabled:  isChartView,
   });
 
   const { data: leaderboard } = useQuery({
-    queryKey: ['leaderboard'],
-    queryFn:  () => dashboardApi.getLeaderboard().then((r) => r.data),
-    enabled:  isAdmin && view === 'cold_call',
+    queryKey: [view === 'qualiopi' ? 'qualiopi-leaderboard' : 'leaderboard'],
+    queryFn:  () => statsApi.getLeaderboard().then((r) => r.data),
+    enabled:  isAdmin && isChartView,
   });
 
   const qualityChartData = data?.by_quality ? [
@@ -123,6 +126,14 @@ export default function DashboardPage() {
           }`}
         >
           <Instagram className="w-4 h-4" /> Instagram
+        </button>
+        <button
+          onClick={() => setView('qualiopi')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            view === 'qualiopi' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <Award className="w-4 h-4" /> Qualiopi
         </button>
       </div>
 
