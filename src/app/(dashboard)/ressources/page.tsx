@@ -796,6 +796,8 @@ Sinon, 15 minutes suffisent :
         title="Documents à télécharger" color="border-gray-300">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
+            { name: 'Onboarding Setter — Qualiopi',  file: 'onboarding-setter-qualiopi.pdf', desc: 'Base de prospection, tunnel de qualification, ordre d\'attaque', color: 'text-teal-600 bg-teal-50 border-teal-200'       },
+            { name: 'Qualiopi — Pitch & Offre',       file: 'qualiopi-paymentflow.pdf',       desc: 'Marché, argumentaire, script Rémi, prospection et tarifs',   color: 'text-teal-600 bg-teal-50 border-teal-200'       },
             { name: 'Script Prospection DM',          file: 'script-prospection-dm.pdf', desc: 'Guide opérationnel complet IG & FB — Cas 1, Cas 2, ChatGPT, relances', color: 'text-pink-600 bg-pink-50 border-pink-200'       },
             { name: 'Processus Warm-Up complet',    file: 'processus-warmup.pdf',    desc: 'Guide opérationnel 17 pages — comptes IG & FB',    color: 'text-orange-600 bg-orange-50 border-orange-200' },
             { name: 'Script de Chatting',           file: 'script-chatting.pdf',    desc: 'Scripts DM Instagram & Facebook avec relances',    color: 'text-pink-600 bg-pink-50 border-pink-200'       },
