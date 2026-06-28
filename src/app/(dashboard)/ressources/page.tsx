@@ -335,10 +335,10 @@ Cordialement,
               Script d'appel — pitch formateur (4 étapes)
             </h3>
             <Script label="Script Qualiopi — Rémi" color="border-teal-300" text={`1 · ACCROCHE
-"Bonjour, je contacte les organismes de formation certifiés Qualiopi — votre audit de surveillance approche-t-il ?"
+"Bonjour, je contacte les organismes de formation autour de la certification Qualiopi — vous êtes déjà certifié, ou c'est un projet en cours ?"
 
 2 · DOULEUR
-"Savez-vous que votre site web doit respecter 32 indicateurs précis pour être conforme Qualiopi — dont l'affichage obligatoire du certificat depuis 2023 ?"
+"Pour être conforme Qualiopi, votre site doit respecter 32 indicateurs précis (le Critère 1) — un site Wix ou inexistant ne passe pas l'audit, et le certificat doit y être affiché depuis 2023."
 
 3 · CRÉDIBILITÉ
 "Nous avons déjà accompagné plus de 100 formateurs et coachs pour passer leur audit sans non-conformité sur le site. On a le cahier des charges exact."
