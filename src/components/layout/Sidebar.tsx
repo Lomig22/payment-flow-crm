@@ -78,7 +78,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const showInstagram = isAdmin || sources.length === 0 || sources.includes('instagram');
   const showFacebook  = isAdmin || sources.length === 0 || sources.includes('facebook');
   const showColdCall  = isAdmin || sources.length === 0 || sources.includes('cold_call');
-  const showQualiopi  = isAdmin || sources.includes('qualiopi');
+  const showQualiopi  = isAdmin || sources.length === 0 || sources.includes('cold_call') || sources.includes('qualiopi');
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
