@@ -100,6 +100,7 @@ export const qualiopiDashboardApi = {
 
 export const notificationsApi = {
   getRecent: () => api.get('/notifications'),
+  getAll:    (limit = 100) => api.get('/notifications', { params: { limit } }),
 };
 
 export const chatApi = {

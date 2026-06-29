@@ -6,6 +6,9 @@ export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
 
+  const { searchParams } = new URL(request.url);
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '15')));
+
   // For setters: restrict to their own leads
   let leadIds: string[] | null = null;
   if (user.role !== 'admin') {
@@ -21,7 +24,7 @@ export async function GET(request: NextRequest) {
     .from('lead_history')
     .select('id, lead_id, field_changed, old_value, new_value, action_note, created_at, leads!lead_id(first_name, last_name, company)')
     .order('created_at', { ascending: false })
-    .limit(15);
+    .limit(limit);
 
   if (leadIds) q = q.in('lead_id', leadIds);
 

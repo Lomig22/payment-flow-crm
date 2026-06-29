@@ -21,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/profile':             'Mon profil',
   '/chat':                'Messages',
   '/ressources':          'Ressources',
+  '/notifications':       'Notifications',
   '/admin':               'Admin',
 };
 

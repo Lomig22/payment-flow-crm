@@ -176,10 +176,10 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
 
               <div className="border-t border-gray-100 px-4 py-2.5">
                 <button
-                  onClick={() => { setNotifOpen(false); router.push('/leads'); }}
+                  onClick={() => { setNotifOpen(false); router.push('/notifications'); }}
                   className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
                 >
-                  Voir tous les leads <ChevronRight className="w-3 h-3" />
+                  Voir toutes les notifications <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
