@@ -84,25 +84,34 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
   }
 
-  // Si le statut change et que c'est un lead Instagram/Facebook → enregistre la date
-  if (updates.status && (current.source === 'instagram' || current.source === 'facebook')) {
-    const dateField = IG_STATUS_DATE[updates.status as string];
-    if (dateField) updates[dateField] = new Date().toISOString();
-  }
-
-  // Cocher « RDV pris » (cold call) fait avancer le lead dans la colonne « RDV pris »
-  // du pipeline, qui s'organise par statut. On n'avance que depuis un statut amont
-  // (on ne rétrograde jamais un lead déjà en R2 / client / perdu).
+  // Cocher « RDV pris » fait apparaître le lead comme RDV dans le pipeline et les
+  // dashboards (qui s'organisent par statut). On mappe vers le bon statut selon le
+  // canal, sans jamais rétrograder un lead déjà plus avancé :
+  //   • cold call          → 'appointment' (colonne RDV pris)
+  //   • instagram/facebook → 'rdv'         (colonne RDV du funnel DM)
   const appointmentChecked = updates.appointment_taken === true || updates.appointment_taken === 'true';
-  if (current.source === 'cold_call' && appointmentChecked) {
+  if (appointmentChecked) {
     const effectiveStatus = (updates.status as string) ?? current.status;
-    if (['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
+    if (current.source === 'cold_call' && ['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
       updates.status = 'appointment';
       historyRows.push({
         lead_id: params.id, user_id: user.id, field_changed: 'status',
         old_value: effectiveStatus, new_value: 'appointment',
       });
+    } else if ((current.source === 'instagram' || current.source === 'facebook') && effectiveStatus !== 'rdv') {
+      updates.status = 'rdv';
+      historyRows.push({
+        lead_id: params.id, user_id: user.id, field_changed: 'status',
+        old_value: effectiveStatus, new_value: 'rdv',
+      });
     }
+  }
+
+  // Lead Instagram/Facebook dont le statut change → enregistre la date du funnel
+  // (placé après le mapping ci-dessus pour capter le passage automatique en 'rdv').
+  if (updates.status && (current.source === 'instagram' || current.source === 'facebook')) {
+    const dateField = IG_STATUS_DATE[updates.status as string];
+    if (dateField) updates[dateField] = new Date().toISOString();
   }
 
   if (Object.keys(updates).length > 0) {
