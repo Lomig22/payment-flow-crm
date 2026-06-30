@@ -90,6 +90,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (dateField) updates[dateField] = new Date().toISOString();
   }
 
+  // Cocher « RDV pris » (cold call) fait avancer le lead dans la colonne « RDV pris »
+  // du pipeline, qui s'organise par statut. On n'avance que depuis un statut amont
+  // (on ne rétrograde jamais un lead déjà en R2 / client / perdu).
+  const appointmentChecked = updates.appointment_taken === true || updates.appointment_taken === 'true';
+  if (current.source === 'cold_call' && appointmentChecked) {
+    const effectiveStatus = (updates.status as string) ?? current.status;
+    if (['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
+      updates.status = 'appointment';
+      historyRows.push({
+        lead_id: params.id, user_id: user.id, field_changed: 'status',
+        old_value: effectiveStatus, new_value: 'appointment',
+      });
+    }
+  }
+
   if (Object.keys(updates).length > 0) {
     await supabase.from('leads').update(updates).eq('id', params.id);
     if (historyRows.length > 0) await supabase.from('lead_history').insert(historyRows);

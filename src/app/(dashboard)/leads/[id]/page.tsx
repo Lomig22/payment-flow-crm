@@ -246,6 +246,13 @@ export default function LeadDetailPage() {
             setEditOpen(false);
             qc.invalidateQueries({ queryKey: ['lead', id] });
             qc.invalidateQueries({ queryKey: ['leads'] });
+            // Le statut/RDV peut changer → rafraîchir pipeline, listes par pôle,
+            // compteurs et dashboards qui s'organisent par statut.
+            qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
+            qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+            qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
+            qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
+            qc.invalidateQueries({ queryKey: ['leaderboard'] });
           }}
           onCancel={() => setEditOpen(false)}
         />

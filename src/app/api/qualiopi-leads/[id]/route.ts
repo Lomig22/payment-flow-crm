@@ -70,6 +70,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
   }
 
+  // Cocher « RDV pris » fait avancer le lead dans la colonne « RDV pris » du
+  // pipeline (organise par statut), sans jamais rétrograder un lead plus avance.
+  const appointmentChecked = updates.appointment_taken === true || updates.appointment_taken === 'true';
+  if (appointmentChecked) {
+    const effectiveStatus = (updates.status as string) ?? current.status;
+    if (['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
+      updates.status = 'appointment';
+      historyRows.push({
+        qualiopi_lead_id: params.id, user_id: user.id, field_changed: 'status',
+        old_value: effectiveStatus, new_value: 'appointment',
+      });
+    }
+  }
+
   if (Object.keys(updates).length > 0) {
     await supabase.from('qualiopi_leads').update(updates).eq('id', params.id);
     if (historyRows.length > 0) await supabase.from('qualiopi_lead_history').insert(historyRows);

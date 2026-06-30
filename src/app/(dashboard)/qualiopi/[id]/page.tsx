@@ -224,6 +224,9 @@ export default function QualiopiLeadDetailPage() {
             setEditOpen(false);
             qc.invalidateQueries({ queryKey: ['qualiopi-lead', id] });
             qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+            qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
+            qc.invalidateQueries({ queryKey: ['qualiopi-counts'] });
+            qc.invalidateQueries({ queryKey: ['qualiopi-dashboard-stats'] });
           }}
           onCancel={() => setEditOpen(false)}
         />
