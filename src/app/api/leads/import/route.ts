@@ -15,6 +15,11 @@ const COLUMN_MAP: Record<string, string> = {
   'prises de notes': 'notes',
   qualite: 'lead_quality', 'qualité': 'lead_quality', lead_quality: 'lead_quality',
   statut: 'status', status: 'status',
+  // Exports d'entreprises (Google Maps / OpenStreetMap / annuaires locaux)
+  secteur: '_categories',
+  site_web: '_website', 'site web': '_website',
+  a_site_web: '_ignore', code_postal: '_ignore',
+  latitude: '_ignore', longitude: '_ignore', source: '_ignore',
   // Google Maps scraper column IDs
   osrxxb: 'company',
   'rllt__details 3': 'phone',
@@ -165,12 +170,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Le fichier CSV est vide' }, { status: 400 });
   }
 
-  // Detect "prospects export" format: has a "dirigeant" column → Nom = company, not last name
+  // « nom » désigne la société (pas un nom de personne) dès qu'il n'y a ni colonne
+  // prénom ni colonne société dédiée : cas des exports d'entreprises (prospects,
+  // Google Maps, OpenStreetMap, annuaires). Le lead est alors créé à partir de la
+  // société, sans exiger un nom de personne.
   const firstRecordHeaders = Object.keys(records[0] || {}).map(h =>
     h.toLowerCase().trim().replace(/^﻿/, '')
   );
+  const hasPersonName = firstRecordHeaders.some(h => ['prénom','prenom','firstname','first_name'].includes(h));
+  const hasCompanyCol = firstRecordHeaders.some(h => ['entreprise','société','societe','company','nom_entreprise','raison sociale'].includes(h));
   const isProspectsExport = firstRecordHeaders.includes('dirigeant');
-  const effectiveMap: Record<string, string> = isProspectsExport
+  const nomIsCompany = firstRecordHeaders.includes('nom') && !hasPersonName && !hasCompanyCol;
+  const effectiveMap: Record<string, string> = (isProspectsExport || nomIsCompany)
     ? { ...COLUMN_MAP, nom: 'company' }
     : COLUMN_MAP;
 

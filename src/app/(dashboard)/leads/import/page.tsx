@@ -438,6 +438,11 @@ export default function ImportPage() {
           <div className="p-2 bg-gray-50 rounded font-mono text-xs text-gray-600 whitespace-pre">
             {`prénom,nom,société,téléphone,email,ville\nJean,Dupont,Acme SA,0612345678,jean@acme.fr,Paris`}
           </div>
+          <p className="text-xs text-gray-500 mt-3">
+            <strong>Fichiers d'entreprises</strong> (Google Maps, OpenStreetMap, annuaires) : si la colonne{' '}
+            <code>nom</code> contient un nom de <strong>société</strong> et qu'il n'y a pas de colonne prénom, le lead
+            est créé à partir de la société (nom de personne non requis). La colonne <code>secteur</code> est reprise en notes.
+          </p>
         </div>
 
         <div className="border-t border-gray-100 pt-4">
