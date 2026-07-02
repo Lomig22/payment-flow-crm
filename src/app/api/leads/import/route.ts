@@ -20,6 +20,9 @@ const COLUMN_MAP: Record<string, string> = {
   site_web: '_website', 'site web': '_website',
   a_site_web: '_ignore', code_postal: '_ignore',
   latitude: '_ignore', longitude: '_ignore', source: '_ignore',
+  // Exports Instagram (scrapers de comptes)
+  'métier estimé': 'niche', 'metier estime': 'niche', 'métier': 'niche', metier: 'niche',
+  'url instagram': '_ig_url', followers: '_ignore', posts: '_ignore',
   // Google Maps scraper column IDs
   osrxxb: 'company',
   'rllt__details 3': 'phone',
@@ -153,6 +156,10 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const text   = decodeContent(buffer);
 
+  // Détecte le séparateur : les exports FR (Excel, scrapers) utilisent souvent ';'
+  const headerLine = text.split(/\r?\n/, 1)[0] ?? '';
+  const delimiter  = (headerLine.split(';').length - 1) > (headerLine.split(',').length - 1) ? ';' : ',';
+
   let records: Record<string, string>[];
   try {
     records = parse(text, {
@@ -161,6 +168,7 @@ export async function POST(request: NextRequest) {
       trim: true,
       relax_column_count: true,
       bom: true,
+      delimiter,
     });
   } catch (e: any) {
     return NextResponse.json({ message: `Fichier CSV invalide : ${e.message}` }, { status: 400 });
@@ -431,7 +439,7 @@ export async function POST(request: NextRequest) {
         instagram_username: row._ig_username || null,
         instagram_url:      row._ig_url      || null,
         ig_score:           row._ig_score    ? parseInt(row._ig_score, 10) : null,
-        niche:              batchNiche        || null,
+        niche:              row.niche || batchNiche || null,
       } : {}),
     });
 
