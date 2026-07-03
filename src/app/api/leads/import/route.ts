@@ -16,7 +16,9 @@ const COLUMN_MAP: Record<string, string> = {
   qualite: 'lead_quality', 'qualité': 'lead_quality', lead_quality: 'lead_quality',
   statut: 'status', status: 'status',
   // Exports d'entreprises (Google Maps / OpenStreetMap / annuaires locaux)
-  secteur: '_categories',
+  // Le secteur/métier/catégorie devient l'activité (niche) du lead → filtrable.
+  secteur: 'niche', 'secteur d\'activité': 'niche',
+  'catégorie': 'niche', categorie: 'niche',
   site_web: '_website', 'site web': '_website',
   a_site_web: '_ignore', code_postal: '_ignore',
   latitude: '_ignore', longitude: '_ignore', source: '_ignore',
@@ -433,13 +435,13 @@ export async function POST(request: NextRequest) {
       status:       VALID_STATUS.has(row.status) ? row.status : defaultStatus,
       source:       leadSource,
       notes:        row.notes      || null,
+      niche:        row.niche || batchNiche || null,   // activité (toutes sources)
       setter_id:    getNextSetter(),
       // Instagram/Facebook columns (requires Sprint 1 SQL migration)
       ...(isSocial ? {
         instagram_username: row._ig_username || null,
         instagram_url:      row._ig_url      || null,
         ig_score:           row._ig_score    ? parseInt(row._ig_score, 10) : null,
-        niche:              row.niche || batchNiche || null,
       } : {}),
     });
 

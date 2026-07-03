@@ -78,6 +78,12 @@ export default function ColdCallLeadsPage() {
     enabled:  isAdmin,
   });
 
+  const { data: niches } = useQuery({
+    queryKey: ['leads-cc-niches'],
+    queryFn:  () => leadsApi.niches('cold_call').then((r) => r.data as string[]),
+    staleTime: 60_000,
+  });
+
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }: { ids: string[]; status: string }) =>
       leadsApi.bulkStatus(ids, status),
@@ -191,6 +197,14 @@ export default function ColdCallLeadsPage() {
           <option value="cold">Froid</option>
         </select>
 
+        {niches && niches.length > 0 && (
+          <select className="select w-auto text-sm" value={filters.niche ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 }))}>
+            <option value="">Toutes activités</option>
+            {niches.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
+
         {isAdmin && setters && (
           <select className="select w-auto text-sm" value={filters.setter_id ?? ''}
             onChange={(e) => setFilters((f) => ({ ...f, setter_id: e.target.value || undefined, page: 1 }))}>
@@ -268,6 +282,7 @@ export default function ColdCallLeadsPage() {
                   </th>
                   <th className="th">Nom</th>
                   <th className="th hidden md:table-cell">Société</th>
+                  <th className="th hidden lg:table-cell">Activité</th>
                   <th className="th hidden lg:table-cell">Téléphone</th>
                   <th className="th">Qualité</th>
                   <th className="th">Statut</th>
@@ -294,6 +309,11 @@ export default function ColdCallLeadsPage() {
                       </div>
                     </td>
                     <td className="td hidden md:table-cell text-gray-500">{lead.company ?? '—'}</td>
+                    <td className="td hidden lg:table-cell">
+                      {lead.niche
+                        ? <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{lead.niche}</span>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
                     <td className="td hidden lg:table-cell">
                       {lead.phone
                         ? <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()}
