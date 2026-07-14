@@ -13,6 +13,7 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import LeadForm from '@/components/leads/LeadForm';
+import DuplicatesBanner from '@/components/leads/DuplicatesBanner';
 import { formatDate } from '@/lib/utils';
 import type { Lead, LeadsFilters, LeadStatus } from '@/types';
 
@@ -150,6 +151,7 @@ export default function FacebookLeadsPage() {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads-facebook'] });
       qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
+      qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
   });
 
@@ -175,6 +177,8 @@ export default function FacebookLeadsPage() {
 
   return (
     <div className="space-y-4">
+      <DuplicatesBanner source="facebook" label="Facebook" />
+
       {/* Tabs */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">

@@ -17,24 +17,32 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const source = searchParams.get('source');
 
-  let q = (supabase as any)
-    .from('leads')
-    .select('id, first_name, last_name, phone, email, instagram_username');
-
-  if (source) {
-    q = q.eq('source', source);
-  } else {
-    q = q.or('phone.not.is.null,email.not.is.null,instagram_username.not.is.null');
-  }
-
-  const { data, error } = await q.limit(10000);
-
-  if (error) return NextResponse.json({ message: error.message }, { status: 500 });
-
-  const leads: {
+  // Lecture paginée : Supabase plafonne chaque requête (max-rows PostgREST,
+  // souvent 1000), un .limit(10000) seul ne ramènerait qu'une partie de la base.
+  const PAGE_SIZE = 1000;
+  let leads: {
     id: string; first_name: string; last_name: string;
     phone: string | null; email: string | null; instagram_username: string | null;
-  }[] = data ?? [];
+  }[] = [];
+
+  for (let from = 0; from < 50_000; from += PAGE_SIZE) {
+    let q = (supabase as any)
+      .from('leads')
+      .select('id, first_name, last_name, phone, email, instagram_username')
+      .order('id');
+
+    if (source) {
+      q = q.eq('source', source);
+    } else {
+      q = q.or('phone.not.is.null,email.not.is.null,instagram_username.not.is.null');
+    }
+
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) return NextResponse.json({ message: error.message }, { status: 500 });
+
+    leads = leads.concat(data ?? []);
+    if (!data || data.length < PAGE_SIZE) break;
+  }
 
   // Group by normalized phone
   const phoneMap = new Map<string, typeof leads>();

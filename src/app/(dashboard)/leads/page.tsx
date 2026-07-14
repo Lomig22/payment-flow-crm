@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Trash2, Eye, RefreshCw,
-  ChevronLeft, ChevronRight, X, UserCheck, AlertTriangle,
+  ChevronLeft, ChevronRight, X, UserCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -13,6 +13,7 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import LeadForm from '@/components/leads/LeadForm';
+import DuplicatesBanner from '@/components/leads/DuplicatesBanner';
 import { formatDate, ACTION_LABELS } from '@/lib/utils';
 import type { Lead, LeadsFilters, LeadStatus, LeadQuality, LeadSource } from '@/types';
 
@@ -45,13 +46,6 @@ export default function LeadsPage() {
     queryFn:  () => usersApi.getAll({ role: 'setter', is_active: 'true' }).then((r) => r.data),
     enabled:  isAdmin,
   });
-
-  const { data: dupData } = useQuery({
-    queryKey: ['leads-duplicates'],
-    queryFn:  () => leadsApi.duplicates().then((r) => r.data),
-    staleTime: 5 * 60 * 1000,
-  });
-  const [dupExpanded, setDupExpanded] = useState(true);
 
   const deleteMutation = useMutation({
     mutationFn: leadsApi.delete,
@@ -149,45 +143,7 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Duplicate warning banner */}
-      {dupData && dupData.count > 0 && (
-        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 overflow-hidden shadow-sm">
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-100 border-b border-amber-300">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="flex-1 text-sm font-semibold text-amber-900">
-              ⚠️ {dupData.count} lead{dupData.count > 1 ? 's' : ''} en doublon détecté{dupData.count > 1 ? 's' : ''} dans votre base
-            </span>
-            <button
-              onClick={() => setDupExpanded((v) => !v)}
-              className="text-xs text-amber-700 underline hover:text-amber-900"
-            >
-              {dupExpanded ? 'Réduire' : 'Voir le détail'}
-            </button>
-          </div>
-          {/* Detail list — visible by default */}
-          {dupExpanded && (
-            <div className="px-4 py-3">
-              <ul className="space-y-1.5">
-                {dupData.groups.map((g, i) => (
-                  <li key={i} className="text-xs text-amber-800 flex items-start gap-2">
-                    <span className="shrink-0 font-semibold bg-amber-200 text-amber-900 rounded px-1.5 py-0.5">
-                      {g.field === 'phone' ? 'Tél' : g.field === 'instagram_username' ? '@IG' : 'Email'}
-                    </span>
-                    <span>
-                      <span className="font-medium">
-                        {g.field === 'instagram_username' ? `@${g.value}` : g.value}
-                      </span>
-                      {' — '}
-                      {g.leads.map((l) => `${l.first_name} ${l.last_name}`).join(' · ')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      <DuplicatesBanner />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">

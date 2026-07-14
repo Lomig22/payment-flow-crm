@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import LeadForm from '@/components/leads/LeadForm';
+import DuplicatesBanner from '@/components/leads/DuplicatesBanner';
 import { formatDate } from '@/lib/utils';
 import type { Lead, LeadsFilters, LeadStatus, LeadQuality } from '@/types';
 
@@ -112,6 +113,7 @@ export default function ColdCallLeadsPage() {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
       qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
+      qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
   });
 
@@ -137,6 +139,8 @@ export default function ColdCallLeadsPage() {
 
   return (
     <div className="space-y-4">
+      <DuplicatesBanner source="cold_call" label="Cold Call" />
+
       {/* Tabs */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
