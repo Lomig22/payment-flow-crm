@@ -1,34 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import { getAuthUser, unauthorized, forbidden, notFound, badRequest } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import { parisIso, formatRdvFr } from '@/lib/rdv';
+import { sendLeadEmail, mailerConfigError } from '@/lib/mailer';
 
 // Mail-passerelle (Opération Show-Up).
 // Le setter saisit en direct l'email (donné à l'oral pendant l'appel) et le
 // créneau du RDV ; le prospect reçoit le récapitulatif + un bouton CONFIRMER
 // qui pointe vers /api/confirm/[token] (horodatage + notification équipe),
 // puis redirige vers le WhatsApp de closing avec « CONFIRMER » pré-rempli.
-// Envoi : Vercel bloque le SMTP sortant des fonctions serverless — en prod
-// l'envoi passe par l'API HTTP Brevo (BREVO_API_KEY) ; le SMTP (SMTP_HOST/
-// PORT/USER/PASS) reste un fallback hors Vercel. SMTP_FROM (Nom <adresse>)
-// est l'identité d'expéditeur dans les deux cas — l'adresse doit être un
-// expéditeur vérifié chez Brevo.
-// Optionnelles : APP_URL (sinon origine de la requête), WHATSAPP_CONFIRM_PHONE.
+// Envoi : voir src/lib/mailer.ts (API Gmail en priorité — Vercel bloque le
+// SMTP sortant). Optionnelles : APP_URL (sinon origine de la requête),
+// WHATSAPP_CONFIRM_PHONE.
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
 
-  const { BREVO_API_KEY, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
-  const smtpReady = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
-  if (!SMTP_FROM || (!BREVO_API_KEY && !smtpReady)) {
-    return NextResponse.json(
-      { message: 'Envoi non configuré : renseigner SMTP_FROM + BREVO_API_KEY (recommandé sur Vercel), ou SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS.' },
-      { status: 503 }
-    );
-  }
+  const cfgError = mailerConfigError();
+  if (cfgError) return NextResponse.json({ message: cfgError }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));
   const email    = String(body.email ?? '').trim().toLowerCase();
@@ -91,36 +82,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const text = `${greeting}\n\nComme convenu au téléphone, le récapitulatif :\n— Votre rendez-vous : ${rdvFr}\n— Votre maquette part en production dès votre confirmation\n\nConfirmez dans les 15 minutes — passé ce délai, le créneau repart à un autre artisan.\n\nConfirmer : ${confirmUrl}`;
 
-  const subject = 'Votre créneau + votre maquette';
-
   try {
-    if (BREVO_API_KEY) {
-      const m = SMTP_FROM.match(/^\s*(.*?)\s*<(.+)>\s*$/);
-      const sender = m ? { name: m[1] || undefined, email: m[2] } : { email: SMTP_FROM };
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          sender,
-          to: [{ email }],
-          subject,
-          htmlContent: html,
-          textContent: text,
-        }),
-      });
-      if (!res.ok) {
-        const detail = (await res.text().catch(() => '')).slice(0, 300);
-        throw new Error(`Brevo ${res.status} — ${detail}`);
-      }
-    } else {
-      const transporter = nodemailer.createTransport({
-        host: SMTP_HOST,
-        port: Number(SMTP_PORT ?? 587),
-        secure: Number(SMTP_PORT ?? 587) === 465,
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-      });
-      await transporter.sendMail({ from: SMTP_FROM, to: email, subject, html, text });
-    }
+    await sendLeadEmail({ to: email, subject: 'Votre créneau + votre maquette', html, text });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Erreur d\'envoi inconnue';
     return NextResponse.json({ message: `Échec de l'envoi : ${msg}` }, { status: 502 });
