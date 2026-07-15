@@ -53,7 +53,8 @@ export const leadsApi = {
   assign:   (leadIds: string[], setterId: string) =>
     api.post('/leads/assign', { lead_ids: leadIds, setter_id: setterId }),
   duplicates: (source?: string) => api.get<{ count: number; groups: { field: string; value: string; leads: { id: string; first_name: string; last_name: string }[] }[] }>('/leads/duplicates', { params: source ? { source } : undefined }),
-  sendConfirmation: (id: string) => api.post<{ ok: boolean; sent_at: string }>(`/leads/${id}/send-confirmation`),
+  sendConfirmation: (id: string, data: { email: string; rdv_date: string }) =>
+    api.post<{ ok: boolean; sent_at: string }>(`/leads/${id}/send-confirmation`, data),
   niches:   (source?: string) => api.get<string[]>('/leads/niches', { params: source ? { source } : undefined }),
 };
 

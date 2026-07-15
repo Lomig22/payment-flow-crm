@@ -35,6 +35,9 @@ export default function LeadDetailPage() {
   const user     = useAuthStore((s) => s.user);
   const isAdmin  = user?.role === 'admin';
   const [editOpen, setEditOpen] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
+  const [mailEmail, setMailEmail] = useState('');
+  const [mailRdv, setMailRdv] = useState('');
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ['lead', id],
@@ -42,14 +45,28 @@ export default function LeadDetailPage() {
   });
 
   const sendConfirmationMutation = useMutation({
-    mutationFn: () => leadsApi.sendConfirmation(id),
+    mutationFn: () => leadsApi.sendConfirmation(id, { email: mailEmail.trim(), rdv_date: mailRdv }),
     onSuccess: () => {
       toast.success('Mail-passerelle envoyé ✓');
+      setMailOpen(false);
       qc.invalidateQueries({ queryKey: ['lead', id] });
     },
     onError: (err: any) =>
       toast.error(err.response?.data?.message ?? 'Échec de l\'envoi du mail'),
   });
+
+  const openMailModal = () => {
+    setMailEmail(lead?.email ?? '');
+    setMailRdv('');
+    setMailOpen(true);
+  };
+
+  const mailEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailEmail.trim());
+  const rdvPreview = mailRdv
+    ? new Intl.DateTimeFormat('fr-FR', {
+        weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+      }).format(new Date(mailRdv)).replace(/,?\s(\d{2}):(\d{2})$/, ' à $1h$2')
+    : null;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner className="w-8 h-8" /></div>;
@@ -77,20 +94,11 @@ export default function LeadDetailPage() {
           {lead.lead_quality && <Badge variant={lead.lead_quality} />}
           {lead.source === 'cold_call' && (
             <button
-              onClick={() => {
-                if (!lead.confirmation_email_sent_at
-                    || confirm('Un mail-passerelle a déjà été envoyé pour ce lead. Renvoyer ?')) {
-                  sendConfirmationMutation.mutate();
-                }
-              }}
-              disabled={!lead.email || sendConfirmationMutation.isPending}
-              title={!lead.email ? 'Ce lead n\'a pas d\'adresse email' : undefined}
-              className="btn-sm flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              onClick={openMailModal}
+              className="btn-sm flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
             >
               <Send className="w-3.5 h-3.5" />
-              {sendConfirmationMutation.isPending
-                ? 'Envoi…'
-                : lead.confirmation_email_sent_at ? 'Renvoyer le mail-passerelle' : 'Mail-passerelle'}
+              {lead.confirmation_email_sent_at ? 'Renvoyer le mail-passerelle' : 'Mail-passerelle'}
             </button>
           )}
           <button onClick={() => setEditOpen(true)} className="btn-primary btn-sm">
@@ -265,12 +273,73 @@ export default function LeadDetailPage() {
                 <div>
                   <p className="text-xs text-gray-400">Mail-passerelle envoyé</p>
                   <p className="text-sm">{formatDateTime(lead.confirmation_email_sent_at)}</p>
+                  {lead.confirmation_received_at
+                    ? <p className="text-sm text-green-600 font-medium mt-0.5">
+                        ✅ Confirmé le {formatDateTime(lead.confirmation_received_at)}
+                      </p>
+                    : <p className="text-sm text-amber-600 mt-0.5">En attente de confirmation…</p>}
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mail-passerelle modal — email donné à l'oral pendant l'appel + créneau */}
+      <Modal open={mailOpen} onClose={() => setMailOpen(false)} title="Envoyer le mail-passerelle" size="lg">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email du prospect <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={mailEmail}
+              onChange={(e) => setMailEmail(e.target.value)}
+              placeholder="donné à l'oral pendant l'appel"
+              className="input"
+              autoFocus
+            />
+            {mailEmail && !mailEmailValid && (
+              <p className="text-xs text-red-500 mt-1">Adresse email invalide</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Créneau du rendez-vous <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={mailRdv}
+              onChange={(e) => setMailRdv(e.target.value)}
+              className="input"
+            />
+          </div>
+
+          <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-sm text-gray-600">
+            <p className="font-medium text-gray-800 mb-1">Le prospect recevra :</p>
+            <p>📅 Récapitulatif : {rdvPreview
+              ? <strong>{rdvPreview}</strong>
+              : <span className="text-gray-400">choisir un créneau…</span>}</p>
+            <p>🎨 « Votre maquette part en production dès votre confirmation »</p>
+            <p>⏱ Règle des 15 minutes + bouton <strong>CONFIRMER</strong> → confirmation
+              horodatée puis WhatsApp</p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setMailOpen(false)} className="btn-secondary btn-sm">Annuler</button>
+            <button
+              onClick={() => sendConfirmationMutation.mutate()}
+              disabled={!mailEmailValid || !mailRdv || sendConfirmationMutation.isPending}
+              className="btn-sm flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {sendConfirmationMutation.isPending ? 'Envoi…' : 'Envoyer maintenant'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Edit modal */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Modifier le lead" size="xl">
