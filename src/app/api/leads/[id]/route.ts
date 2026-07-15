@@ -107,6 +107,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
   }
 
+  // Cocher « R2 planifié » avance de même le lead cold call vers la colonne
+  // R2 pris. Cold call uniquement : le statut 'r2' existe aussi côté Instagram
+  // mais y désigne la 2e relance DM — rien à voir, on n'y touche pas.
+  const r2Checked = updates.r2_planned === true || updates.r2_planned === 'true';
+  if (r2Checked && current.source === 'cold_call') {
+    const effectiveStatus = (updates.status as string) ?? current.status;
+    if (['in_progress', 'to_follow_up', 'to_follow_up_2', 'appointment'].includes(effectiveStatus)) {
+      updates.status = 'r2';
+      historyRows.push({
+        lead_id: params.id, user_id: user.id, field_changed: 'status',
+        old_value: effectiveStatus, new_value: 'r2',
+      });
+    }
+  }
+
   // Lead Instagram/Facebook dont le statut change → enregistre la date du funnel
   // (placé après le mapping ci-dessus pour capter le passage automatique en 'rdv').
   if (updates.status && (current.source === 'instagram' || current.source === 'facebook')) {
