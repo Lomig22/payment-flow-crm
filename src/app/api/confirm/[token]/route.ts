@@ -5,9 +5,10 @@ import { formatRdvFr } from '@/lib/rdv';
 
 // Lien public cliqué par le prospect depuis le mail-passerelle (bouton CONFIRMER).
 // Horodate la confirmation, notifie l'équipe (historique → page Notifications,
-// + groupe WhatsApp si Whapi configuré), puis redirige vers le WhatsApp de
-// closing avec « CONFIRMER » pré-rempli.
-// Env optionnelles : WHATSAPP_CONFIRM_PHONE, WHAPI_TOKEN + WHAPI_GROUP_ID.
+// + groupe WhatsApp si Whapi configuré), puis redirige vers le WhatsApp du
+// SETTER ASSIGNÉ (users.phone) avec « CONFIRMER » pré-rempli.
+// Env optionnelles : WHATSAPP_CONFIRM_PHONE (fallback si le setter n'a pas
+// de numéro), WHAPI_TOKEN + WHAPI_GROUP_ID.
 
 const page = (title: string, body: string) =>
   new NextResponse(
@@ -44,7 +45,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
 
   const { data: lead } = await supabase
     .from('leads')
-    .select('id, first_name, last_name, company, rdv_date, confirmation_received_at, users!setter_id(first_name, last_name)')
+    .select('id, first_name, last_name, company, rdv_date, confirmation_received_at, users!setter_id(first_name, last_name, phone)')
     .eq('id', leadId)
     .single();
 
@@ -70,7 +71,9 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
     await notifyWhatsAppGroup(`✅ CONFIRMÉ — ${who}\n📅 ${rdvFr}\n👤 Setter : ${setter}\n🎨 Maquette à lancer`);
   }
 
-  const phone = process.env.WHATSAPP_CONFIRM_PHONE;
+  // Le prospect atterrit sur le WhatsApp du setter assigné ; fallback global sinon
+  const setterPhone = String((lead as any).users?.phone ?? '').replace(/\D/g, '');
+  const phone = setterPhone || String(process.env.WHATSAPP_CONFIRM_PHONE ?? '').replace(/\D/g, '');
   if (phone) {
     return NextResponse.redirect(`https://wa.me/${phone}?text=${encodeURIComponent('CONFIRMER')}`, 302);
   }

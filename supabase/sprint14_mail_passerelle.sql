@@ -6,3 +6,7 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS confirmation_email_sent_at timestampt
 
 -- Horodatage du clic CONFIRMER par le prospect (KPI : taux/délai de confirmation)
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS confirmation_received_at timestamptz;
+
+-- Numéro WhatsApp du setter : le clic CONFIRMER redirige le prospect vers
+-- le fil du setter assigné (fallback : WHATSAPP_CONFIRM_PHONE)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar(30);
