@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { supabase } from '@/lib/supabase';
 import { formatRdvFr } from '@/lib/rdv';
+import { sendLeadEmail, mailerConfigError } from '@/lib/mailer';
+import { sendSms, smsConfigured } from '@/lib/sms';
 
 // Lien public cliqué par le prospect depuis le mail-passerelle (bouton CONFIRMER).
 // Horodate la confirmation, notifie l'équipe (historique → page Notifications,
@@ -45,7 +47,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
 
   const { data: lead } = await supabase
     .from('leads')
-    .select('id, first_name, last_name, company, rdv_date, confirmation_received_at, users!setter_id(first_name, last_name, phone)')
+    .select('id, first_name, last_name, company, phone, email, rdv_date, confirmation_received_at, users!setter_id(first_name, last_name, phone)')
     .eq('id', leadId)
     .single();
 
@@ -69,6 +71,53 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
     });
 
     await notifyWhatsAppGroup(`✅ CONFIRMÉ — ${who}\n📅 ${rdvFr}\n👤 Setter : ${setter}\n🎨 Maquette à lancer`);
+
+    // « SMS + mail dans la foulée » (brief, étape 4) — best-effort : un échec
+    // d'envoi ne doit jamais casser la confirmation, déjà enregistrée.
+    const fullName      = `${lead.first_name ?? ''} ${lead.last_name ?? ''}`.trim();
+    const isCompanyName = !!lead.company && fullName === lead.company.trim();
+    const prenom        = isCompanyName ? '' : ` ${lead.first_name}`;
+    const rdvTxt        = lead.rdv_date ? ` du ${rdvFr}` : '';
+    const sentTo: string[] = [];
+
+    if (smsConfigured() && lead.phone) {
+      try {
+        await sendSms(
+          lead.phone,
+          `Payment Flow : c'est noté${prenom} ! Votre RDV${rdvTxt} est confirmé, votre maquette part en production. Un imprévu ? Ecrivez-nous sur WhatsApp.`
+        );
+        sentTo.push(`SMS au ${lead.phone}`);
+      } catch { /* voir note best-effort ci-dessus */ }
+    }
+
+    if (!mailerConfigError() && lead.email) {
+      try {
+        await sendLeadEmail({
+          to: lead.email,
+          subject: 'RDV confirmé — on prépare votre maquette',
+          html: `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px 16px;color:#1f2937;">
+    <p style="font-size:15px;line-height:1.6;">${isCompanyName ? 'Bonjour,' : `Bonjour ${lead.first_name},`}</p>
+    <p style="font-size:15px;line-height:1.6;">
+      C'est bien confirmé : votre rendez-vous${rdvTxt} est verrouillé,
+      et votre maquette part en production.
+    </p>
+    <p style="font-size:15px;line-height:1.6;">
+      Un imprévu ? Répondez simplement à cet email, on reprogramme.
+    </p>
+  </div>`,
+          text: `C'est bien confirmé : votre rendez-vous${rdvTxt} est verrouillé, et votre maquette part en production.\n\nUn imprévu ? Répondez simplement à cet email, on reprogramme.`,
+        });
+        sentTo.push(`email à ${lead.email}`);
+      } catch { /* voir note best-effort ci-dessus */ }
+    }
+
+    if (sentTo.length > 0) {
+      await supabase.from('lead_history').insert({
+        lead_id: leadId,
+        action_note: `Confirmation envoyée au prospect (${sentTo.join(' + ')})`,
+      });
+    }
   }
 
   // Le prospect atterrit sur le WhatsApp du setter assigné ; fallback global sinon
