@@ -9,6 +9,13 @@ export function parisIso(local: string): string {
   return `${local}:00${m ? `${m[1]}:${m[2]}` : '+01:00'}`;
 }
 
+// ISO → « 14h00 » (heure de Paris)
+export function formatHeureFr(iso: string): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso)).replace(':', 'h');
+}
+
 // ISO → « jeudi 17 juillet à 14h00 »
 export function formatRdvFr(iso: string): string {
   const txt = new Intl.DateTimeFormat('fr-FR', {
