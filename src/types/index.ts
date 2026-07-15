@@ -76,6 +76,8 @@ export interface Lead {
   ig_score?:           number;
   // RDV outcome (Sprint 3)
   rdv_outcome?:        'present' | 'vendu' | 'no_show' | 'pas_qualifie';
+  // Mail-passerelle Opération Show-Up (Sprint 14)
+  confirmation_email_sent_at?: string | null;
   // Instagram/Facebook funnel dates
   m1_date?:            string;
   r1_date?:            string;

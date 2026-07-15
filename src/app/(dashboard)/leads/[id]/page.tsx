@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Edit2, Phone, Mail, MapPin, Building,
-  CheckCircle, XCircle, Clock, History,
+  CheckCircle, XCircle, Clock, History, Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi } from '@/lib/api';
@@ -41,6 +41,16 @@ export default function LeadDetailPage() {
     queryFn:  () => leadsApi.getOne(id).then((r) => r.data as Lead),
   });
 
+  const sendConfirmationMutation = useMutation({
+    mutationFn: () => leadsApi.sendConfirmation(id),
+    onSuccess: () => {
+      toast.success('Mail-passerelle envoyé ✓');
+      qc.invalidateQueries({ queryKey: ['lead', id] });
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.message ?? 'Échec de l\'envoi du mail'),
+  });
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner className="w-8 h-8" /></div>;
   }
@@ -65,6 +75,24 @@ export default function LeadDetailPage() {
         <div className="ml-auto flex items-center gap-2">
           <Badge variant={lead.status} />
           {lead.lead_quality && <Badge variant={lead.lead_quality} />}
+          {lead.source === 'cold_call' && (
+            <button
+              onClick={() => {
+                if (!lead.confirmation_email_sent_at
+                    || confirm('Un mail-passerelle a déjà été envoyé pour ce lead. Renvoyer ?')) {
+                  sendConfirmationMutation.mutate();
+                }
+              }}
+              disabled={!lead.email || sendConfirmationMutation.isPending}
+              title={!lead.email ? 'Ce lead n\'a pas d\'adresse email' : undefined}
+              className="btn-sm flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {sendConfirmationMutation.isPending
+                ? 'Envoi…'
+                : lead.confirmation_email_sent_at ? 'Renvoyer le mail-passerelle' : 'Mail-passerelle'}
+            </button>
+          )}
           <button onClick={() => setEditOpen(true)} className="btn-primary btn-sm">
             <Edit2 className="w-3.5 h-3.5" />
             Modifier
@@ -233,6 +261,12 @@ export default function LeadDetailPage() {
                 <p className="text-xs text-gray-400">Dernière mise à jour</p>
                 <p className="text-sm">{timeAgo(lead.updated_at)}</p>
               </div>
+              {lead.confirmation_email_sent_at && (
+                <div>
+                  <p className="text-xs text-gray-400">Mail-passerelle envoyé</p>
+                  <p className="text-sm">{formatDateTime(lead.confirmation_email_sent_at)}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
