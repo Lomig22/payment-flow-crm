@@ -107,6 +107,18 @@ export default function ColdCallLeadsPage() {
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => leadsApi.bulkDelete(ids),
+    onSuccess: (_, ids) => {
+      toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
+      qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: leadsApi.delete,
     onSuccess: () => {
@@ -264,6 +276,19 @@ export default function ColdCallLeadsPage() {
                   <UserCheck className="w-3.5 h-3.5" /> Assigner
                 </button>
               </div>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  if (confirm(`Supprimer définitivement ${selected.size} lead${selected.size > 1 ? 's' : ''} ? Cette action est irréversible.`)) {
+                    bulkDeleteMutation.mutate(Array.from(selected));
+                  }
+                }}
+                disabled={bulkDeleteMutation.isPending}
+                className="px-3 py-1 text-xs font-medium bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-lg flex items-center gap-1">
+                <Trash2 className="w-3.5 h-3.5" />
+                {bulkDeleteMutation.isPending ? 'Suppression…' : `Supprimer (${selected.size})`}
+              </button>
             )}
             <button onClick={() => setSelected(new Set())} className="text-sm text-gray-500 hover:text-gray-700">Annuler</button>
           </div>

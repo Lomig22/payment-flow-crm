@@ -796,6 +796,8 @@ Sinon, 15 minutes suffisent :
         title="Documents à télécharger" color="border-gray-300">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
+            { name: 'Opération Show-Up — Brief équipe', file: 'operation-show-up-brief.pdf', desc: 'Le système anti no-show : parcours, rôles, KPIs — le créneau se mérite', color: 'text-green-600 bg-green-50 border-green-200' },
+            { name: 'Script d\'appel Cold Call',         file: 'script-appel-cold-call.pdf',  desc: 'Pivot organisation + verrou CONFIRMER — électriciens & réno générale',  color: 'text-green-600 bg-green-50 border-green-200' },
             { name: 'Onboarding Setter — Qualiopi',  file: 'onboarding-setter-qualiopi.pdf', desc: 'Base de prospection, tunnel de qualification, ordre d\'attaque', color: 'text-teal-600 bg-teal-50 border-teal-200'       },
             { name: 'Qualiopi — Pitch & Offre',       file: 'qualiopi-paymentflow.pdf',       desc: 'Marché, argumentaire, script Rémi, prospection et tarifs',   color: 'text-teal-600 bg-teal-50 border-teal-200'       },
             { name: 'Script Prospection DM',          file: 'script-prospection-dm.pdf', desc: 'Guide opérationnel complet IG & FB — Cas 1, Cas 2, ChatGPT, relances', color: 'text-pink-600 bg-pink-50 border-pink-200'       },
