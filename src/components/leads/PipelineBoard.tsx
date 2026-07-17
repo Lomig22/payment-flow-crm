@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverlay,
@@ -8,9 +8,10 @@ import {
   type CollisionDetection,
 } from '@dnd-kit/core';
 import { Phone, Building } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { leadsApi, qualiopiLeadsApi } from '@/lib/api';
+import { leadsApi, qualiopiLeadsApi, usersApi } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import type { Lead, LeadStatus } from '@/types';
@@ -198,12 +199,39 @@ const COLUMNS_FACEBOOK = COLUMNS_INSTAGRAM;
 /* ── Board ────────────────────────────────────────────────────────── */
 interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook'; variant?: 'qualiopi' }
 
-export default function PipelineBoard({ source, variant }: PipelineBoardProps = {}) {
+export default function PipelineBoard(props: PipelineBoardProps = {}) {
+  // useSearchParams (filtre setter dans l'URL) impose une frontière Suspense
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner className="w-8 h-8" /></div>}>
+      <Board {...props} />
+    </Suspense>
+  );
+}
+
+function Board({ source, variant }: PipelineBoardProps) {
   const qc = useQueryClient();
+  const router   = useRouter();
+  const pathname = usePathname();
+  const sp       = useSearchParams();
+  const user     = useAuthStore((s) => s.user);
+  const isAdmin  = user?.role === 'admin';
+
+  // Admin : regarder le pipeline d'un setter précis (persisté dans l'URL)
+  const [setterId, setSetterId] = useState(sp.get('setter') ?? '');
+  useEffect(() => {
+    router.replace(setterId ? `${pathname}?setter=${setterId}` : pathname, { scroll: false });
+  }, [setterId, pathname, router]);
+
+  const { data: setters } = useQuery({
+    queryKey: ['users-setters'],
+    queryFn:  () => usersApi.getAll({ role: 'setter', is_active: 'true' }).then((r) => r.data),
+    enabled:  isAdmin,
+  });
+
   const isQualiopi = variant === 'qualiopi';
   const api = isQualiopi ? qualiopiLeadsApi : leadsApi;
   const detailBase = isQualiopi ? '/qualiopi' : '/leads';
-  const queryKey = ['leads-pipeline', source, variant];
+  const queryKey = ['leads-pipeline', source, variant, setterId];
   const [activeLead, setActiveLead] = useState<BoardLead | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
 
@@ -221,7 +249,11 @@ export default function PipelineBoard({ source, variant }: PipelineBoardProps = 
 
   const { data, isLoading } = useQuery({
     queryKey,
-    queryFn:  () => (api as any).getAll({ limit: 2000, ...(source && !isQualiopi ? { source } : {}) }).then((r: any) => r.data.data as BoardLead[]),
+    queryFn:  () => (api as any).getAll({
+      limit: 2000,
+      ...(source && !isQualiopi ? { source } : {}),
+      ...(setterId ? { setter_id: setterId } : {}),
+    }).then((r: any) => r.data.data as BoardLead[]),
   });
 
   const mutation = useMutation({
@@ -281,15 +313,30 @@ export default function PipelineBoard({ source, variant }: PipelineBoardProps = 
     mutation.mutate({ id: leadId, updates });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner className="w-8 h-8" />
-      </div>
-    );
-  }
-
   return (
+    <div className="space-y-4">
+      {/* Admin : filtrer le pipeline par setter */}
+      {isAdmin && setters && (
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-500">Pipeline de :</label>
+          <select
+            value={setterId}
+            onChange={(e) => setSetterId(e.target.value)}
+            className="select w-auto text-sm"
+          >
+            <option value="">Tous les setters</option>
+            {(setters as any[]).map((s) => (
+              <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Spinner className="w-8 h-8" />
+        </div>
+      ) : (
     <DndContext
       sensors={sensors}
       collisionDetection={closestColumnByX}
@@ -313,5 +360,7 @@ export default function PipelineBoard({ source, variant }: PipelineBoardProps = 
         {activeLead ? <OverlayCard lead={activeLead} isQualiopi={isQualiopi} /> : null}
       </DragOverlay>
     </DndContext>
+      )}
+    </div>
   );
 }
