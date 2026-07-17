@@ -6,7 +6,9 @@ import nodemailer from 'nodemailer';
 // dans « Messages envoyés ») > Brevo > SMTP (hors Vercel uniquement).
 // SMTP_FROM = identité d'expéditeur commune, format « Nom <adresse> ».
 
-type Mail = { to: string; subject: string; html: string; text: string };
+// fromName : remplace le nom d'affichage de SMTP_FROM (l'adresse ne change
+// jamais) — permet de signer le mail du prénom du setter qui envoie
+type Mail = { to: string; subject: string; html: string; text: string; fromName?: string };
 
 export function mailerConfigError(): string | null {
   const {
@@ -54,7 +56,8 @@ async function sendViaGmail(mail: Mail) {
   const { access_token } = (await tokenRes.json()) as { access_token: string };
 
   const from = parseFrom(SMTP_FROM!);
-  const fromHeader = from.name ? `${rfc2047(from.name)} <${from.email}>` : from.email;
+  const fromName = mail.fromName ?? from.name;
+  const fromHeader = fromName ? `${rfc2047(fromName)} <${from.email}>` : from.email;
   const boundary = 'b_' + Math.random().toString(36).slice(2);
   const mime = [
     `From: ${fromHeader}`,
@@ -93,7 +96,7 @@ async function sendViaBrevo(mail: Mail) {
     method: 'POST',
     headers: { 'api-key': BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      sender:      parseFrom(SMTP_FROM!),
+      sender:      { ...parseFrom(SMTP_FROM!), ...(mail.fromName ? { name: mail.fromName } : {}) },
       to:          [{ email: mail.to }],
       subject:     mail.subject,
       htmlContent: mail.html,
@@ -114,7 +117,11 @@ async function sendViaSmtp(mail: Mail) {
     secure: Number(SMTP_PORT ?? 587) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
-  await transporter.sendMail({ from: SMTP_FROM, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text });
+  const parsed = parseFrom(SMTP_FROM!);
+  await transporter.sendMail({
+    from: mail.fromName ? { name: mail.fromName, address: parsed.email } : SMTP_FROM,
+    to: mail.to, subject: mail.subject, html: mail.html, text: mail.text,
+  });
 }
 
 export async function sendLeadEmail(mail: Mail) {

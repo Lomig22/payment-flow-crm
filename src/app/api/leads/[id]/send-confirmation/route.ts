@@ -40,8 +40,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const rdvIso = parisIso(rdvLocal);
   const rdvFr  = formatRdvFr(rdvIso);
 
+  // senderId : le CONFIRMER atterrira sur le WhatsApp de celui qui envoie
+  // le mail depuis sa session (Rémi, Kamil…), pas forcément le setter assigné
   const token = jwt.sign(
-    { leadId: lead.id, purpose: 'rdv-confirm' },
+    { leadId: lead.id, senderId: user.id, purpose: 'rdv-confirm' },
     process.env.JWT_SECRET!,
     { expiresIn: '7d' }
   );
@@ -83,7 +85,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const text = `${greeting}\n\nComme convenu au téléphone, le récapitulatif :\n— Votre rendez-vous : ${rdvFr}\n— Votre maquette part en production dès votre confirmation\n\nConfirmez dans les 15 minutes — passé ce délai, le créneau repart à un autre artisan.\n\nConfirmer : ${confirmUrl}`;
 
   try {
-    await sendLeadEmail({ to: email, subject: 'Votre créneau + votre maquette', html, text });
+    await sendLeadEmail({
+      to: email,
+      subject: 'Votre créneau + votre maquette',
+      html,
+      text,
+      fromName: `${user.first_name} — Payment Flow`,
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Erreur d\'envoi inconnue';
     return NextResponse.json({ message: `Échec de l'envoi : ${msg}` }, { status: 502 });

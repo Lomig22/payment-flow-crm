@@ -37,10 +37,12 @@ async function notifyWhatsAppGroup(message: string) {
 
 export async function GET(_request: NextRequest, { params }: { params: { token: string } }) {
   let leadId: string;
+  let senderId: string | null = null;
   try {
-    const decoded = jwt.verify(params.token, process.env.JWT_SECRET!) as { leadId: string; purpose: string };
+    const decoded = jwt.verify(params.token, process.env.JWT_SECRET!) as { leadId: string; senderId?: string; purpose: string };
     if (decoded.purpose !== 'rdv-confirm') throw new Error('bad purpose');
     leadId = decoded.leadId;
+    senderId = decoded.senderId ?? null;
   } catch {
     return page('Lien expiré', 'Ce lien de confirmation n\'est plus valide. Répondez simplement à notre email ou SMS.');
   }
@@ -120,9 +122,15 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
     }
   }
 
-  // Le prospect atterrit sur le WhatsApp du setter assigné ; fallback global sinon
+  // Le prospect atterrit sur le WhatsApp de celui qui a envoyé le mail depuis
+  // sa session (senderId du lien) ; sinon le setter assigné ; sinon le fallback
+  let senderPhone = '';
+  if (senderId) {
+    const { data: sender } = await supabase.from('users').select('phone').eq('id', senderId).single();
+    senderPhone = String(sender?.phone ?? '').replace(/\D/g, '');
+  }
   const setterPhone = String((lead as any).users?.phone ?? '').replace(/\D/g, '');
-  const phone = setterPhone || String(process.env.WHATSAPP_CONFIRM_PHONE ?? '').replace(/\D/g, '');
+  const phone = senderPhone || setterPhone || String(process.env.WHATSAPP_CONFIRM_PHONE ?? '').replace(/\D/g, '');
   if (phone) {
     return NextResponse.redirect(`https://wa.me/${phone}?text=${encodeURIComponent('CONFIRMER')}`, 302);
   }
