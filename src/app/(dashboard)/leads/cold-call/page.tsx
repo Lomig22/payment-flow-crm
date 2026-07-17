@@ -1,7 +1,7 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone, Plus,
 } from 'lucide-react';
@@ -33,14 +33,49 @@ const CC_TABS = [
 ];
 
 export default function ColdCallLeadsPage() {
-  const router  = useRouter();
+  // useSearchParams impose une frontière Suspense sur une page pré-rendue
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-48"><Spinner /></div>}>
+      <ColdCallLeads />
+    </Suspense>
+  );
+}
+
+function ColdCallLeads() {
+  const router   = useRouter();
+  const pathname = usePathname();
+  const sp       = useSearchParams();
   const qc      = useQueryClient();
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
-  const [activeTab,    setActiveTab]    = useState('');
-  const [filters,      setFilters]      = useState<LeadsFilters>({ page: 1, limit: 50, source: 'cold_call' });
-  const [search,       setSearch]       = useState('');
+  // Filtres initialisés depuis l'URL : le retour depuis une fiche lead
+  // (router.back) retombe sur la même vue filtrée
+  const [activeTab,    setActiveTab]    = useState(sp.get('status') ?? '');
+  const [filters,      setFilters]      = useState<LeadsFilters>({
+    page:      Math.max(1, Number(sp.get('page') ?? 1) || 1),
+    limit:     50,
+    source:    'cold_call',
+    status:    (sp.get('status')  ?? undefined) as LeadStatus | undefined,
+    quality:   (sp.get('quality') ?? undefined) as LeadQuality | undefined,
+    niche:     sp.get('niche')  ?? undefined,
+    setter_id: sp.get('setter') ?? undefined,
+    search:    sp.get('q')      ?? undefined,
+  });
+  const [search,       setSearch]       = useState(sp.get('q') ?? '');
+
+  // Reflète chaque changement de filtre dans l'URL (replace, sans scroll)
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (filters.status)    p.set('status',  String(filters.status));
+    if (filters.quality)   p.set('quality', String(filters.quality));
+    if (filters.niche)     p.set('niche',   filters.niche);
+    if (filters.setter_id) p.set('setter',  filters.setter_id);
+    if (filters.search)    p.set('q',       filters.search);
+    if ((filters.page ?? 1) > 1) p.set('page', String(filters.page));
+    const qs = p.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [filters, pathname, router]);
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [bulkStatus,   setBulkStatus]   = useState('');
   const [bulkSetterId, setBulkSetterId] = useState('');
