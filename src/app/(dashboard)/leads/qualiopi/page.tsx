@@ -85,6 +85,7 @@ export default function QualiopiLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} mis à jour`);
       setSelected(new Set()); setBulkStatus('');
       qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
   });
@@ -96,6 +97,7 @@ export default function QualiopiLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set()); setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -105,6 +107,7 @@ export default function QualiopiLeadsPage() {
     onSuccess: () => {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['qualiopi-counts'] });
     },
   });
@@ -364,6 +367,7 @@ export default function QualiopiLeadsPage() {
           onSuccess={() => {
             setCreateOpen(false);
             qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
             qc.invalidateQueries({ queryKey: ['qualiopi-counts'] });
           }}
           onCancel={() => setCreateOpen(false)}

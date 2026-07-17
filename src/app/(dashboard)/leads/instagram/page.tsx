@@ -142,6 +142,7 @@ export default function InstagramLeadsPage() {
       toast.success(`${handle} → Réponse ✓`);
       setQrInput('');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
     },
     onError: (err: any) => toast.error(err.message ?? 'Erreur Quick Reply'),
@@ -164,7 +165,8 @@ export default function InstagramLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, a_ouvert: val } : l) ?? [],
       }));
     },
-    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur'); },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] }); toast.error('Erreur'); },
   });
 
   const nicheMutation = useMutation({
@@ -177,7 +179,8 @@ export default function InstagramLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, niche } : l) ?? [],
       }));
     },
-    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur niche'); },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] }); toast.error('Erreur niche'); },
   });
 
   const rdvOutcomeMutation = useMutation({
@@ -190,7 +193,8 @@ export default function InstagramLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, rdv_outcome } : l) ?? [],
       }));
     },
-    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] }); toast.error('Erreur résultat RDV'); },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] }); toast.error('Erreur résultat RDV'); },
   });
 
   const bulkStatusMutation = useMutation({
@@ -200,6 +204,7 @@ export default function InstagramLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${IG_STATUS_LABELS[status] ?? status}`);
       setSelected(new Set()); setBulkStatus('');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
@@ -212,6 +217,7 @@ export default function InstagramLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set()); setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -221,6 +227,7 @@ export default function InstagramLeadsPage() {
     onSuccess: () => {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
       qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
@@ -383,6 +390,7 @@ export default function InstagramLeadsPage() {
           <button
             onClick={() => {
               qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
               qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
             }}
             className="btn-secondary btn-sm"
@@ -617,6 +625,7 @@ export default function InstagramLeadsPage() {
           onSuccess={() => {
             setCreateOpen(false);
             qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
             qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
           }}
           onCancel={() => setCreateOpen(false)}

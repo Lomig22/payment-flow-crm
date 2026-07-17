@@ -127,6 +127,7 @@ function ColdCallLeads() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} mis à jour`);
       setSelected(new Set()); setBulkStatus('');
       qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
   });
@@ -138,6 +139,7 @@ function ColdCallLeads() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set()); setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -148,6 +150,7 @@ function ColdCallLeads() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
       qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
@@ -159,6 +162,7 @@ function ColdCallLeads() {
     onSuccess: () => {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
       qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
@@ -447,6 +451,7 @@ function ColdCallLeads() {
           onSuccess={() => {
             setCreateOpen(false);
             qc.invalidateQueries({ queryKey: ['leads-cold-call'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
             qc.invalidateQueries({ queryKey: ['leads-cc-counts'] });
           }}
           onCancel={() => setCreateOpen(false)}

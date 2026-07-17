@@ -216,11 +216,16 @@ function Board({ source, variant }: PipelineBoardProps) {
   const user     = useAuthStore((s) => s.user);
   const isAdmin  = user?.role === 'admin';
 
-  // Admin : regarder le pipeline d'un setter précis (persisté dans l'URL)
+  // Filtres persistés dans l'URL : setter (admin) + activité
   const [setterId, setSetterId] = useState(sp.get('setter') ?? '');
+  const [niche,    setNiche]    = useState(sp.get('niche')  ?? '');
   useEffect(() => {
-    router.replace(setterId ? `${pathname}?setter=${setterId}` : pathname, { scroll: false });
-  }, [setterId, pathname, router]);
+    const p = new URLSearchParams();
+    if (setterId) p.set('setter', setterId);
+    if (niche)    p.set('niche',  niche);
+    const qs = p.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [setterId, niche, pathname, router]);
 
   const { data: setters } = useQuery({
     queryKey: ['users-setters'],
@@ -279,9 +284,14 @@ function Board({ source, variant }: PipelineBoardProps) {
   });
 
   const rawLeads: BoardLead[] = (data as BoardLead[] | undefined) ?? [];
-  const leads: BoardLead[] = rawLeads.map((l) =>
-    optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l
-  );
+  // Activités présentes dans la vue (niche côté leads, activite côté Qualiopi)
+  const leadNiche = (l: BoardLead) => ((isQualiopi ? l.activite : l.niche) ?? '').trim();
+  const nicheOptions = Array.from(new Set(rawLeads.map(leadNiche).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+  if (niche && !nicheOptions.includes(niche)) nicheOptions.unshift(niche);
+  const leads: BoardLead[] = rawLeads
+    .filter((l) => !niche || leadNiche(l) === niche)
+    .map((l) => (optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l));
   const getColumn = (s: LeadStatus) => leads.filter((l) => l.status === s);
 
   const handleDragStart = ({ active }: DragStartEvent) => {
@@ -315,20 +325,34 @@ function Board({ source, variant }: PipelineBoardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Admin : filtrer le pipeline par setter */}
-      {isAdmin && setters && (
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-500">Pipeline de :</label>
-          <select
-            value={setterId}
-            onChange={(e) => setSetterId(e.target.value)}
-            className="select w-auto text-sm"
-          >
-            <option value="">Tous les setters</option>
-            {(setters as any[]).map((s) => (
-              <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-            ))}
-          </select>
+      {/* Filtres : setter (admin) + activité */}
+      {((isAdmin && setters) || nicheOptions.length > 0) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && setters && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-500">Pipeline de :</label>
+              <select
+                value={setterId}
+                onChange={(e) => setSetterId(e.target.value)}
+                className="select w-auto text-sm"
+              >
+                <option value="">Tous les setters</option>
+                {(setters as any[]).map((s) => (
+                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {nicheOptions.length > 0 && (
+            <select
+              value={niche}
+              onChange={(e) => setNiche(e.target.value)}
+              className="select w-auto text-sm"
+            >
+              <option value="">Toutes activités</option>
+              {nicheOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
         </div>
       )}
 

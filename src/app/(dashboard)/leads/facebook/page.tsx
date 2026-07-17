@@ -106,7 +106,8 @@ export default function FacebookLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, niche } : l) ?? [],
       }));
     },
-    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] }); toast.error('Erreur niche'); },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] }); toast.error('Erreur niche'); },
   });
 
   const rdvOutcomeMutation = useMutation({
@@ -119,7 +120,8 @@ export default function FacebookLeadsPage() {
         data: old?.data?.map((l: Lead) => l.id === id ? { ...l, rdv_outcome } : l) ?? [],
       }));
     },
-    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] }); toast.error('Erreur résultat RDV'); },
+    onError: () => { qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] }); toast.error('Erreur résultat RDV'); },
   });
 
   const bulkStatusMutation = useMutation({
@@ -129,6 +131,7 @@ export default function FacebookLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${FB_STATUS_LABELS[status] ?? status}`);
       setSelected(new Set()); setBulkStatus('');
       qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
     },
     onError: () => toast.error('Erreur lors de la mise à jour'),
@@ -141,6 +144,7 @@ export default function FacebookLeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} réassigné${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set()); setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -150,6 +154,7 @@ export default function FacebookLeadsPage() {
     onSuccess: () => {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
       qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
       qc.invalidateQueries({ queryKey: ['leads-duplicates'] });
     },
@@ -269,6 +274,7 @@ export default function FacebookLeadsPage() {
           <button
             onClick={() => {
               qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
               qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
             }}
             className="btn-secondary btn-sm"
@@ -474,6 +480,7 @@ export default function FacebookLeadsPage() {
           onSuccess={() => {
             setCreateOpen(false);
             qc.invalidateQueries({ queryKey: ['leads-facebook'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
             qc.invalidateQueries({ queryKey: ['leads-facebook-counts'] });
           }}
           onCancel={() => setCreateOpen(false)}

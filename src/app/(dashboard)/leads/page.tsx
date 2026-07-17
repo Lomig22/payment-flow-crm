@@ -52,6 +52,7 @@ export default function LeadsPage() {
     onSuccess:  () => {
       toast.success('Lead supprimé');
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la suppression'),
   });
@@ -62,6 +63,7 @@ export default function LeadsPage() {
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la suppression'),
   });
@@ -74,6 +76,7 @@ export default function LeadsPage() {
       setSelected(new Set());
       setBulkSetterId('');
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors de la réassignation'),
   });
@@ -87,6 +90,7 @@ export default function LeadsPage() {
       setSelected(new Set());
       setBulkSourceVal('');
       qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
     },
     onError: () => toast.error('Erreur lors du changement de source'),
   });
@@ -442,6 +446,7 @@ export default function LeadsPage() {
           onSuccess={() => {
             setCreateOpen(false);
             qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-pipeline'] });
           }}
           onCancel={() => setCreateOpen(false)}
         />
