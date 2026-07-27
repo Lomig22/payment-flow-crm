@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
-  Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone, Plus,
+  Search, Eye, RefreshCw, X, ChevronLeft, ChevronRight, Trash2, UserCheck, Phone, Plus, Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi, usersApi } from '@/lib/api';
@@ -351,6 +351,7 @@ function ColdCallLeads() {
                   <th className="th">Nom</th>
                   <th className="th hidden md:table-cell">Société</th>
                   <th className="th hidden lg:table-cell">Activité</th>
+                  <th className="th hidden lg:table-cell">Avis</th>
                   <th className="th hidden lg:table-cell">Téléphone</th>
                   <th className="th">Qualité</th>
                   <th className="th">Statut</th>
@@ -380,6 +381,15 @@ function ColdCallLeads() {
                     <td className="td hidden lg:table-cell">
                       {lead.niche
                         ? <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">{lead.niche}</span>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="td hidden lg:table-cell">
+                      {lead.rating != null
+                        ? <span className="inline-flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            {lead.rating}
+                            {lead.reviews != null && <span className="text-gray-400">({lead.reviews})</span>}
+                          </span>
                         : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     <td className="td hidden lg:table-cell">

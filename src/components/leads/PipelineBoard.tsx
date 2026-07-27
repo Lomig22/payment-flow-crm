@@ -7,7 +7,7 @@ import {
   MouseSensor, TouchSensor, useSensor, useSensors,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { Phone, Building } from 'lucide-react';
+import { Phone, Building, Star } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { leadsApi, qualiopiLeadsApi, usersApi } from '@/lib/api';
@@ -75,6 +75,12 @@ function LeadCardInner({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boo
         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
           <Phone className="w-3 h-3 flex-shrink-0" />
           {lead.phone}
+        </p>
+      )}
+      {lead.rating != null && (
+        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+          <Star className="w-3 h-3 flex-shrink-0 fill-amber-400 text-amber-400" />
+          <span>{lead.rating}{lead.reviews != null && ` · ${lead.reviews} avis`}</span>
         </p>
       )}
       {tagline && (

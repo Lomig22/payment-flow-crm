@@ -8,9 +8,11 @@ const COLUMN_MAP: Record<string, string> = {
   prenom: 'first_name', 'prénom': 'first_name', firstname: 'first_name', first_name: 'first_name',
   nom: 'last_name', lastname: 'last_name', last_name: 'last_name', surname: 'last_name',
   entreprise: 'company', company: 'company', 'société': 'company', societe: 'company', nom_entreprise: 'company',
+  // « name » (anglais) = nom de l'établissement dans les exports d'entreprises (Google Maps, annuaires).
+  name: 'company',
   telephone: 'phone', 'téléphone': 'phone', phone: 'phone', tel: 'phone', mobile: 'phone', portable: 'phone',
   email: 'email', mail: 'email', 'e-mail': 'email',
-  ville: 'location', location: 'location', adresse: 'location', localisation: 'location', city: 'location',
+  ville: 'location', location: 'location', adresse: 'location', address: 'location', localisation: 'location', city: 'location',
   notes: 'notes', commentaire: 'notes', commentaires: 'notes', description: 'notes',
   'prises de notes': 'notes',
   qualite: 'lead_quality', 'qualité': 'lead_quality', lead_quality: 'lead_quality',
@@ -19,6 +21,9 @@ const COLUMN_MAP: Record<string, string> = {
   // Le secteur/métier/catégorie devient l'activité (niche) du lead → filtrable.
   secteur: 'niche', 'secteur d\'activité': 'niche',
   'catégorie': 'niche', categorie: 'niche',
+  // Note Google (/5) et nombre d'avis de la fiche GMB (exports Google Maps).
+  rating: '_rating', note_google: '_rating', 'note google': '_rating',
+  reviews: '_reviews', avis: '_reviews', 'nombre d\'avis': '_reviews', nb_avis: '_reviews',
   site_web: '_website', 'site web': '_website',
   a_site_web: '_ignore', code_postal: '_ignore',
   latitude: '_ignore', longitude: '_ignore', source: '_ignore',
@@ -276,6 +281,14 @@ export async function POST(request: NextRequest) {
         }
       } else if (mapped === '_ig_biz_cat') {
         if (v && v !== 'None') extras.push(v.trim());
+      } else if (mapped === '_rating') {
+        // Note GMB : accepte « 4,9 » comme « 4.9 », borne à [0, 5]
+        const n = parseFloat(v.replace(',', '.'));
+        if (!isNaN(n) && n >= 0 && n <= 5) row._rating = String(n);
+      } else if (mapped === '_reviews') {
+        // Nombre d'avis : garde uniquement les chiffres (« 1 234 avis » → 1234)
+        const n = parseInt(v.replace(/[^\d]/g, ''), 10);
+        if (!isNaN(n) && n >= 0) row._reviews = String(n);
       } else if (mapped === '_gmaps_extra') {
         const val = v.trim();
         if (val && !/^[·•\-–]+$/.test(val)) extras.push(val);
@@ -436,6 +449,8 @@ export async function POST(request: NextRequest) {
       source:       leadSource,
       notes:        row.notes      || null,
       niche:        row.niche || batchNiche || null,   // activité (toutes sources)
+      rating:       row._rating  ? parseFloat(row._rating)   : null,   // note GMB /5
+      reviews:      row._reviews ? parseInt(row._reviews, 10) : null,   // nombre d'avis GMB
       setter_id:    getNextSetter(),
       // Instagram/Facebook columns (requires Sprint 1 SQL migration)
       ...(isSocial ? {

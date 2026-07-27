@@ -62,6 +62,8 @@ export interface Lead {
   status:              LeadStatus;
   source?:             LeadSource | null;
   notes?:              string;
+  rating?:             number;   // note Google My Business (/5)
+  reviews?:            number;   // nombre d'avis Google My Business
   tags?:               Tag[];
   history?:            LeadHistory[];
   created_at:          string;

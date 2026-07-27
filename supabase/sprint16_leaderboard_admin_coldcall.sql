@@ -1,23 +1,11 @@
--- ============================================================
--- Sprint 9 — Dashboard Cold Call : activité setter enrichie
---   Ajoute, par setter, le détail relances / relances 2 / perdus :
---     • by_setter        (cumulé sur la fenêtre, état actuel)
---     • by_setter_daily  (jour par jour, sémantique « état actuel »)
---     • get_leaderboard  (classement cumulé)
---
--- Même sémantique « état actuel » que le sprint 8 : une action n'est
--- comptée que si le lead est TOUJOURS dans cet état, attribuée au JOUR de
--- la DERNIÈRE transition vers cet état (MAX de lead_history). Repli sur la
--- date de création quand aucune trace d'historique n'existe.
--- À exécuter dans Supabase > SQL Editor (ou via psql -f)
--- ============================================================
+-- Sprint 16 — Inclure les admins qui font du cold call dans les tableaux par setter du dashboard.
+-- (classement + « Performance par setter » + « Activité par setter »). Généré depuis les
+-- définitions live, en élargissant le filtre de role 'setter' aux admins ('setter' + 'admin').
+-- Le garde-fou 'cold_call' = ANY(acquisition_sources) empêche les admins hors cold call d'apparaître.
 
-CREATE OR REPLACE FUNCTION public.get_dashboard_stats(
-  p_setter_id uuid DEFAULT NULL,
-  p_days integer DEFAULT 30
-)
-RETURNS json
-LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.get_dashboard_stats(p_setter_id uuid DEFAULT NULL::uuid, p_days integer DEFAULT 30)
+ RETURNS json
+ LANGUAGE plpgsql
 AS $function$
 DECLARE
   v_start date := CURRENT_DATE - p_days;
@@ -80,7 +68,7 @@ BEGIN
             ROUND(CASE WHEN COUNT(l.id) > 0 THEN COUNT(l.id) FILTER (WHERE l.status = 'client')::numeric / COUNT(l.id) * 100 ELSE 0 END, 1) as conversion_rate
           FROM users u
           LEFT JOIN leads l ON l.setter_id = u.id AND l.source = 'cold_call' AND l.created_at >= v_start
-          WHERE u.role = 'setter' AND u.is_active = true
+          WHERE u.role IN ('setter', 'admin') AND u.is_active = true
             AND 'cold_call' = ANY(u.acquisition_sources)
           GROUP BY u.id, u.first_name, u.last_name
 
@@ -117,17 +105,41 @@ BEGIN
              WHERE l.source = 'cold_call' AND DATE(l.created_at) = d::date
                AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)) as leads_created,
           (SELECT COUNT(*) FROM leads l
-             WHERE l.source = 'cold_call' AND l.status = 'client'
+             WHERE l.source = 'cold_call' AND l.called = true
                AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
                AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
-                              WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'client'),
-                            DATE(l.created_at)) = d::date) as clients,
+                              WHERE h.lead_id = l.id AND h.field_changed = 'called' AND h.new_value = 'true'),
+                            DATE(l.created_at)) = d::date) as called,
+          (SELECT COUNT(*) FROM leads l
+             WHERE l.source = 'cold_call' AND l.status = 'to_follow_up'
+               AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
+               AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
+                              WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'to_follow_up'),
+                            DATE(l.created_at)) = d::date) as follow_ups,
+          (SELECT COUNT(*) FROM leads l
+             WHERE l.source = 'cold_call' AND l.status = 'to_follow_up_2'
+               AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
+               AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
+                              WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'to_follow_up_2'),
+                            DATE(l.created_at)) = d::date) as follow_ups_2,
           (SELECT COUNT(*) FROM leads l
              WHERE l.source = 'cold_call' AND l.appointment_taken = true
                AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
                AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
                               WHERE h.lead_id = l.id AND h.field_changed = 'appointment_taken' AND h.new_value = 'true'),
-                            DATE(l.created_at)) = d::date) as appointments
+                            DATE(l.created_at)) = d::date) as appointments,
+          (SELECT COUNT(*) FROM leads l
+             WHERE l.source = 'cold_call' AND l.status = 'lost'
+               AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
+               AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
+                              WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'lost'),
+                            DATE(l.created_at)) = d::date) as lost,
+          (SELECT COUNT(*) FROM leads l
+             WHERE l.source = 'cold_call' AND l.status = 'client'
+               AND (p_setter_id IS NULL OR l.setter_id = p_setter_id)
+               AND COALESCE((SELECT DATE(MAX(h.created_at)) FROM lead_history h
+                              WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'client'),
+                            DATE(l.created_at)) = d::date) as clients
         FROM generate_series(v_start, CURRENT_DATE, '1 day') d
         ORDER BY d
       ) t
@@ -185,7 +197,7 @@ BEGIN
                                       WHERE h.lead_id = l.id AND h.field_changed = 'status' AND h.new_value = 'client'),
                                     DATE(l.created_at)) = d::date) AS clients
                 FROM users u
-                WHERE u.role = 'setter' AND u.is_active = true
+                WHERE u.role IN ('setter', 'admin') AND u.is_active = true
                   AND 'cold_call' = ANY(u.acquisition_sources)
 
                 UNION ALL
@@ -244,14 +256,13 @@ BEGIN
     ), '[]'::json)
   );
 END;
-$function$;
+$function$
 
--- ============================================================
--- Classement des setters : ajout relances / relances 2 / perdus
--- ============================================================
+;
+
 CREATE OR REPLACE FUNCTION public.get_leaderboard(p_days integer DEFAULT 30)
-RETURNS json
-LANGUAGE plpgsql
+ RETURNS json
+ LANGUAGE plpgsql
 AS $function$
 BEGIN
   RETURN COALESCE((
@@ -268,13 +279,14 @@ BEGIN
         ROUND(CASE WHEN COUNT(l.id) > 0 THEN COUNT(l.id) FILTER (WHERE l.status = 'client')::numeric / COUNT(l.id) * 100 ELSE 0 END, 1) as conversion_rate
       FROM users u
       LEFT JOIN leads l ON l.setter_id = u.id AND l.source = 'cold_call' AND l.created_at >= CURRENT_DATE - p_days
-      -- Inclut aussi les admins qui font du cold call (ex. Lomig, Albin) — le garde-fou acquisition_sources
-      -- empêche les admins hors cold call (ex. Jenifer) d'apparaître dans le classement.
-      WHERE u.role IN ('setter','admin') AND u.is_active = true
+      WHERE u.role IN ('setter', 'admin') AND u.is_active = true
         AND 'cold_call' = ANY(u.acquisition_sources)
       GROUP BY u.id, u.first_name, u.last_name
       ORDER BY clients DESC, total_leads DESC
     ) s
   ), '[]'::json);
 END;
-$function$;
+$function$
+
+;
+
