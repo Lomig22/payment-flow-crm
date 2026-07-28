@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
+import { normalizePhone } from '@/lib/phone';
 
 export interface DuplicateGroup {
   field: 'phone' | 'email' | 'instagram_username';
@@ -8,7 +9,7 @@ export interface DuplicateGroup {
   leads: { id: string; first_name: string; last_name: string }[];
 }
 
-const normPhone = (p: string) => p.replace(/[\s.\-\(\)\/]/g, '');
+const normPhone = (p: string) => normalizePhone(p);
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
+import { normalizePhone } from '@/lib/phone';
 import { parse } from 'csv-parse/sync';
 
 // Colonnes du tableur Qualiopi (ex. « SansSite_OK ») + alias courants.
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Pass 2 : détection de doublons (téléphone) ────────────────────────────
-  const normPhone = (p: string) => p.replace(/[\s.\-\(\)\/]/g, '');
+  const normPhone = (p: string) => normalizePhone(p);
   const csvPhones = parsedRows.map((r) => r.phone).filter(Boolean).map(normPhone);
 
   const dbPhoneSet = new Set<string>();

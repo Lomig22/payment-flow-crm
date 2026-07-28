@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
+import { normalizePhone } from '@/lib/phone';
 import { parse } from 'csv-parse/sync';
 
 const COLUMN_MAP: Record<string, string> = {
@@ -336,7 +337,7 @@ export async function POST(request: NextRequest) {
 
   // ── Pass 2 : bulk duplicate detection ────────────────────────────────────
   // Normalize phone for comparison (digits only, no spaces/dashes)
-  const normPhone = (p: string) => p.replace(/[\s.\-\(\)\/]/g, '');
+  const normPhone = (p: string) => normalizePhone(p);
 
   // Collect phones, emails, and instagram usernames present in this CSV
   const csvPhones      = parsedRows.map(r => r.phone).filter(Boolean).map(normPhone);
