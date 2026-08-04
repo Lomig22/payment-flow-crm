@@ -21,7 +21,7 @@ const COLUMN_MAP: Record<string, string> = {
   statut: 'status', status: 'status',
   // Exports d'entreprises (Google Maps / OpenStreetMap / annuaires locaux)
   // Le secteur/métier/catégorie devient l'activité (niche) du lead → filtrable.
-  secteur: 'niche', 'secteur d\'activité': 'niche',
+  secteur: 'niche', 'secteur d\'activité': 'niche', sector: 'niche',
   'catégorie': 'niche', categorie: 'niche',
   // Note Google (/5) et nombre d'avis de la fiche GMB (exports Google Maps).
   rating: '_rating', note_google: '_rating', 'note google': '_rating',
