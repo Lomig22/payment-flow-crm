@@ -135,13 +135,23 @@ export async function POST(request: NextRequest) {
 
   const dbPhoneSet = new Set<string>();
   const dbPhoneLabel: Record<string, string> = {};
+  // Comparaison insensible au format (+33 6… == 06…) : on ne peut pas normaliser
+  // dans un filtre SQL `.in('phone', …)` (il compare la colonne brute), donc on
+  // charge les leads existants (paginé) et on normalise côté JS.
   if (csvPhones.length > 0) {
-    const { data: existing } = await (supabase as any)
-      .from('qualiopi_leads')
-      .select('company, phone')
-      .in('phone', csvPhones);
-    for (const lead of existing ?? []) {
-      if (lead.phone) { const np = normPhone(lead.phone); dbPhoneSet.add(np); dbPhoneLabel[np] = lead.company; }
+    const db = supabase as any;
+    const PAGE = 1000;
+    for (let from = 0; from < 100_000; from += PAGE) {
+      const { data: existing, error: exErr } = await db
+        .from('qualiopi_leads')
+        .select('company, phone')
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (exErr) break;
+      for (const lead of existing ?? []) {
+        if (lead.phone) { const np = normPhone(lead.phone); if (np) { dbPhoneSet.add(np); dbPhoneLabel[np] = lead.company; } }
+      }
+      if (!existing || existing.length < PAGE) break;
     }
   }
   const seenPhones = new Set<string>();

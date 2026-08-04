@@ -354,23 +354,27 @@ export async function POST(request: NextRequest) {
   const dbEmailLabel: Record<string, string> = {};
   const dbIgLabel:    Record<string, string> = {};
 
+  // La comparaison par téléphone doit être insensible au format (« +33 6… » == « 06… »,
+  // espaces, etc.). Un filtre SQL `phone.in.(…)` compare la colonne BRUTE aux valeurs
+  // normalisées → il rate les doublons de format. On charge donc les leads existants
+  // (lecture paginée, cap PostgREST ~1000) et on normalise côté JS avec normalizePhone.
   if (csvPhones.length > 0 || csvEmails.length > 0 || csvIgUsernames.length > 0) {
     const db = supabase as any;
-    const orParts: string[] = [];
-    if (csvPhones.length > 0)      orParts.push(`phone.in.(${csvPhones.join(',')})`);
-    if (csvEmails.length > 0)      orParts.push(`email.in.(${csvEmails.join(',')})`);
-    if (csvIgUsernames.length > 0) orParts.push(`instagram_username.in.(${csvIgUsernames.join(',')})`);
-
-    const { data: existing } = await db
-      .from('leads')
-      .select('first_name, last_name, phone, email, instagram_username')
-      .or(orParts.join(','));
-
-    for (const lead of existing ?? []) {
-      const label = `${lead.first_name} ${lead.last_name}`.trim();
-      if (lead.phone)             { const np = normPhone(lead.phone);                    dbPhoneSet.add(np); dbPhoneLabel[np] = label; }
-      if (lead.email)             { const ne = lead.email.toLowerCase();                 dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
-      if (lead.instagram_username){ const ni = lead.instagram_username.toLowerCase();    dbIgSet.add(ni);    dbIgLabel[ni]    = label; }
+    const PAGE = 1000;
+    for (let from = 0; from < 100_000; from += PAGE) {
+      const { data: existing, error: exErr } = await db
+        .from('leads')
+        .select('first_name, last_name, phone, email, instagram_username')
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (exErr) break;
+      for (const lead of existing ?? []) {
+        const label = `${lead.first_name} ${lead.last_name}`.trim();
+        if (lead.phone)              { const np = normPhone(lead.phone);                 if (np) { dbPhoneSet.add(np); dbPhoneLabel[np] = label; } }
+        if (lead.email)              { const ne = lead.email.toLowerCase();              dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
+        if (lead.instagram_username) { const ni = lead.instagram_username.toLowerCase(); dbIgSet.add(ni);    dbIgLabel[ni]    = label; }
+      }
+      if (!existing || existing.length < PAGE) break;
     }
   }
 
