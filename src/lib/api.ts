@@ -56,6 +56,7 @@ export const leadsApi = {
   sendConfirmation: (id: string, data: { email: string; rdv_date: string }) =>
     api.post<{ ok: boolean; sent_at: string }>(`/leads/${id}/send-confirmation`, data),
   niches:   (source?: string) => api.get<string[]>('/leads/niches', { params: source ? { source } : undefined }),
+  regions:  (source?: string) => api.get<string[]>('/leads/regions', { params: source ? { source } : undefined }),
 };
 
 export const shiftsApi = {

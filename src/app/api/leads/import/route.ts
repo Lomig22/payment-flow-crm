@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import { normalizePhone } from '@/lib/phone';
+import { regionForLocation } from '@/lib/regions';
 import { parse } from 'csv-parse/sync';
 
 const COLUMN_MAP: Record<string, string> = {
@@ -450,6 +451,7 @@ export async function POST(request: NextRequest) {
       source:       leadSource,
       notes:        row.notes      || null,
       niche:        row.niche || batchNiche || null,   // activité (toutes sources)
+      region:       regionForLocation(row.location) || null,   // région déduite de la ville
       rating:       row._rating  ? parseFloat(row._rating)   : null,   // note GMB /5
       reviews:      row._reviews ? parseInt(row._reviews, 10) : null,   // nombre d'avis GMB
       setter_id:    getNextSetter(),

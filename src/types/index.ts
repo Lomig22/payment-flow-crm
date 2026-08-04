@@ -73,6 +73,7 @@ export interface Lead {
   instagram_url?:      string;
   a_ouvert?:           boolean;
   niche?:              string;
+  region?:             string;
   bio?:                string;
   followers_count?:    number;
   ig_score?:           number;
@@ -317,6 +318,7 @@ export interface LeadsFilters {
   order?:              'asc' | 'desc';
   // Instagram/Facebook-specific
   niche?:              string;
+  region?:             string;
   a_ouvert?:           string;
   instagram_username?: string;
   // Utility

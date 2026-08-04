@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   const source      = searchParams.get('source');
   const search      = searchParams.get('search');
   const niche       = searchParams.get('niche');
+  const region      = searchParams.get('region');
   const a_ouvert    = searchParams.get('a_ouvert');
   const ig_username = searchParams.get('instagram_username');
   const countOnly   = searchParams.get('count_only') === 'true';
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     }
     if (source) cq = cq.eq('source', source);
     if (niche)  cq = (cq as any).eq('niche', niche);
+    if (region) cq = (cq as any).eq('region', region);
     const { data: rows } = await (cq as any).limit(5000);
     const counts: Record<string, number> = {};
     let open_count = 0;
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest) {
   if (quality)     q = q.eq('lead_quality', quality);
   if (source)      q = q.eq('source', source);
   if (niche)       q = (q as any).eq('niche', niche);
+  if (region)      q = (q as any).eq('region', region);
   if (a_ouvert === 'true')  q = (q as any).eq('a_ouvert', true);
   if (a_ouvert === 'false') q = (q as any).eq('a_ouvert', false);
   if (ig_username) q = (q as any).ilike('instagram_username', `%${ig_username.replace(/^@/, '')}%`);

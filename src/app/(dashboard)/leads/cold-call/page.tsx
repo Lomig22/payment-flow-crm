@@ -59,6 +59,7 @@ function ColdCallLeads() {
     status:    (sp.get('status')  ?? undefined) as LeadStatus | undefined,
     quality:   (sp.get('quality') ?? undefined) as LeadQuality | undefined,
     niche:     sp.get('niche')  ?? undefined,
+    region:    sp.get('region') ?? undefined,
     setter_id: sp.get('setter') ?? undefined,
     search:    sp.get('q')      ?? undefined,
   });
@@ -70,6 +71,7 @@ function ColdCallLeads() {
     if (filters.status)    p.set('status',  String(filters.status));
     if (filters.quality)   p.set('quality', String(filters.quality));
     if (filters.niche)     p.set('niche',   filters.niche);
+    if (filters.region)    p.set('region',  filters.region);
     if (filters.setter_id) p.set('setter',  filters.setter_id);
     if (filters.search)    p.set('q',       filters.search);
     if ((filters.page ?? 1) > 1) p.set('page', String(filters.page));
@@ -117,6 +119,12 @@ function ColdCallLeads() {
   const { data: niches } = useQuery({
     queryKey: ['leads-cc-niches'],
     queryFn:  () => leadsApi.niches('cold_call').then((r) => r.data as string[]),
+    staleTime: 60_000,
+  });
+
+  const { data: regions } = useQuery({
+    queryKey: ['leads-cc-regions'],
+    queryFn:  () => leadsApi.regions('cold_call').then((r) => r.data as string[]),
     staleTime: 60_000,
   });
 
@@ -257,6 +265,14 @@ function ColdCallLeads() {
             onChange={(e) => setFilters((f) => ({ ...f, niche: e.target.value || undefined, page: 1 }))}>
             <option value="">Toutes activités</option>
             {niches.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
+
+        {regions && regions.length > 0 && (
+          <select className="select w-auto text-sm" value={filters.region ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, region: e.target.value || undefined, page: 1 }))}>
+            <option value="">Toutes régions</option>
+            {regions.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         )}
 

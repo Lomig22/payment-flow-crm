@@ -225,13 +225,15 @@ function Board({ source, variant }: PipelineBoardProps) {
   // Filtres persistés dans l'URL : setter (admin) + activité
   const [setterId, setSetterId] = useState(sp.get('setter') ?? '');
   const [niche,    setNiche]    = useState(sp.get('niche')  ?? '');
+  const [region,   setRegion]   = useState(sp.get('region') ?? '');
   useEffect(() => {
     const p = new URLSearchParams();
     if (setterId) p.set('setter', setterId);
     if (niche)    p.set('niche',  niche);
+    if (region)   p.set('region', region);
     const qs = p.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [setterId, niche, pathname, router]);
+  }, [setterId, niche, region, pathname, router]);
 
   const { data: setters } = useQuery({
     queryKey: ['users-setters'],
@@ -295,8 +297,13 @@ function Board({ source, variant }: PipelineBoardProps) {
   const nicheOptions = Array.from(new Set(rawLeads.map(leadNiche).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'fr'));
   if (niche && !nicheOptions.includes(niche)) nicheOptions.unshift(niche);
+  const leadRegion = (l: BoardLead) => (l.region ?? '').trim();
+  const regionOptions = Array.from(new Set(rawLeads.map(leadRegion).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+  if (region && !regionOptions.includes(region)) regionOptions.unshift(region);
   const leads: BoardLead[] = rawLeads
     .filter((l) => !niche || leadNiche(l) === niche)
+    .filter((l) => !region || leadRegion(l) === region)
     .map((l) => (optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l));
   const getColumn = (s: LeadStatus) => leads.filter((l) => l.status === s);
 
@@ -332,7 +339,7 @@ function Board({ source, variant }: PipelineBoardProps) {
   return (
     <div className="space-y-4">
       {/* Filtres : setter (admin) + activité */}
-      {((isAdmin && setters) || nicheOptions.length > 0) && (
+      {((isAdmin && setters) || nicheOptions.length > 0 || regionOptions.length > 0) && (
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin && setters && (
             <div className="flex items-center gap-2">
@@ -357,6 +364,16 @@ function Board({ source, variant }: PipelineBoardProps) {
             >
               <option value="">Toutes activités</option>
               {nicheOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
+          {regionOptions.length > 0 && (
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="select w-auto text-sm"
+            >
+              <option value="">Toutes régions</option>
+              {regionOptions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           )}
         </div>
