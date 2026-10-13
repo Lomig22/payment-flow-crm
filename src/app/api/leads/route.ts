@@ -20,6 +20,14 @@ const VALID_SORTS: Record<string, string> = {
   last_name: 'last_name', status: 'status', lead_quality: 'lead_quality',
 };
 
+// SEA/ADS est une sous-section du pôle Cold Call : un setter limité au canal
+// cold_call voit aussi les leads sea_ads.
+function expandSources(sources: string[]): string[] {
+  return sources.includes('cold_call') && !sources.includes('sea_ads')
+    ? [...sources, 'sea_ads']
+    : sources;
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
@@ -47,7 +55,7 @@ export async function GET(request: NextRequest) {
     let cq = supabase.from('leads').select('status, a_ouvert');
     if (user.role !== 'admin') {
       cq = cq.eq('setter_id', user.id);
-      if (user.acquisition_sources?.length) cq = (cq as any).in('source', user.acquisition_sources);
+      if (user.acquisition_sources?.length) cq = (cq as any).in('source', expandSources(user.acquisition_sources));
     } else if (setter_id) {
       cq = cq.eq('setter_id', setter_id);
     }
@@ -72,7 +80,7 @@ export async function GET(request: NextRequest) {
 
   if (user.role !== 'admin') {
     q = q.eq('setter_id', user.id);
-    if (user.acquisition_sources?.length) q = (q as any).in('source', user.acquisition_sources);
+    if (user.acquisition_sources?.length) q = (q as any).in('source', expandSources(user.acquisition_sources));
   } else if (setter_id) {
     q = q.eq('setter_id', setter_id);
   }
@@ -126,7 +134,8 @@ export async function POST(request: NextRequest) {
   const { first_name, last_name, company, phone, email, location,
           called, action_in_progress, lead_quality, need_identified,
           setter_id, appointment_taken, appointment_honored, quote_sent,
-          r2_planned, r3_planned, status, source, notes } = body;
+          r2_planned, r3_planned, status, source, notes,
+          origin, inbound_channel, origin_content_id, linkedin_url } = body;
 
   if (!first_name || !last_name) {
     return NextResponse.json({ message: 'Prénom et nom sont requis' }, { status: 400 });
@@ -145,6 +154,10 @@ export async function POST(request: NextRequest) {
       appointment_honored: appointment_honored || false, quote_sent: quote_sent || false,
       r2_planned: r2_planned || false, r3_planned: r3_planned || false,
       status: status || 'in_progress', source: source || null, notes: notes || null,
+      origin: origin || null, inbound_channel: inbound_channel || null,
+      origin_content_id: origin_content_id || null,
+      // seulement si renseigné : la colonne n'existe qu'après la migration sprint42
+      ...(linkedin_url ? { linkedin_url } : {}),
     })
     .select()
     .single();

@@ -13,6 +13,7 @@ interface ImportResult {
   imported:         number;
   skipped:          number;
   duplicate_count:  number;
+  enriched?:        number;
   assignment_mode:  string;
   errors?:          string[];
   duplicates?:      string[];
@@ -63,8 +64,14 @@ export default function ImportPage() {
     formData.append('assignment_mode', mode);
     if (mode === 'round_robin' && rrSetterIds.length > 0) formData.append('setter_ids', rrSetterIds.join(','));
     if (mode === 'manual' && setterId) formData.append('setter_id', setterId);
-    if (source) formData.append('source', source);
-    if ((source === 'instagram' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
+    // « Instagram — À follow » = source instagram, piste follow (statut À follow)
+    if (source === 'instagram_follow') {
+      formData.append('source', 'instagram');
+      formData.append('ig_outreach', 'follow');
+    } else if (source) {
+      formData.append('source', source);
+    }
+    if ((source === 'instagram' || source === 'instagram_follow' || source === 'facebook') && batchNiche) formData.append('niche', batchNiche);
     if (dryRun) formData.append('dry_run', 'true');
     if (skipDuplicates) formData.append('skip_duplicates', 'true');
     return formData;
@@ -250,7 +257,9 @@ export default function ImportPage() {
           <div className="flex flex-wrap gap-3">
             {([
               ['cold_call', '📞 Cold call',  'Prospection téléphonique'],
-              ['instagram', '📸 Instagram',  'Leads depuis Instagram'],
+              ['sea_ads',   '🎯 SEA/ADS',    'Sous-section SEA/ADS du cold call'],
+              ['instagram', '📸 Instagram — DM à froid', 'Colonne « Lead » → DM direct'],
+              ['instagram_follow', '👤 Instagram — À follow', 'Colonne « À follow » → DM après follow back'],
               ['facebook',  '💬 Facebook',   'Leads depuis Facebook'],
               ['qualiopi',  '🎓 Qualiopi',   'Tableur Qualiopi → table dédiée'],
             ] as const).map(([val, title, desc]) => (
@@ -268,6 +277,25 @@ export default function ImportPage() {
           </div>
         </div>
 
+        {/* Comptes à follow : format hint */}
+        {source === 'instagram_follow' && (
+          <div className="mt-5 p-3 bg-sky-50 border border-sky-200 rounded-lg text-xs text-sky-800 space-y-1">
+            <p>
+              Les comptes arrivent dans la colonne <strong>« À follow »</strong> du pipeline Instagram (pas dans « Lead »).
+            </p>
+            <p>
+              Une colonne suffit : le <strong>pseudo</strong> (<code>username</code>, <code>pseudo</code>, <code>compte</code>, avec ou sans @)
+              <em> ou</em> le <strong>lien du profil</strong> (<code>profile_url</code>, <code>url</code>, <code>lien</code>…).
+              Les exports Apify sont reconnus tels quels.
+            </p>
+            <p>Un compte déjà présent dans le CRM (quelle que soit sa colonne) n'est jamais réimporté.</p>
+            <p>
+              Si le fichier contient le nombre de <strong>publications</strong> (<code>posts_count</code>), d'<strong>abonnés</strong> ou la <strong>bio</strong>,
+              ils sont enregistrés : le message DM s'adapte (pas de compliment sur les réalisations si le compte n'a rien publié).
+            </p>
+          </div>
+        )}
+
         {/* Qualiopi format hint */}
         {source === 'qualiopi' && (
           <div className="mt-5 p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800">
@@ -277,8 +305,9 @@ export default function ImportPage() {
           </div>
         )}
 
+
         {/* Niche batch (Instagram / Facebook) */}
-        {(source === 'instagram' || source === 'facebook') && (
+        {(source === 'instagram' || source === 'instagram_follow' || source === 'facebook') && (
           <div className="mt-5">
             <label className="label">Niche du lot <span className="text-gray-400 font-normal">(optionnel — appliquée à tous les leads importés)</span></label>
             <select value={batchNiche} onChange={(e) => setBatchNiche(e.target.value)} className="select">
@@ -375,6 +404,13 @@ export default function ImportPage() {
               </p>
             </div>
           </div>
+
+          {(result.enriched ?? 0) > 0 && (
+            <div className="mb-4 p-3 bg-sky-50 rounded-lg border border-sky-200 text-xs text-sky-800">
+              {result.enriched} compte{(result.enriched ?? 0) > 1 ? 's' : ''} déjà présent{(result.enriched ?? 0) > 1 ? 's' : ''} dans le CRM
+              {(result.enriched ?? 0) > 1 ? ' ont été complétés' : ' a été complété'} (publications, abonnés, bio) — leur message DM est maintenant mieux personnalisé.
+            </div>
+          )}
 
           {result.duplicates && result.duplicates.length > 0 && (
             <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">

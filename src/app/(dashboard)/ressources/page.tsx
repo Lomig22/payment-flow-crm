@@ -438,7 +438,7 @@ Cordialement,
             <span className="w-5 h-5 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center justify-center">1</span>
             CAS 1 — Prospect sans site web
           </h3>
-          <Script label="Message 1 — À envoyer en premier" color="border-green-300" text={`Bonjour (Prénom),
+          <Script label="Message 1 — À envoyer en premier" color="border-green-300" text={`Hello (Prénom),
 
 J'ai pris 15 minutes pour créer un aperçu de site web pensé spécifiquement pour (Entreprise).
 Rien à vendre ici - juste un visuel que j'aimerais vous montrer.
@@ -468,7 +468,7 @@ On se réserve ça ?`} />
           <InfoBox type="warning">Quand il répond positivement → envoie le lien Calendly directement : <strong>https://calendly.com/paymentfloww/prevuesiteweb</strong></InfoBox>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom)
+            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Hello (Prénom)
 
 Je voulais juste m'assurer que mon message vous avait bien atteint !
 L'aperçu de votre site est prêt, ça prend 10 minutes à regarder ensemble et ça pourrait vraiment changer la donne pour (Entreprise).
@@ -605,7 +605,7 @@ En 15 minutes de visio, je vous montre exactement quoi faire en premier pour (En
 👉 (Lien Lemcal)`} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Bonjour (Prénom),
+            <Script label="Relance 1 — J+2 (pas de réponse)" color="border-red-200" text={`Hello (Prénom),
 
 Je voulais m'assurer que vous aviez bien reçu le guide !
 

@@ -26,6 +26,7 @@ const FB_STATUS_LABELS: Record<string, string> = {
   lead: 'Lead', m1: 'M1 envoyé', r1: 'R1', r2: 'R2',
   reponse: 'Réponse', a_relancer: 'À relancer',
   audit_a_envoyer: 'Audit à envoyer', audit_envoye: 'Audit envoyé', rdv: 'RDV',
+  not_qualified: 'Non qualifié',
 };
 
 const RDV_OUTCOME_LABELS: Record<string, string> = {
@@ -39,6 +40,7 @@ const RDV_OUTCOME_COLORS: Record<string, string> = {
 const FB_TABS = [
   { label: 'Tous',           value: '' },
   { label: 'Lead',           value: 'lead' },
+  { label: 'Non qualifié',   value: 'not_qualified' },
   { label: 'M1 envoyé',      value: 'm1' },
   { label: 'R1',             value: 'r1' },
   { label: 'R2',             value: 'r2' },
@@ -257,6 +259,17 @@ export default function FacebookLeadsPage() {
           {NICHE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
 
+        <select className="select w-auto text-sm"
+          value={`${filters.sort ?? 'created_at'}:${filters.order ?? 'desc'}`}
+          onChange={(e) => {
+            const [sort, order] = e.target.value.split(':');
+            setFilters((f) => ({ ...f, sort, order: order as 'asc' | 'desc', page: 1 }));
+          }}>
+          <option value="created_at:desc">Tri : création (récent → ancien)</option>
+          <option value="updated_at:desc">Tri : mise à jour (récent → ancien)</option>
+          <option value="updated_at:asc">Tri : mise à jour (ancien → récent)</option>
+        </select>
+
         {isAdmin && setters && (
           <select
             className="select w-auto text-sm"
@@ -353,7 +366,7 @@ export default function FacebookLeadsPage() {
                   <th className="th">Statut</th>
                   {activeTab === 'rdv' && <th className="th">Résultat RDV</th>}
                   {isAdmin && <th className="th hidden xl:table-cell">Setter</th>}
-                  <th className="th hidden md:table-cell">Créé le</th>
+                  <th className="th hidden md:table-cell">{filters.sort === 'updated_at' ? 'Mis à jour' : 'Créé le'}</th>
                   <th className="th w-16">Actions</th>
                 </tr>
               </thead>
@@ -430,7 +443,7 @@ export default function FacebookLeadsPage() {
                     )}
 
                     <td className="td hidden md:table-cell text-gray-500 text-xs" onClick={() => router.push(`/leads/${lead.id}`)}>
-                      {formatDate(lead.created_at)}
+                      {formatDate(filters.sort === 'updated_at' ? lead.updated_at : lead.created_at)}
                     </td>
 
                     <td className="td" onClick={(e) => e.stopPropagation()}>

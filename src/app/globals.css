@@ -63,6 +63,7 @@
   .badge-cold        { @apply badge bg-blue-100 text-blue-700; }
   .badge-client      { @apply badge bg-green-100 text-green-700; }
   .badge-lost        { @apply badge bg-gray-100 text-gray-600; }
+  .badge-not_qualified { @apply badge bg-stone-200 text-stone-700; }
   .badge-in_progress    { @apply badge bg-yellow-100 text-yellow-700; }
   .badge-to_follow_up   { @apply badge bg-orange-100 text-orange-700; }
   .badge-to_follow_up_2 { @apply badge bg-red-100 text-red-700; }

@@ -20,7 +20,7 @@ const Q_COLUMN_MAP: Record<string, string> = {
 };
 
 const VALID_STATUS = new Set([
-  'in_progress', 'client', 'lost', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
+  'in_progress', 'client', 'lost', 'not_qualified', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
 ]);
 
 // Détecte du Windows-1252 lu comme de l'UTF-8 (fréquent sur les fichiers scrapés)

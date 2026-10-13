@@ -30,6 +30,7 @@ export const STATUS_LABELS: Record<string, string> = {
   appointment:    'RDV pris',
   r2:             'R2 pris',
   client:         'Client',
+  not_qualified:  'Non qualifié',
   lost:           'Perdu',
 };
 
@@ -42,6 +43,7 @@ export const ACTION_LABELS: Record<string, string> = {
 };
 
 export const FIELD_LABELS: Record<string, string> = {
+  li_status:           'Séquence LinkedIn',
   called:              'Appelé',
   action_in_progress:  'Action en cours',
   lead_quality:        'Qualité du lead',
@@ -61,3 +63,20 @@ export const FIELD_LABELS: Record<string, string> = {
   email:               'Email',
   location:            'Localisation',
 };
+
+// Lien officiel Meta qui ouvre directement la conversation DM avec le compte
+// (appli Instagram sur mobile, instagram.com/direct sur desktop).
+export const igDmUrl = (username: string) =>
+  `https://ig.me/m/${encodeURIComponent(username.trim().replace(/^@/, ''))}`;
+
+// Filet de sécurité des légendes : un émoji sorti en échappement littéral
+// (« 💬 », bug du compilateur de Next.js en prod) est remis en caractère.
+export function fixEscapedEmoji(text: string): string;
+export function fixEscapedEmoji(text: string | null): string | null;
+export function fixEscapedEmoji(text: string | null): string | null {
+  if (!text || !text.includes('\\u')) return text;
+  return text
+    .replace(/\\u\{([0-9a-fA-F]{4,6})\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})/g,
+      (_, hi, lo) => String.fromCharCode(parseInt(hi, 16), parseInt(lo, 16)));
+}

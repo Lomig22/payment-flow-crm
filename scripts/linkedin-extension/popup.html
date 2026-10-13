@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Payment Flow — LinkedIn</title>
+<style>
+  body { font: 13px/1.4 system-ui, sans-serif; width: 320px; margin: 0; padding: 14px; color: #111827; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  label { display: block; font-size: 11px; color: #6b7280; margin: 8px 0 3px; }
+  input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+  .row { display: flex; gap: 6px; margin-top: 10px; }
+  button { flex: 1; padding: 7px; border: 0; border-radius: 6px; background: #0a66c2; color: #fff; font: inherit; cursor: pointer; }
+  button.secondary { background: #f3f4f6; color: #374151; }
+  #status { margin-top: 12px; padding: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+  #at { color: #9ca3af; font-size: 11px; }
+</style>
+</head>
+<body>
+  <h1>Payment Flow — LinkedIn</h1>
+  <label for="crmUrl">Adresse du CRM</label>
+  <input id="crmUrl" placeholder="https://payment-flow-crm-delta.vercel.app">
+  <label for="extKey">Clé de l'extension (page LinkedIn du CRM)</label>
+  <input id="extKey" type="password">
+  <div class="row">
+    <button id="save">Enregistrer</button>
+    <button id="pause" class="secondary">Pause</button>
+  </div>
+  <div class="row"><button id="run" class="secondary">Lancer une action maintenant</button></div>
+  <div id="status">—<div id="at"></div></div>
+  <script src="popup.js"></script>
+</body>
+</html>

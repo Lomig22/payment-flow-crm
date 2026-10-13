@@ -4,7 +4,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Upload, UsersRound, LogOut, Zap, User, X,
   MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
-  Users, Kanban, ChevronDown, Award,
+  Users, Kanban, ChevronDown, Award, Megaphone, Clapperboard, CalendarClock, Linkedin,
+  CheckSquare, Gauge, Settings2,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -38,11 +39,12 @@ function NavLink({ href, icon: Icon, label, onClick, exact = false }: {
 }
 
 function PoleSection({ icon: Icon, label, color, segment, children, defaultOpen = false }: {
-  icon: React.ElementType; label: string; color: string; segment: string;
+  icon: React.ElementType; label: string; color: string; segment: string | string[];
   children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(defaultOpen || pathname.includes(segment));
+  const segments = Array.isArray(segment) ? segment : [segment];
+  const [open, setOpen] = useState(defaultOpen || segments.some((s) => pathname.includes(s)));
 
   return (
     <div>
@@ -107,6 +109,8 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           <PoleSection icon={Instagram} label="Instagram" color="text-pink-500" segment="instagram">
             <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
+            {isAdmin && <NavLink href="/instagram/contenu" icon={Clapperboard} label="Contenu" onClick={onClose} />}
+            {isAdmin && <NavLink href="/instagram/publication" icon={CalendarClock} label="Publication" onClick={onClose} />}
           </PoleSection>
         )}
 
@@ -118,11 +122,30 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </PoleSection>
         )}
 
-        {/* ── Pôle Cold Call ── */}
+        {/* ── Pôle Cold Call (+ sous-section SEA/ADS) ── */}
         {showColdCall && (
-          <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment="cold-call">
+          <PoleSection icon={Phone} label="Cold Call" color="text-blue-500" segment={['cold-call', 'sea-ads']}>
             <NavLink href="/leads/cold-call" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/cold-call" icon={Kanban} label="Pipeline" onClick={onClose} />
+            <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Megaphone className="w-3 h-3 text-amber-500" />
+              SEA / ADS
+            </p>
+            <NavLink href="/leads/sea-ads" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/pipeline/sea-ads" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
+
+        {/* ── Pôle LinkedIn (admins) : opérationnel (suivi des leads) et organisation (pilotage, import, réglages) ── */}
+        {isAdmin && (
+          <PoleSection icon={Linkedin} label="LinkedIn" color="text-[#0a66c2]" segment="linkedin">
+            <p className="px-2 pt-1 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Opérationnel</p>
+            <NavLink href="/linkedin/leads" icon={Users} label="Leads" onClick={onClose} />
+            <NavLink href="/linkedin/pipeline" icon={Kanban} label="Pipeline" onClick={onClose} />
+            <NavLink href="/linkedin/validation" icon={CheckSquare} label="À valider" onClick={onClose} />
+            <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Organisation</p>
+            <NavLink href="/linkedin" icon={Gauge} label="Pilotage" onClick={onClose} exact />
+            <NavLink href="/linkedin/reglages" icon={Settings2} label="Import & réglages" onClick={onClose} />
           </PoleSection>
         )}
 

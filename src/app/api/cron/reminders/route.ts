@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const { data: leads, error } = await supabase
     .from('leads')
     .select('id, first_name, last_name, company, phone, rdv_date, confirmation_received_at, reminder_j1_sent_at, reminder_h2_sent_at')
-    .eq('source', 'cold_call')
+    .in('source', ['cold_call', 'sea_ads'])
     .neq('status', 'lost')
     .not('confirmation_received_at', 'is', null)
     .not('phone', 'is', null)

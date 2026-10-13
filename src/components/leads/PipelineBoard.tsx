@@ -7,11 +7,12 @@ import {
   MouseSensor, TouchSensor, useSensor, useSensors,
   type CollisionDetection,
 } from '@dnd-kit/core';
-import { Phone, Building, Star } from 'lucide-react';
+import { Phone, Building, Star, ExternalLink } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { leadsApi, qualiopiLeadsApi, usersApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { DmAccountBar, DmAccountTag, CopyM1Button, FollowBackButtons, useIgHandle, useFollowClick } from '@/components/leads/DmAccount';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import type { Lead, LeadStatus } from '@/types';
@@ -46,8 +47,23 @@ const COLUMNS: { id: LeadStatus; label: string; topColor: string; hoverBg: strin
   { id: 'appointment',    label: 'RDV pris',     topColor: 'border-t-blue-400',    hoverBg: 'bg-blue-50/60',    ringColor: 'ring-blue-300'    },
   { id: 'r2',             label: 'R2 pris',      topColor: 'border-t-purple-400',  hoverBg: 'bg-purple-50/60',  ringColor: 'ring-purple-300'  },
   { id: 'client',         label: 'Client',       topColor: 'border-t-green-500',   hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'   },
+  { id: 'not_qualified',  label: 'Non qualifié', topColor: 'border-t-stone-500',   hoverBg: 'bg-stone-100/60',  ringColor: 'ring-stone-300'   },
   { id: 'lost',           label: 'Perdu',        topColor: 'border-t-gray-400',    hoverBg: 'bg-gray-100/60',   ringColor: 'ring-gray-300'    },
 ];
+
+// Tri d'une colonne, choisi dans son en-tête et mémorisé par navigateur :
+//   entered      → derniers arrivés dans la colonne en haut (défaut)
+//   updated_desc → dernière mise à jour : du plus récent au plus ancien
+//   updated_asc  → dernière mise à jour : du plus ancien au plus récent
+type ColSort = 'entered' | 'updated_desc' | 'updated_asc';
+const COL_SORT_LABELS: Record<ColSort, string> = {
+  entered:      'Derniers arrivés',
+  updated_desc: 'Mis à jour : récent → ancien',
+  updated_asc:  'Mis à jour : ancien → récent',
+};
+
+const shortDateTime = (iso?: string) =>
+  iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 
 /* ── Card ─────────────────────────────────────────────────────────── */
 function LeadCardInner({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boolean }) {
@@ -62,9 +78,34 @@ function LeadCardInner({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boo
     : lead.company;
   const tagline = isQualiopi ? lead.activite : lead.niche;
 
+  // @username cliquable (profil ou DM selon l'étape, cf. useIgHandle), nouvel onglet.
+  // stopPropagation sur mousedown/touchstart : ne démarre pas un drag dnd-kit
+  // (MouseSensor/TouchSensor) ni l'ouverture de la fiche lead (onClick de la carte).
+  const igHandle = useIgHandle();
+  const ig = isSocial && lead.instagram_username ? igHandle(lead) : null;
+
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold text-gray-900 break-words">{displayName}</p>
+      {ig ? (
+        <span className="inline-flex items-center gap-1">
+        <a
+          href={ig.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={ig.onClick}
+          className="text-sm font-semibold text-gray-900 break-words hover:text-pink-600 hover:underline inline-flex items-center gap-1"
+          title={ig.title}
+        >
+          {displayName}
+          <ExternalLink className="w-3 h-3 flex-shrink-0 text-gray-300" />
+        </a>
+        <CopyM1Button lead={lead} />
+        </span>
+      ) : (
+        <p className="text-sm font-semibold text-gray-900 break-words">{displayName}</p>
+      )}
       {subtitle && (
         <p className="text-xs text-gray-500 flex items-start gap-1 mt-0.5 break-words">
           <Building className="w-3 h-3 flex-shrink-0 text-gray-400 mt-0.5" />
@@ -85,6 +126,11 @@ function LeadCardInner({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boo
       )}
       {tagline && (
         <p className="text-[10px] text-gray-400 mt-0.5">{tagline}</p>
+      )}
+      {isSocial && <DmAccountTag accountId={lead.last_dm_account_id} />}
+      {isSocial && <FollowBackButtons lead={lead} compact />}
+      {lead.updated_at && (
+        <p className="text-[10px] text-gray-300 mt-1" title="Dernière mise à jour du lead">maj {shortDateTime(lead.updated_at)}</p>
       )}
       <div className="flex items-center gap-1 mt-2 flex-wrap">
         {lead.lead_quality && <Badge variant={lead.lead_quality} />}
@@ -134,13 +180,15 @@ function OverlayCard({ lead, isQualiopi }: { lead: BoardLead; isQualiopi?: boole
 
 /* ── Column ───────────────────────────────────────────────────────── */
 function Column({
-  col, leads, isTargeted, detailBase, isQualiopi,
+  col, leads, isTargeted, detailBase, isQualiopi, sort, onSortChange,
 }: {
   col: typeof COLUMNS[number];
   leads: BoardLead[];
   isTargeted: boolean;
   detailBase: string;
   isQualiopi?: boolean;
+  sort: ColSort;
+  onSortChange: (s: ColSort) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   const active = isOver && isTargeted;
@@ -154,11 +202,24 @@ function Column({
       style={{ minHeight: 420, width: 260 }}
     >
       {/* Header */}
-      <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-800">{col.label}</h3>
-        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-          {leads.length}
-        </span>
+      <div className="p-3 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-800">{col.label}</h3>
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+            {leads.length}
+          </span>
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => onSortChange(e.target.value as ColSort)}
+          title="Ordre des cartes de cette colonne"
+          className={`mt-1.5 w-full text-[11px] rounded-md border px-1.5 py-0.5 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary-400
+            ${sort === 'entered' ? 'border-gray-200 text-gray-400' : 'border-indigo-300 text-indigo-700 bg-indigo-50'}`}
+        >
+          {(Object.keys(COL_SORT_LABELS) as ColSort[]).map((k) => (
+            <option key={k} value={k}>↕ {COL_SORT_LABELS[k]}</option>
+          ))}
+        </select>
       </div>
 
       {/* Cards */}
@@ -188,8 +249,16 @@ function Column({
   );
 }
 
-const COLUMNS_INSTAGRAM: typeof COLUMNS = [
-  { id: 'lead' as LeadStatus,             label: 'Lead',            topColor: 'border-t-gray-300',    hoverBg: 'bg-gray-50/60',    ringColor: 'ring-gray-200'    },
+// Piste « follow d'abord » (Instagram uniquement) : DM seulement après follow back.
+const COLUMNS_FOLLOW: typeof COLUMNS = [
+  { id: 'to_follow' as LeadStatus,        label: 'À follow',        topColor: 'border-t-sky-300',     hoverBg: 'bg-sky-50/60',     ringColor: 'ring-sky-200'     },
+  { id: 'followed' as LeadStatus,         label: 'Follow envoyé',   topColor: 'border-t-sky-500',     hoverBg: 'bg-sky-50/60',     ringColor: 'ring-sky-300'     },
+  { id: 'followed_back' as LeadStatus,    label: 'Follow back',     topColor: 'border-t-teal-500',    hoverBg: 'bg-teal-50/60',    ringColor: 'ring-teal-300'    },
+];
+
+const COLUMNS_DM: typeof COLUMNS = [
+  { id: 'lead' as LeadStatus,            label: 'Lead',            topColor: 'border-t-gray-300',    hoverBg: 'bg-gray-50/60',    ringColor: 'ring-gray-200'    },
+  { id: 'not_qualified' as LeadStatus,    label: 'Non qualifié',    topColor: 'border-t-stone-500',   hoverBg: 'bg-stone-100/60',  ringColor: 'ring-stone-300'   },
   { id: 'm1' as LeadStatus,               label: 'M1 envoyé',       topColor: 'border-t-blue-300',    hoverBg: 'bg-blue-50/60',    ringColor: 'ring-blue-200'    },
   { id: 'r1' as LeadStatus,               label: 'R1',              topColor: 'border-t-indigo-400',  hoverBg: 'bg-indigo-50/60',  ringColor: 'ring-indigo-300'  },
   { id: 'r2' as LeadStatus,               label: 'R2',              topColor: 'border-t-violet-400',  hoverBg: 'bg-violet-50/60',  ringColor: 'ring-violet-300'  },
@@ -200,10 +269,11 @@ const COLUMNS_INSTAGRAM: typeof COLUMNS = [
   { id: 'rdv' as LeadStatus,              label: 'RDV',             topColor: 'border-t-green-500',   hoverBg: 'bg-green-50/60',   ringColor: 'ring-green-400'   },
 ];
 
-const COLUMNS_FACEBOOK = COLUMNS_INSTAGRAM;
+const COLUMNS_INSTAGRAM = [...COLUMNS_FOLLOW, ...COLUMNS_DM];
+const COLUMNS_FACEBOOK  = COLUMNS_DM;
 
 /* ── Board ────────────────────────────────────────────────────────── */
-interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook'; variant?: 'qualiopi' }
+interface PipelineBoardProps { source?: 'instagram' | 'cold_call' | 'facebook' | 'sea_ads'; variant?: 'qualiopi' }
 
 export default function PipelineBoard(props: PipelineBoardProps = {}) {
   // useSearchParams (filtre setter dans l'URL) impose une frontière Suspense
@@ -247,8 +317,22 @@ function Board({ source, variant }: PipelineBoardProps) {
   const queryKey = ['leads-pipeline', source, variant, setterId];
   const [activeLead, setActiveLead] = useState<BoardLead | null>(null);
   const [optimistic, setOptimistic] = useState<Record<string, LeadStatus>>({});
+  const followClick = useFollowClick();
 
-  // Qualiopi suit le funnel cold call (mêmes statuts).
+  // Tri par colonne, mémorisé par pipeline dans le navigateur
+  const sortStorageKey = `pf_pipeline_sort:${variant ?? source ?? 'all'}`;
+  const [colSort, setColSort] = useState<Record<string, ColSort>>({});
+  useEffect(() => {
+    try { setColSort(JSON.parse(localStorage.getItem(sortStorageKey) ?? '{}')); } catch { setColSort({}); }
+  }, [sortStorageKey]);
+  const changeColSort = (colId: string, mode: ColSort) =>
+    setColSort((prev) => {
+      const next = { ...prev, [colId]: mode };
+      try { localStorage.setItem(sortStorageKey, JSON.stringify(next)); } catch { /* stockage indisponible */ }
+      return next;
+    });
+
+  // Qualiopi et SEA/ADS suivent le funnel cold call (mêmes statuts).
   const columns = isQualiopi ? COLUMNS
     : source === 'instagram' ? COLUMNS_INSTAGRAM
     : source === 'facebook' ? COLUMNS_FACEBOOK
@@ -267,11 +351,23 @@ function Board({ source, variant }: PipelineBoardProps) {
       ...(source && !isQualiopi ? { source } : {}),
       ...(setterId ? { setter_id: setterId } : {}),
     }).then((r: any) => r.data.data as BoardLead[]),
+    // Toujours re-lire le serveur en (re)arrivant sur la page : le staleTime
+    // global (60 s) resservait un cache d'avant le dernier drag → les cartes
+    // semblaient revenues en arrière après un aller-retour rapide.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const mutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<BoardLead> }) =>
       (api as any).update(id, updates).then((r: any) => r.data),
+    // Une micro-coupure réseau ne doit pas perdre un déplacement : on renvoie
+    // la requête jusqu'à 3 fois. networkMode 'always' = tenter tout de suite
+    // même si le navigateur se croit hors-ligne (sinon la mutation reste en
+    // pause et se perd si on quitte la page).
+    retry: 2,
+    retryDelay: (attempt) => 500 * 2 ** attempt,
+    networkMode: 'always',
     onSuccess: (_, { id, updates }) => {
       qc.setQueryData<BoardLead[]>(queryKey, (old) =>
         old?.map((l) => (l.id === id ? { ...l, ...updates } : l)) ?? old
@@ -279,6 +375,12 @@ function Board({ source, variant }: PipelineBoardProps) {
       setOptimistic((p) => { const n = { ...p }; delete n[id]; return n; });
       qc.invalidateQueries({ queryKey: ['leads'] });
       qc.invalidateQueries({ queryKey: ['qualiopi-leads'] });
+      // Invalide aussi les listes par pôle (leads-cold-call, leads-instagram,
+      // leads-facebook, leads-cc-counts…) : leur clé ne commence pas par
+      // ['leads'] et elles resservaient 60 s de cache périmé après un drag.
+      qc.invalidateQueries({
+        predicate: (q) => typeof q.queryKey[0] === 'string' && (q.queryKey[0] as string).startsWith('leads-'),
+      });
       // Le déplacement modifie l'activité agrégée → rafraîchir les dashboards.
       qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
       qc.invalidateQueries({ queryKey: ['leaderboard'] });
@@ -304,8 +406,23 @@ function Board({ source, variant }: PipelineBoardProps) {
   const leads: BoardLead[] = rawLeads
     .filter((l) => !niche || leadNiche(l) === niche)
     .filter((l) => !region || leadRegion(l) === region)
-    .map((l) => (optimistic[l.id] ? { ...l, status: optimistic[l.id] } : l));
-  const getColumn = (s: LeadStatus) => leads.filter((l) => l.status === s);
+    .map((l) => (optimistic[l.id]
+      // Timestamp optimiste : la carte déposée remonte en haut de sa colonne
+      // sans attendre la réponse serveur.
+      ? { ...l, status: optimistic[l.id], status_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+      : l));
+  // Dans chaque colonne, le lead entré le plus récemment apparaît en haut
+  // (status_changed_at maintenu par trigger SQL ; fallback updated_at/created_at).
+  const statusTime = (l: BoardLead) =>
+    new Date(l.status_changed_at ?? l.updated_at ?? l.created_at).getTime();
+  const updatedTime = (l: BoardLead) => new Date(l.updated_at ?? l.created_at).getTime();
+  const getColumn = (s: LeadStatus) => {
+    const mode = colSort[s] ?? 'entered';
+    const cards = leads.filter((l) => l.status === s);
+    if (mode === 'updated_asc')  return cards.sort((a, b) => updatedTime(a) - updatedTime(b));
+    if (mode === 'updated_desc') return cards.sort((a, b) => updatedTime(b) - updatedTime(a));
+    return cards.sort((a, b) => statusTime(b) - statusTime(a));
+  };
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveLead(active.data.current?.lead ?? null);
@@ -320,8 +437,18 @@ function Board({ source, variant }: PipelineBoardProps) {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === newStatus) return;
 
-    const updates: Partial<BoardLead> = { status: newStatus };
-    if (source === 'cold_call' || isQualiopi) {
+    // « À follow » → « Follow envoyé » = un follow : il passe par la route qui
+    // applique le quota quotidien et le rattache au compte d'envoi.
+    if (lead.status === 'to_follow' && newStatus === 'followed') {
+      followClick(lead);
+      return;
+    }
+
+    // status_changed_at est posé par le trigger SQL côté serveur ; on le met
+    // aussi dans updates pour que le cache local (merge onSuccess) garde la
+    // carte en haut de colonne sans refetch. La route PUT ignore ce champ.
+    const updates: Partial<BoardLead> = { status: newStatus, status_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    if (source === 'cold_call' || source === 'sea_ads' || isQualiopi) {
       // Sortir un lead de « En cours » vers un autre statut signifie forcément
       // qu'on l'a appelé → on coche « Appelé » automatiquement.
       if (lead.status === 'in_progress' && !lead.called) updates.called = true;
@@ -338,6 +465,8 @@ function Board({ source, variant }: PipelineBoardProps) {
 
   return (
     <div className="space-y-4">
+      {(source === 'instagram' || source === 'facebook') && <DmAccountBar />}
+
       {/* Filtres : setter (admin) + activité */}
       {((isAdmin && setters) || nicheOptions.length > 0 || regionOptions.length > 0) && (
         <div className="flex flex-wrap items-center gap-3">
@@ -399,6 +528,8 @@ function Board({ source, variant }: PipelineBoardProps) {
             isTargeted={activeLead !== null && activeLead.status !== col.id}
             detailBase={detailBase}
             isQualiopi={isQualiopi}
+            sort={colSort[col.id] ?? 'entered'}
+            onSortChange={(mode) => changeColSort(col.id, mode)}
           />
         ))}
       </div>

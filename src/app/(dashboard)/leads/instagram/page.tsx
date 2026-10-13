@@ -14,7 +14,9 @@ import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 import LeadForm from '@/components/leads/LeadForm';
 import DuplicatesBanner from '@/components/leads/DuplicatesBanner';
+import FollowersImport from '@/components/leads/FollowersImport';
 import { formatDate } from '@/lib/utils';
+import { DmAccountBar, DmAccountTag, CopyM1Button, FollowBackButtons, useIgHandle } from '@/components/leads/DmAccount';
 import type { Lead, LeadsFilters, LeadStatus } from '@/types';
 
 const NICHE_OPTIONS = [
@@ -23,9 +25,11 @@ const NICHE_OPTIONS = [
 ];
 
 const IG_STATUS_LABELS: Record<string, string> = {
+  to_follow: 'À follow', followed: 'Follow envoyé', followed_back: 'Follow back',
   lead: 'Lead', m1: 'M1 envoyé', r1: 'R1', r2: 'R2',
   reponse: 'Réponse', a_relancer: 'À relancer',
   audit_a_envoyer: 'Audit à envoyer', audit_envoye: 'Audit envoyé', rdv: 'RDV',
+  not_qualified: 'Non qualifié',
 };
 
 const RDV_OUTCOME_LABELS: Record<string, string> = {
@@ -40,7 +44,11 @@ const RDV_OUTCOME_COLORS: Record<string, string> = {
 
 const IG_TABS = [
   { label: 'Tous',           value: '' },
+  { label: 'À follow',       value: 'to_follow' },
+  { label: 'Follow envoyé',  value: 'followed' },
+  { label: 'Follow back',    value: 'followed_back' },
   { label: 'Lead',           value: 'lead' },
+  { label: 'Non qualifié',   value: 'not_qualified' },
   { label: 'M1 envoyé',      value: 'm1' },
   { label: 'R1',             value: 'r1' },
   { label: 'R2',             value: 'r2' },
@@ -82,6 +90,7 @@ function OpenRateBar({ openCount, totalCount }: { openCount: number; totalCount:
 export default function InstagramLeadsPage() {
   const router  = useRouter();
   const qc      = useQueryClient();
+  const igHandle = useIgHandle();
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
@@ -288,6 +297,8 @@ export default function InstagramLeadsPage() {
         </form>
       </div>
 
+      <DmAccountBar />
+
       {/* Tabs */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -373,6 +384,17 @@ export default function InstagramLeadsPage() {
           <option value="false">Non ouvert</option>
         </select>
 
+        <select className="select w-auto text-sm"
+          value={`${filters.sort ?? 'created_at'}:${filters.order ?? 'desc'}`}
+          onChange={(e) => {
+            const [sort, order] = e.target.value.split(':');
+            setFilters((f) => ({ ...f, sort, order: order as 'asc' | 'desc', page: 1 }));
+          }}>
+          <option value="created_at:desc">Tri : création (récent → ancien)</option>
+          <option value="updated_at:desc">Tri : mise à jour (récent → ancien)</option>
+          <option value="updated_at:asc">Tri : mise à jour (ancien → récent)</option>
+        </select>
+
         {isAdmin && setters && (
           <select
             className="select w-auto text-sm"
@@ -397,6 +419,12 @@ export default function InstagramLeadsPage() {
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
+          {isAdmin && (
+            <FollowersImport onDone={() => {
+              qc.invalidateQueries({ queryKey: ['leads-instagram'] });
+              qc.invalidateQueries({ queryKey: ['leads-instagram-counts'] });
+            }} />
+          )}
           <button onClick={() => setCreateOpen(true)} className="btn-primary btn-sm">
             <Plus className="w-3.5 h-3.5" />
             Nouveau lead
@@ -468,9 +496,10 @@ export default function InstagramLeadsPage() {
                   <th className="th">Ouvert ?</th>
                   <th className="th hidden sm:table-cell">Score</th>
                   <th className="th">Statut</th>
+                  {activeTab === 'followed' && <th className="th">Follow back ?</th>}
                   {activeTab === 'rdv' && <th className="th">Résultat RDV</th>}
                   {isAdmin && <th className="th hidden xl:table-cell">Setter</th>}
-                  <th className="th hidden md:table-cell">Créé le</th>
+                  <th className="th hidden md:table-cell">{filters.sort === 'updated_at' ? 'Mis à jour' : 'Créé le'}</th>
                   <th className="th w-16">Actions</th>
                 </tr>
               </thead>
@@ -486,9 +515,18 @@ export default function InstagramLeadsPage() {
                       <div className="flex items-center gap-2">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-gray-900 text-sm">
-                              {lead.instagram_username ? `@${lead.instagram_username}` : `${lead.first_name} ${lead.last_name}`}
-                            </p>
+                            {lead.instagram_username ? (
+                              <a href={igHandle(lead).href} target="_blank" rel="noopener noreferrer"
+                                onClick={igHandle(lead).onClick}
+                                className="font-medium text-gray-900 text-sm hover:text-pink-600 hover:underline"
+                                title={igHandle(lead).title}>
+                                @{lead.instagram_username}
+                              </a>
+                            ) : null}
+                            {lead.instagram_username && <CopyM1Button lead={lead} />}
+                            {lead.instagram_username ? null : (
+                              <p className="font-medium text-gray-900 text-sm">{lead.first_name} {lead.last_name}</p>
+                            )}
                             {lead.instagram_url && (
                               <a href={lead.instagram_url} target="_blank" rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
@@ -501,6 +539,7 @@ export default function InstagramLeadsPage() {
                           {lead.company && lead.instagram_username && (
                             <p className="text-xs text-gray-400">{lead.company}</p>
                           )}
+                          <DmAccountTag accountId={lead.last_dm_account_id} />
                         </div>
                       </div>
                     </td>
@@ -547,6 +586,13 @@ export default function InstagramLeadsPage() {
                       </span>
                     </td>
 
+                    {/* Follow back ? (onglet Follow envoyé) — vérification matinale du VA */}
+                    {activeTab === 'followed' && (
+                      <td className="td" onClick={(e) => e.stopPropagation()}>
+                        <FollowBackButtons lead={lead} />
+                      </td>
+                    )}
+
                     {/* Résultat RDV (tab rdv only) */}
                     {activeTab === 'rdv' && (
                       <td className="td" onClick={(e) => e.stopPropagation()}>
@@ -573,7 +619,7 @@ export default function InstagramLeadsPage() {
 
                     {/* Date */}
                     <td className="td hidden md:table-cell text-gray-500 text-xs" onClick={() => router.push(`/leads/${lead.id}`)}>
-                      {formatDate(lead.created_at)}
+                      {formatDate(filters.sort === 'updated_at' ? lead.updated_at : lead.created_at)}
                     </td>
 
                     {/* Actions */}

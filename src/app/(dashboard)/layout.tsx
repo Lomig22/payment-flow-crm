@@ -4,12 +4,15 @@ import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import ShiftGuard from '@/components/shift/ShiftGuard';
+import PostingAlarm from '@/components/layout/PostingAlarm';
 import { useAuthStore } from '@/store/authStore';
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard':           'Dashboard',
   '/leads':               'Tous les leads',
   '/leads/instagram':     '📸 Leads Instagram',
+  '/instagram/contenu':   '🎬 Contenu Instagram',
+  '/instagram/publication': '📅 Publication Instagram',
   '/leads/facebook':      '💬 Leads Facebook',
   '/leads/cold-call':     '📞 Leads Cold Call',
   '/pipeline':            'Pipeline global',
@@ -72,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      <PostingAlarm />
     </div>
   );
 }

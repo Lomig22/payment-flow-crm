@@ -24,7 +24,7 @@ const schema = z.object({
   appointment_taken:  z.boolean().default(false),
   appointment_honored:z.boolean().default(false),
   quote_sent:         z.boolean().default(false),
-  status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2']).default('in_progress'),
+  status:             z.enum(['lost', 'in_progress', 'client', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2', 'not_qualified']).default('in_progress'),
   notes:              z.string().optional(),
 });
 
@@ -142,6 +142,7 @@ export default function QualiopiLeadForm({ lead, onSuccess, onCancel }: Qualiopi
             <option value="appointment">RDV pris</option>
             <option value="r2">R2 pris</option>
             <option value="client">Client</option>
+            <option value="not_qualified">Non qualifié</option>
             <option value="lost">Perdu</option>
           </select>
         </F>

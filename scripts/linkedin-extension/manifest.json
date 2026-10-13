@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Payment Flow — LinkedIn",
+  "version": "1.0.0",
+  "description": "Séquence LinkedIn du CRM Payment Flow : invitation, détection de l'acceptation, DM automatique.",
+  "permissions": ["alarms", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://payment-flow-crm-delta.vercel.app/*",
+    "http://localhost:3000/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Payment Flow — LinkedIn" },
+  "options_page": "popup.html"
+}

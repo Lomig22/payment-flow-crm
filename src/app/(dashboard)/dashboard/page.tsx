@@ -29,6 +29,7 @@ const COLD_CALL_FUNNEL_STEPS: { key: string; label: string }[] = [
   { key: 'appointment',    label: 'RDV pris'     },
   { key: 'r2',             label: 'R2 pris'      },
   { key: 'client',         label: 'Client'       },
+  { key: 'not_qualified',  label: 'Non qualifié' },
   { key: 'lost',           label: 'Perdu'        },
 ];
 

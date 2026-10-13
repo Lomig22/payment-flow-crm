@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized, forbidden, badRequest } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 
-const VALID_SOURCES = ['instagram', 'facebook', 'cold_call'];
+const VALID_SOURCES = ['instagram', 'facebook', 'cold_call', 'sea_ads'];
 
 export async function PATCH(request: NextRequest) {
   const user = await getAuthUser(request);

@@ -1,0 +1,13 @@
+{
+  "name": "linkedin-worker",
+  "private": true,
+  "type": "module",
+  "description": "Exécute la séquence LinkedIn du CRM Payment Flow sur un serveur (Playwright + Chromium).",
+  "scripts": {
+    "login": "node login.mjs",
+    "start": "node worker.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

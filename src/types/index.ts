@@ -1,12 +1,13 @@
 export type UserRole    = 'admin' | 'setter';
 export type LeadQuality = 'hot' | 'warm' | 'cold';
 // Cold call funnel
-export type ColdCallStatus = 'in_progress' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2' | 'client' | 'lost';
+export type ColdCallStatus = 'in_progress' | 'to_follow_up' | 'to_follow_up_2' | 'appointment' | 'r2' | 'client' | 'not_qualified' | 'lost';
 // Instagram funnel (DM)
-export type InstagramStatus = 'lead' | 'm1' | 'r1' | 'r2' | 'reponse' | 'a_relancer' | 'audit_a_envoyer' | 'audit_envoye' | 'rdv';
+export type InstagramStatus = 'to_follow' | 'followed' | 'followed_back' | 'lead' | 'm1' | 'r1' | 'r2' | 'reponse' | 'a_relancer' | 'audit_a_envoyer' | 'audit_envoye' | 'rdv';
 export type LeadStatus = ColdCallStatus | InstagramStatus;
 export type ActionType  = 'to_call' | 'callback' | 'follow_up' | 'negotiation' | 'no_action';
-export type LeadSource  = 'instagram' | 'facebook' | 'cold_call';
+// sea_ads = sous-section SEA/ADS du pôle Cold Call (même funnel que cold_call)
+export type LeadSource  = 'instagram' | 'facebook' | 'cold_call' | 'sea_ads' | 'linkedin';
 
 export interface User {
   id:                   string;
@@ -40,6 +41,9 @@ export interface LeadHistory {
   created_at:    string;
 }
 
+export type LinkedinStatus = 'to_invite' | 'invited' | 'expired' | 'connected' | 'to_validate' | 'ready'
+  | 'first_sent' | 'r1_sent' | 'r2_sent' | 'r3_sent' | 'no_reply' | 'to_resume' | 'dnc' | 'failed';
+
 export interface Lead {
   id:                  string;
   first_name:          string;
@@ -61,6 +65,30 @@ export interface Lead {
   r3_planned:          boolean;
   status:              LeadStatus;
   source?:             LeadSource | null;
+  origin?:             'outbound' | 'inbound' | null;
+  inbound_channel?:    'comment_keyword' | 'dm_inbound' | 'story_reply' | 'link_bio' | 'other' | null;
+  origin_content_id?:  string | null;   // contenu Instagram qui a amené le lead
+  // Séquence LinkedIn (sprint42) : invitation → acceptation → DM à J+1
+  linkedin_url?:       string | null;
+  li_status?:          LinkedinStatus | null;
+  li_enqueued_at?:     string | null;
+  li_invited_at?:      string | null;
+  li_connected_at?:    string | null;
+  li_dm_due_at?:       string | null;
+  li_dm_sent_at?:      string | null;
+  li_followup_due_at?: string | null;
+  li_followup_sent_at?: string | null;
+  li_error?:           string | null;
+  // Séquence LinkedIn v2 (sprint44)
+  job_title?:          string | null;
+  siren?:              string | null;
+  website?:            string | null;
+  li_sector?:          string | null;
+  li_variant?:         string | null;
+  li_question?:        string | null;
+  li_reply_text?:      string | null;
+  li_thread_url?:      string | null;
+  do_not_contact?:     boolean;
   notes?:              string;
   rating?:             number;   // note Google My Business (/5)
   reviews?:            number;   // nombre d'avis Google My Business
@@ -68,6 +96,7 @@ export interface Lead {
   history?:            LeadHistory[];
   created_at:          string;
   updated_at:          string;
+  status_changed_at?:  string;  // dernier changement de statut (tri pipeline)
   // Instagram/Facebook-specific
   instagram_username?: string;
   instagram_url?:      string;
@@ -76,7 +105,14 @@ export interface Lead {
   region?:             string;
   bio?:                string;
   followers_count?:    number;
+  posts_count?:        number | null;   // publications Instagram (null = inconnu)
+  is_private?:         boolean | null;  // compte privé
   ig_score?:           number;
+  last_dm_account_id?: string | null;  // compte Instagram du dernier DM ouvert depuis le CRM
+  ig_outreach?:        'dm' | 'follow';  // piste Instagram : DM à froid ou follow d'abord
+  followed_at?:        string | null;
+  followed_back_at?:   string | null;
+  follow_back_checked_at?: string | null;  // dernière vérification « follow back ? » (réponse Non)
   // RDV outcome (Sprint 3)
   rdv_outcome?:        'present' | 'vendu' | 'no_show' | 'pas_qualifie';
   // Mail-passerelle Opération Show-Up (Sprint 14)
@@ -118,6 +154,7 @@ export interface QualiopiLead {
   history?:            LeadHistory[];
   created_at:          string;
   updated_at:          string;
+  status_changed_at?:  string;  // dernier changement de statut (tri pipeline)
 }
 
 export interface QualiopiLeadsFilters {
@@ -225,6 +262,16 @@ export interface UserPerformance {
   instagram: InstagramPerformance;
 }
 
+// Vision funnel Instagram (get_instagram_funnel_stats) — compteurs cumulés « a atteint l'étape »
+export interface InstagramFunnelStats {
+  stock: Record<string, number>;   // leads par statut actuel (to_follow, followed, followed_back, lead, m1…)
+  funnel_follow: { imported: number; followed: number; followed_back: number; dm_sent: number; opened: number; replied: number; rdv: number };
+  funnel_dm:     { leads: number; dm_sent: number; opened: number; replied: number; rdv: number };
+  by_account: Array<{ account_id: string; username: string; dm_sent: number; opened: number; replied: number; follows: number; follow_backs: number }>;
+  last7: { follows: number; follow_backs: number; dm_sent: number; replied: number };
+  timeline: Array<{ date: string; follows: number; follow_backs: number; dm_cold: number; dm_follow: number }>;
+}
+
 export interface InstagramDashboardStats {
   overview: {
     total_leads:         number;
@@ -253,6 +300,10 @@ export interface InstagramDashboardStats {
       reponse:       number;
       audit_envoye:  number;
       rdv:           number;
+      follows?:      number;   // follows envoyés (journal d'envoi)
+      dms?:          number;   // DM envoyés (M1, R1, R2)
+      follow_backs?: number;   // follow backs obtenus
+      actions?:      number;   // actions totales sur les leads (historique)
     }>;
   }>;
   timeline: Array<{
@@ -265,6 +316,7 @@ export interface InstagramDashboardStats {
     audit_envoye:   number;
     rdv:            number;
   }>;
+  funnel?: InstagramFunnelStats | null;
 }
 
 export interface ConversationMember {

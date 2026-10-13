@@ -85,7 +85,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   if (Object.keys(updates).length > 0) {
-    await supabase.from('qualiopi_leads').update(updates).eq('id', params.id);
+    // Un échec d'UPDATE doit remonter en erreur : sinon le client croit la
+    // sauvegarde réussie (carte déplacée) alors que la base n'a pas bougé.
+    const { error: updErr } = await supabase.from('qualiopi_leads').update(updates).eq('id', params.id);
+    if (updErr) return NextResponse.json({ message: 'Sauvegarde échouée, réessayez' }, { status: 500 });
     if (historyRows.length > 0) await supabase.from('qualiopi_lead_history').insert(historyRows);
   }
 

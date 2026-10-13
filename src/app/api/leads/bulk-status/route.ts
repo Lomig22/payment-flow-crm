@@ -6,6 +6,7 @@ const IG_STATUS_DATE: Record<string, string> = {
   m1: 'm1_date', r1: 'r1_date', r2: 'r2_date',
   reponse: 'reponse_date', a_relancer: 'a_relancer_date',
   audit_a_envoyer: 'audit_date', audit_envoye: 'audit_date', rdv: 'rdv_date',
+    followed: 'followed_at', followed_back: 'followed_back_at',
 };
 
 export async function PATCH(request: NextRequest) {

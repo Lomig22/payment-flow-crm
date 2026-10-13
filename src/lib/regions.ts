@@ -25,7 +25,7 @@ for (const [ville, region] of Object.entries(CITY_REGION as Record<string, strin
 
 // Département (2 premiers chiffres du code postal) → région. Fallback quand la
 // ville n'est pas dans le mapping mais que l'adresse porte un code postal.
-const DEPT_REGION: Record<string, string> = {
+export const DEPT_REGION: Record<string, string> = {
   '01': 'Auvergne-Rhône-Alpes', '03': 'Auvergne-Rhône-Alpes', '07': 'Auvergne-Rhône-Alpes',
   '15': 'Auvergne-Rhône-Alpes', '26': 'Auvergne-Rhône-Alpes', '38': 'Auvergne-Rhône-Alpes',
   '42': 'Auvergne-Rhône-Alpes', '43': 'Auvergne-Rhône-Alpes', '63': 'Auvergne-Rhône-Alpes',

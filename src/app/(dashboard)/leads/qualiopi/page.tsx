@@ -16,7 +16,7 @@ import { formatDate } from '@/lib/utils';
 import type { QualiopiLead, QualiopiLeadsFilters, QualiopiStatus, LeadQuality } from '@/types';
 
 const Q_STATUS_LABELS: Record<string, string> = {
-  in_progress: 'En cours', to_follow_up: 'À relancer', to_follow_up_2: 'À relancer 2',
+  in_progress: 'En cours', to_follow_up: 'À relancer', to_follow_up_2: 'À relancer 2', not_qualified: 'Non qualifié',
   appointment: 'RDV pris', r2: 'R2 pris', client: 'Client', lost: 'Perdu',
 };
 
@@ -28,6 +28,7 @@ const Q_TABS = [
   { label: 'RDV pris',      value: 'appointment' },
   { label: 'R2 pris',       value: 'r2' },
   { label: 'Client',        value: 'client' },
+  { label: 'Non qualifié',  value: 'not_qualified' },
   { label: 'Perdu',         value: 'lost' },
 ];
 
@@ -194,6 +195,17 @@ export default function QualiopiLeadsPage() {
           <option value="cold">Froid</option>
         </select>
 
+        <select className="select w-auto text-sm"
+          value={`${filters.sort ?? 'created_at'}:${filters.order ?? 'desc'}`}
+          onChange={(e) => {
+            const [sort, order] = e.target.value.split(':');
+            setFilters((f) => ({ ...f, sort, order: order as 'asc' | 'desc', page: 1 }));
+          }}>
+          <option value="created_at:desc">Tri : création (récent → ancien)</option>
+          <option value="updated_at:desc">Tri : mise à jour (récent → ancien)</option>
+          <option value="updated_at:asc">Tri : mise à jour (ancien → récent)</option>
+        </select>
+
         {isAdmin && setters && (
           <select className="select w-auto text-sm" value={filters.setter_id ?? ''}
             onChange={(e) => setFilters((f) => ({ ...f, setter_id: e.target.value || undefined, page: 1 }))}>
@@ -276,7 +288,7 @@ export default function QualiopiLeadsPage() {
                   <th className="th">Qualité</th>
                   <th className="th">Statut</th>
                   {isAdmin && <th className="th hidden xl:table-cell">Setter</th>}
-                  <th className="th hidden md:table-cell">Créé le</th>
+                  <th className="th hidden md:table-cell">{filters.sort === 'updated_at' ? 'Mis à jour' : 'Créé le'}</th>
                   <th className="th w-16">Actions</th>
                 </tr>
               </thead>
@@ -320,7 +332,7 @@ export default function QualiopiLeadsPage() {
                         {lead.setter ? `${lead.setter.first_name} ${lead.setter.last_name}` : <span className="text-gray-300">—</span>}
                       </td>
                     )}
-                    <td className="td hidden md:table-cell text-gray-500 text-xs">{formatDate(lead.created_at)}</td>
+                    <td className="td hidden md:table-cell text-gray-500 text-xs">{formatDate(filters.sort === 'updated_at' ? lead.updated_at : lead.created_at)}</td>
                     <td className="td" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button onClick={() => router.push(`/qualiopi/${lead.id}`)}

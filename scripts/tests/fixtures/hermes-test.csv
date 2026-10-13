@@ -1,0 +1,14 @@
+prenom,nom,entreprise,poste,secteur,ville,departement,site_web,linkedin,siren,source,date_sourcing
+Testa,Alpha,ZZTEST Menuiserie Alpha,Gérant,menuiserie,Vannes,56,www.zztest-alpha.fr,https://www.linkedin.com/in/zztest-pf-alpha/,111111118,hermes,2026-10-12
+Testb,Bravo,ZZTEST Autre,Gérant,menuiserie,Rennes,35,,https://fr.linkedin.com/in/zztest-pf-alpha?trk=x,,hermes,2026-10-12
+Testc,Charlie,ZZTEST Menuiserie Alpha SARL,Associé,menuiserie,Vannes,56,,https://www.linkedin.com/in/zztest-pf-charlie/,,hermes,2026-10-12
+Testd,Delta,ZZTEST Delta Piscines,Président,piscine_paysage,Nantes,44,,https://www.linkedin.com/in/zztest-pf-delta/,111 111 118,hermes,2026-10-12
+Teste,Echo,ZZTEST Echo,Gérant,cuisiniste,Lyon,69,,https://www.linkedin.com/company/zztest-echo/,,hermes,2026-10-12
+,Foxtrot,ZZTEST Foxtrot,Gérant,cuisiniste,Lyon,69,,https://www.linkedin.com/in/zztest-pf-foxtrot/,,hermes,2026-10-12
+Testg,Golf,,Gérant,cuisiniste,Lyon,69,,https://www.linkedin.com/in/zztest-pf-golf/,,hermes,2026-10-12
+Testh,Hotel,ZZTEST Hotel,Gérant,cuisiniste,Lyon,69,,,,hermes,2026-10-12
+Céline,Meyniel,Cuisin'Vraie,Gérant,cuisiniste,Saint-Flour,15,,https://www.linkedin.com/in/cuisinvraie/,,hermes,2026-10-12
+Testj,Juliett,ZZTEST Juliett Immo,Fondatrice,immobilier,Brest,29,,https://www.linkedin.com/in/zztest-pf-juliett/,,hermes,2026-10-12
+Testk,Kilo,ZZTEST Kilo Rénovation,Dirigeant,renovation_energetique,Quimper,29,,https://www.linkedin.com/in/zztest-pf-kilo/,12345,hermes,2026-10-12
+Testl,Lima,ZZTEST Lima,Gérant,agence_immo,Lorient,56,,https://www.linkedin.com/in/zztest-pf-lima,,hermes,2026-10-12
+Testm,Mike,ZZTEST Mike,Gérant,menuiserie,Auray,56,,linkedin.com/in/zztest-pf-mike,,hermes,2026-10-12

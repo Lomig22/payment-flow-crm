@@ -59,9 +59,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const allowed = ['first_name','last_name','company','phone','email','location','called',
     'action_in_progress','lead_quality','need_identified','appointment_taken','appointment_honored',
     'quote_sent','r2_planned','r3_planned','status','source','notes',
+    'origin','inbound_channel','origin_content_id','linkedin_url',
     // Instagram/Facebook
     'instagram_username','instagram_url','a_ouvert','niche','bio','followers_count','ig_score',
-    'rdv_outcome'];
+    'rdv_outcome', 'ig_outreach', 'follow_back_checked_at', 'posts_count', 'is_private'];
   if (user.role === 'admin') allowed.push('setter_id');
 
   // Date automatique pour le funnel Instagram
@@ -69,12 +70,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     m1: 'm1_date', r1: 'r1_date', r2: 'r2_date',
     reponse: 'reponse_date', a_relancer: 'a_relancer_date',
     audit_a_envoyer: 'audit_date', audit_envoye: 'audit_date', rdv: 'rdv_date',
+    followed: 'followed_at', followed_back: 'followed_back_at',
   };
 
   const updates: Record<string, unknown> = {};
   const historyRows: Record<string, unknown>[] = [];
 
   for (const field of allowed) {
+    // Colonne absente en base (migration pas encore appliquée, ex. linkedin_url) : ignorée
+    if (!(field in current)) continue;
     if (body[field] !== undefined && String(body[field]) !== String(current[field])) {
       updates[field] = body[field];
       historyRows.push({
@@ -87,12 +91,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   // Cocher « RDV pris » fait apparaître le lead comme RDV dans le pipeline et les
   // dashboards (qui s'organisent par statut). On mappe vers le bon statut selon le
   // canal, sans jamais rétrograder un lead déjà plus avancé :
-  //   • cold call          → 'appointment' (colonne RDV pris)
-  //   • instagram/facebook → 'rdv'         (colonne RDV du funnel DM)
+  //   • cold call / SEA-ADS → 'appointment' (colonne RDV pris)
+  //   • instagram/facebook  → 'rdv'         (colonne RDV du funnel DM)
+  const isColdCallFunnel = current.source === 'cold_call' || current.source === 'sea_ads';
   const appointmentChecked = updates.appointment_taken === true || updates.appointment_taken === 'true';
   if (appointmentChecked) {
     const effectiveStatus = (updates.status as string) ?? current.status;
-    if (current.source === 'cold_call' && ['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
+    if (isColdCallFunnel && ['in_progress', 'to_follow_up', 'to_follow_up_2'].includes(effectiveStatus)) {
       updates.status = 'appointment';
       historyRows.push({
         lead_id: params.id, user_id: user.id, field_changed: 'status',
@@ -111,7 +116,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   // R2 pris. Cold call uniquement : le statut 'r2' existe aussi côté Instagram
   // mais y désigne la 2e relance DM — rien à voir, on n'y touche pas.
   const r2Checked = updates.r2_planned === true || updates.r2_planned === 'true';
-  if (r2Checked && current.source === 'cold_call') {
+  if (r2Checked && isColdCallFunnel) {
     const effectiveStatus = (updates.status as string) ?? current.status;
     if (['in_progress', 'to_follow_up', 'to_follow_up_2', 'appointment'].includes(effectiveStatus)) {
       updates.status = 'r2';
@@ -130,7 +135,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   if (Object.keys(updates).length > 0) {
-    await supabase.from('leads').update(updates).eq('id', params.id);
+    // Un échec d'UPDATE doit remonter en erreur : sinon le client croit la
+    // sauvegarde réussie (carte déplacée) alors que la base n'a pas bougé.
+    const { error: updErr } = await supabase.from('leads').update(updates).eq('id', params.id);
+    if (updErr) return NextResponse.json({ message: 'Sauvegarde échouée, réessayez' }, { status: 500 });
     if (historyRows.length > 0) await supabase.from('lead_history').insert(historyRows);
   }
 

@@ -4,10 +4,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Edit2, Phone, Mail, MapPin, Building,
-  CheckCircle, XCircle, Clock, History, Send,
+  CheckCircle, XCircle, Clock, History, Send, Linkedin, Ban, ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { leadsApi } from '@/lib/api';
+import { leadsApi, linkedinApi } from '@/lib/api';
+import { LI_STATUS_LABELS, SECTORS, QUESTION_LABELS, STAGE_LABELS, type Question } from '@/lib/linkedinLabels';
 import { useAuthStore } from '@/store/authStore';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
@@ -55,6 +56,16 @@ export default function LeadDetailPage() {
       toast.error(err.response?.data?.message ?? 'Échec de l\'envoi du mail'),
   });
 
+  // Ne plus contacter : le lead et son entreprise sortent définitivement de toute séquence
+  const dncMutation = useMutation({
+    mutationFn: () => linkedinApi.doNotContact(id),
+    onSuccess: (r) => {
+      toast.success(`Exclu définitivement (${r.data.excluded} lead(s) de l'entreprise)`);
+      qc.invalidateQueries({ queryKey: ['lead', id] });
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Erreur'),
+  });
+
   const openMailModal = () => {
     setMailEmail(lead?.email ?? '');
     setMailRdv('');
@@ -92,7 +103,7 @@ export default function LeadDetailPage() {
         <div className="ml-auto flex items-center gap-2">
           <Badge variant={lead.status} />
           {lead.lead_quality && <Badge variant={lead.lead_quality} />}
-          {lead.source === 'cold_call' && (
+          {(lead.source === 'cold_call' || lead.source === 'sea_ads') && (
             <button
               onClick={openMailModal}
               className="btn-sm flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
@@ -151,6 +162,48 @@ export default function LeadDetailPage() {
               )}
             </div>
           </div>
+
+          {/* LinkedIn : séquence d'outreach */}
+          {(lead.linkedin_url || lead.li_status || lead.do_not_contact) && (
+            <div className="card p-5 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Linkedin className="w-4 h-4 text-[#0a66c2]" />
+                <h3 className="text-sm font-semibold text-gray-900">LinkedIn</h3>
+                {lead.do_not_contact
+                  ? <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">Ne plus contacter</span>
+                  : lead.li_status && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{LI_STATUS_LABELS[lead.li_status]}</span>}
+                {lead.linkedin_url && (
+                  <a href={lead.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-[#0a66c2] hover:underline flex items-center gap-1">
+                    Profil <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                {isAdmin && !lead.do_not_contact && (
+                  <button className="ml-auto btn-secondary btn-sm text-red-600" disabled={dncMutation.isPending}
+                    onClick={() => window.confirm('Ne plus contacter ce lead ni son entreprise, définitivement ?') && dncMutation.mutate()}>
+                    <Ban className="w-3.5 h-3.5" /> Ne plus contacter
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {lead.job_title && <div><p className="text-xs text-gray-400">Poste</p><p>{lead.job_title}</p></div>}
+                {lead.li_sector && <div><p className="text-xs text-gray-400">Secteur</p><p>{SECTORS[lead.li_sector] ?? lead.li_sector}</p></div>}
+                {lead.siren && <div><p className="text-xs text-gray-400">SIREN</p><p>{lead.siren}</p></div>}
+                {lead.website && <div><p className="text-xs text-gray-400">Site</p><a className="text-primary-600 hover:underline break-all" href={/^https?:/.test(lead.website) ? lead.website : `https://${lead.website}`} target="_blank" rel="noreferrer">{lead.website}</a></div>}
+                {(lead.li_variant || lead.li_question) && (
+                  <div><p className="text-xs text-gray-400">Premier message</p><p>Variante {lead.li_variant ?? '—'} · {lead.li_question ? QUESTION_LABELS[lead.li_question as Question] : '—'}</p></div>
+                )}
+              </div>
+              {lead.li_reply_text && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-sm">
+                  <p className="text-xs text-emerald-700 mb-1">
+                    Réponse{(lead as any).li_replied_stage && ` après ${STAGE_LABELS[(lead as any).li_replied_stage]}`}
+                    {lead.li_thread_url && <> · <a href={lead.li_thread_url} target="_blank" rel="noreferrer" className="underline">ouvrir la conversation</a></>}
+                  </p>
+                  <p className="text-gray-800 whitespace-pre-wrap">{lead.li_reply_text}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Commercial tracking */}
           <div className="card p-5">

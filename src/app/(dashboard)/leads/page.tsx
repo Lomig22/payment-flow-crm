@@ -85,7 +85,7 @@ export default function LeadsPage() {
     mutationFn: ({ ids, source }: { ids: string[]; source: string }) =>
       leadsApi.bulkSource(ids, source),
     onSuccess: (_, { ids, source }) => {
-      const label = source === 'instagram' ? 'Instagram' : source === 'facebook' ? 'Facebook' : 'Cold Call';
+      const label = source === 'instagram' ? 'Instagram' : source === 'facebook' ? 'Facebook' : source === 'sea_ads' ? 'SEA/ADS' : 'Cold Call';
       toast.success(`${ids.length} lead${ids.length > 1 ? 's' : ''} → ${label}`);
       setSelected(new Set());
       setBulkSourceVal('');
@@ -178,6 +178,7 @@ export default function LeadsPage() {
           <option value="appointment">RDV pris</option>
           <option value="r2">R2 pris</option>
           <option value="client">Client</option>
+          <option value="not_qualified">Non qualifié</option>
           <option value="lost">Perdu</option>
         </select>
 
@@ -201,6 +202,7 @@ export default function LeadsPage() {
           <option value="instagram">📸 Instagram</option>
           <option value="facebook">💬 Facebook</option>
           <option value="cold_call">📞 Cold call</option>
+          <option value="sea_ads">🎯 SEA/ADS</option>
         </select>
 
         {isAdmin && setters && (
@@ -269,6 +271,7 @@ export default function LeadsPage() {
                 <option value="instagram">📸 Instagram</option>
                 <option value="facebook">💬 Facebook</option>
                 <option value="cold_call">📞 Cold Call</option>
+                <option value="sea_ads">🎯 SEA/ADS</option>
               </select>
               <button
                 onClick={() => bulkSourceMutation.mutate({ ids: Array.from(selected), source: bulkSourceVal })}

@@ -9,7 +9,7 @@ interface SetterItem   { name: string; Leads: number; Appelés: number; Relances
 interface SetterDailyItem { name: string; 'Leads': number; 'Appelés': number; 'Relances': number; 'Relances 2': number; 'RDV': number; 'Devis': number; 'Perdus': number; 'Clients': number; }
 interface QualityItem  { name: string; value: number; }
 interface StatusItem   { name: string; value: number; fill: string; }
-interface IgTimelineItem { date: string; m1: number; r1: number; r2: number; reponse: number; audit_envoye: number; rdv: number; }
+interface IgTimelineItem { date: string; m1: number; r1: number; r2: number; reponse: number; audit_envoye: number; rdv: number; follows?: number; follow_backs?: number; }
 interface IgSetterItem   { name: string; M1: number; R1: number; R2: number; 'Réponses': number; 'Audit envoyé': number; RDV: number; }
 interface FunnelItem     { name: string; value: number; }
 interface NicheItem      { name: string; value: number; }
@@ -108,6 +108,8 @@ export function InstagramTimelineChart({ data }: { data: IgTimelineItem[] }) {
         <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
         <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+        <Line type="monotone" dataKey="follows"      name="Follows"       stroke="#0ea5e9" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+        <Line type="monotone" dataKey="follow_backs" name="Follow backs"  stroke="#14b8a6" strokeWidth={2} dot={false} strokeDasharray="4 2" />
         <Line type="monotone" dataKey="m1"           name="M1"            stroke="#3b82f6" strokeWidth={2} dot={false} />
         <Line type="monotone" dataKey="r1"           name="R1"            stroke="#f97316" strokeWidth={2} dot={false} />
         <Line type="monotone" dataKey="r2"           name="R2"            stroke="#10b981" strokeWidth={2} dot={false} />
@@ -189,6 +191,23 @@ export function NicheBarChart({ data }: { data: NicheItem[] }) {
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <Bar dataKey="value" fill={NICHE_COLOR} radius={[0, 4, 4, 0]} />
       </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// Une seule mesure jour par jour (pas de légende : le titre de la carte la nomme)
+export function DailyMetricChart({ data, dataKey, name, color = '#6366f1' }: {
+  data: { date: string; [k: string]: string | number | null }[]; dataKey: string; name: string; color?: string;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+        <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} formatter={(v: number) => [v.toLocaleString('fr-FR'), name]} />
+        <Line type="monotone" dataKey={dataKey} name={name} stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls />
+      </LineChart>
     </ResponsiveContainer>
   );
 }

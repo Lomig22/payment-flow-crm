@@ -3,6 +3,7 @@ import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import { normalizePhone } from '@/lib/phone';
 import { regionForLocation } from '@/lib/regions';
+import { parseIgUsername } from '@/lib/instagram';
 import { parse } from 'csv-parse/sync';
 
 const COLUMN_MAP: Record<string, string> = {
@@ -31,7 +32,7 @@ const COLUMN_MAP: Record<string, string> = {
   latitude: '_ignore', longitude: '_ignore', source: '_ignore',
   // Exports Instagram (scrapers de comptes)
   'métier estimé': 'niche', 'metier estime': 'niche', 'métier': 'niche', metier: 'niche',
-  'url instagram': '_ig_url', followers: '_ignore', posts: '_ignore',
+  'url instagram': '_ig_url', followers: '_ig_followers', posts: '_ig_posts',
   // Google Maps scraper column IDs
   osrxxb: 'company',
   'rllt__details 3': 'phone',
@@ -66,10 +67,10 @@ const COLUMN_MAP: Record<string, string> = {
   source_hashtag: '_ig_hashtag',
   score: '_ig_score',
   business_category: '_ig_biz_cat',
-  followers_count: '_ignore',
+  followers_count: '_ig_followers',
   following_count: '_ignore',
   is_verified: '_ignore',
-  posts_count: '_ignore',
+  posts_count: '_ig_posts',
   scraped_at: '_ignore',
   'score_breakdown/0': '_ignore',
   'score_breakdown/1': '_ignore',
@@ -101,11 +102,20 @@ const COLUMN_MAP: Record<string, string> = {
   'ah5ghc 2': '_gmaps_extra',
   'ah5ghc 3': '_gmaps_extra',
   instagram_username: '_ig_username', // from our own "Instagram sourcing" export
+  // Listes de comptes à follow (exports divers : pseudo ou lien de profil)
+  instagram: '_ig_username', pseudo: '_ig_username', compte: '_ig_username', handle: '_ig_username',
+  'compte instagram': '_ig_username', 'pseudo instagram': '_ig_username', '@': '_ig_username',
+  'lien instagram': '_ig_url', 'profil instagram': '_ig_url', 'instagram url': '_ig_url',
+  url: '_link', lien: '_link', link: '_link', profil: '_link', profile: '_link',
+  // Données de profil → personnalisation du script DM (pas de compliment sans publication)
+  publications: '_ig_posts', nb_posts: '_ig_posts', 'nombre de publications': '_ig_posts', media_count: '_ig_posts',
+  abonnes: '_ig_followers', 'abonnés': '_ig_followers', nb_abonnes: '_ig_followers',
+  is_private: '_ig_private', private: '_ig_private', prive: '_ig_private', 'privé': '_ig_private', 'compte privé': '_ig_private',
 };
 
 const VALID_QUALITY = new Set(['hot', 'warm', 'cold']);
 const VALID_STATUS  = new Set([
-  'in_progress', 'client', 'lost', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
+  'in_progress', 'client', 'lost', 'not_qualified', 'to_follow', 'followed', 'followed_back', 'to_follow_up', 'to_follow_up_2', 'appointment', 'r2',
   'lead', 'm1', 'r1', 'reponse', 'a_relancer', 'audit_a_envoyer', 'audit_envoye', 'rdv',
 ]);
 const VALID_NICHES  = new Set(['Électricien','Plombier','Couvreur','Maçon','Menuisier','Peintre','Carreleur','Plaquiste','Climatisation','Multi-corps','Autre']);
@@ -134,6 +144,17 @@ function cleanPhone(raw: string): string {
     .trim();
 }
 
+// « 1 234 », « 1.234 », « 12,5k », « 3M » → nombre entier (null si illisible)
+function parseCount(raw: string): number | null {
+  const v = raw.trim().toLowerCase().replace(/\s/g, '');
+  const m = v.match(/^(\d+)(?:[.,](\d+))?([km])?$/);
+  if (!m) return null;
+  const [, int, dec, unit] = m;
+  if (!unit && dec && dec.length === 3) return parseInt(int + dec, 10);   // séparateur de milliers
+  const n = parseFloat(`${int}.${dec ?? '0'}`);
+  return Math.round(n * (unit === 'k' ? 1_000 : unit === 'm' ? 1_000_000 : 1));
+}
+
 // "Plus de 15 ans en activité · Bordeaux" → "Bordeaux"
 function extractLocation(desc: string): string {
   const parts = desc.replace(/Â·|·/g, '·').split('·');
@@ -151,13 +172,15 @@ export async function POST(request: NextRequest) {
   const setterIdParam  = formData.get('setter_id') as string | null;
   const setterIdsParam = formData.get('setter_ids') as string | null;
   const selectedSetterIds = setterIdsParam ? setterIdsParam.split(',').filter(Boolean) : [];
-  const VALID_SOURCE   = new Set(['instagram', 'facebook', 'cold_call']);
+  const VALID_SOURCE   = new Set(['instagram', 'facebook', 'cold_call', 'sea_ads']);
   const rawSource      = formData.get('source') as string | null;
   const leadSource     = rawSource && VALID_SOURCE.has(rawSource) ? rawSource : null;
   const rawNiche       = formData.get('niche') as string | null;
   const batchNiche     = rawNiche && VALID_NICHES.has(rawNiche) ? rawNiche : null;
   const dryRun         = (formData.get('dry_run') as string | null) === 'true';
   const skipDuplicates = (formData.get('skip_duplicates') as string | null) === 'true';
+  // Piste Instagram : 'dm' = DM à froid direct, 'follow' = follow d'abord (statut À follow)
+  const igOutreach     = leadSource === 'instagram' && formData.get('ig_outreach') === 'follow' ? 'follow' : 'dm';
 
   if (!file) return NextResponse.json({ message: 'Fichier requis' }, { status: 400 });
 
@@ -268,11 +291,31 @@ export async function POST(request: NextRequest) {
         const cats = v.trim();
         if (cats) extras.push(cats.replace(/\|/g, ', '));
       } else if (mapped === '_ig_bio') {
-        if (v) extras.push(v.trim().replace(/[\n\r]+/g, ' ').slice(0, 400));
+        if (v) {
+          const bio = v.trim().replace(/[\n\r]+/g, ' ').slice(0, 400);
+          extras.push(bio);
+          row._ig_bio = bio;
+        }
       } else if (mapped === '_ig_username') {
-        if (v) row._ig_username = v.trim();
+        const u = parseIgUsername(v);
+        if (u) row._ig_username = u;
       } else if (mapped === '_ig_url') {
-        if (v) { extras.push(`Instagram : ${v.trim()}`); row._ig_url = v.trim(); }
+        if (v) {
+          extras.push(`Instagram : ${v.trim()}`);
+          row._ig_url = v.trim();
+          // Fichiers de comptes avec seulement le lien de profil : on en tire le @
+          const u = parseIgUsername(v);
+          if (u && !row._ig_username) row._ig_username = u;
+        }
+      } else if (mapped === '_link') {
+        // Colonne lien générique : profil Instagram → @, sinon site web en notes
+        const u = parseIgUsername(v);
+        if (u) {
+          row._ig_url = v.trim();
+          if (!row._ig_username) row._ig_username = u;
+        } else if (v) {
+          extras.push(`Site : ${v.trim()}`);
+        }
       } else if (mapped === '_ig_hashtag') {
         if (v) extras.push(`#${v.trim()}`);
       } else if (mapped === '_ig_score') {
@@ -281,6 +324,12 @@ export async function POST(request: NextRequest) {
           row._ig_score = String(n);
           if (!row.lead_quality) row.lead_quality = n >= 15 ? 'hot' : n >= 8 ? 'warm' : 'cold';
         }
+      } else if (mapped === '_ig_posts' || mapped === '_ig_followers') {
+        const n = parseCount(v);
+        if (n != null) row[mapped] = String(n);
+      } else if (mapped === '_ig_private') {
+        if (/^(true|1|oui|yes|vrai)$/i.test(v.trim())) row._ig_private = 'true';
+        else if (/^(false|0|non|no|faux)$/i.test(v.trim())) row._ig_private = 'false';
       } else if (mapped === '_ig_biz_cat') {
         if (v && v !== 'None') extras.push(v.trim());
       } else if (mapped === '_rating') {
@@ -353,6 +402,8 @@ export async function POST(request: NextRequest) {
   const dbPhoneLabel: Record<string, string> = {};
   const dbEmailLabel: Record<string, string> = {};
   const dbIgLabel:    Record<string, string> = {};
+  // Profil des leads Instagram existants, pour les compléter à la réimportation
+  const dbIgInfo: Record<string, { id: string; bio: string | null; posts_count: number | null; followers_count: number | null; is_private: boolean | null }> = {};
 
   // La comparaison par téléphone doit être insensible au format (« +33 6… » == « 06… »,
   // espaces, etc.). Un filtre SQL `phone.in.(…)` compare la colonne BRUTE aux valeurs
@@ -364,7 +415,7 @@ export async function POST(request: NextRequest) {
     for (let from = 0; from < 100_000; from += PAGE) {
       const { data: existing, error: exErr } = await db
         .from('leads')
-        .select('first_name, last_name, phone, email, instagram_username')
+        .select('id, first_name, last_name, phone, email, instagram_username, bio, posts_count, followers_count, is_private')
         .order('id')
         .range(from, from + PAGE - 1);
       if (exErr) break;
@@ -372,7 +423,7 @@ export async function POST(request: NextRequest) {
         const label = `${lead.first_name} ${lead.last_name}`.trim();
         if (lead.phone)              { const np = normPhone(lead.phone);                 if (np) { dbPhoneSet.add(np); dbPhoneLabel[np] = label; } }
         if (lead.email)              { const ne = lead.email.toLowerCase();              dbEmailSet.add(ne); dbEmailLabel[ne] = label; }
-        if (lead.instagram_username) { const ni = lead.instagram_username.toLowerCase(); dbIgSet.add(ni);    dbIgLabel[ni]    = label; }
+        if (lead.instagram_username) { const ni = lead.instagram_username.trim().replace(/^@/, '').toLowerCase(); dbIgSet.add(ni);    dbIgLabel[ni]    = label; dbIgInfo[ni] = lead; }
       }
       if (!existing || existing.length < PAGE) break;
     }
@@ -385,6 +436,7 @@ export async function POST(request: NextRequest) {
 
   // ── Pass 3 : insert with duplicate tagging ────────────────────────────────
   let imported = 0;
+  let enriched = 0;
   let skipped  = 0;
   const errors:     string[] = [...parseErrors];
   const duplicates: string[] = [];
@@ -435,13 +487,30 @@ export async function POST(request: NextRequest) {
 
     if (dryRun) continue;
 
+    // Compte déjà présent : on complète son profil (publications, abonnés, bio,
+    // privé) sans toucher au reste du lead. Les compteurs récents remplacent les anciens.
+    const known = row._ig_username ? dbIgInfo[row._ig_username.toLowerCase()] : undefined;
+    if (known) {
+      const patch: Record<string, unknown> = {};
+      const posts = row._ig_posts ? parseInt(row._ig_posts, 10) : null;
+      const followers = row._ig_followers ? parseInt(row._ig_followers, 10) : null;
+      if (posts != null && posts !== known.posts_count) patch.posts_count = posts;
+      if (followers != null && followers !== known.followers_count) patch.followers_count = followers;
+      if (row._ig_private && (row._ig_private === 'true') !== known.is_private) patch.is_private = row._ig_private === 'true';
+      if (row._ig_bio && !known.bio) patch.bio = row._ig_bio;
+      if (Object.keys(patch).length > 0) {
+        const { error: enrichErr } = await (supabase as any).from('leads').update(patch).eq('id', known.id);
+        if (!enrichErr) { enriched++; Object.assign(known, patch); }
+      }
+    }
+
     if (skipDuplicates && isDuplicateRow) {
       skipped++;
       continue;
     }
 
     const isSocial = leadSource === 'instagram' || leadSource === 'facebook';
-    const defaultStatus = isSocial ? 'lead' : 'in_progress';
+    const defaultStatus = igOutreach === 'follow' ? 'to_follow' : isSocial ? 'lead' : 'in_progress';
 
     const { error } = await (supabase as any).from('leads').insert({
       first_name:   row.first_name,
@@ -464,12 +533,20 @@ export async function POST(request: NextRequest) {
         instagram_username: row._ig_username || null,
         instagram_url:      row._ig_url      || null,
         ig_score:           row._ig_score    ? parseInt(row._ig_score, 10) : null,
+        bio:                row._ig_bio      || null,   // sert au script DM (ville, métier)
+        posts_count:        row._ig_posts     ? parseInt(row._ig_posts, 10)     : null,
+        followers_count:    row._ig_followers ? parseInt(row._ig_followers, 10) : null,
+        is_private:         row._ig_private   ? row._ig_private === 'true'      : null,
+        ig_outreach:        igOutreach,
       } : {}),
     });
 
     if (error) {
       skipped++;
-      errors.push(`Ligne ${lineNum} : ${error.message}`);
+      // Index unique sur le @ : un compte ne peut exister qu'une fois, toutes pistes confondues
+      errors.push(error.code === '23505'
+        ? `Ligne ${lineNum} : @${row._ig_username} existe déjà dans le CRM — ignoré`
+        : `Ligne ${lineNum} : ${error.message}`);
     } else {
       imported++;
     }
@@ -491,6 +568,7 @@ export async function POST(request: NextRequest) {
     total:           imported,
     imported,
     skipped,
+    enriched,
     duplicate_count: duplicates.length,
     assignment_mode: assignmentMode,
     errors:          errors.slice(0, 10),

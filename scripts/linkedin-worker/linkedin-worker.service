@@ -1,0 +1,16 @@
+[Unit]
+Description=Payment Flow - worker LinkedIn
+After=network-online.target li-display.service
+Wants=network-online.target
+Requires=li-display.service
+
+[Service]
+WorkingDirectory=/opt/linkedin-worker
+# Chromium affiché sur l'écran virtuel :42 (li-display), visible à distance par Lomig (li-vnc / li-novnc)
+Environment=DISPLAY=:42
+ExecStart=/usr/bin/env node /opt/linkedin-worker/worker.mjs
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
