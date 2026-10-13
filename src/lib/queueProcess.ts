@@ -8,6 +8,7 @@ import { withEndCard } from '@/lib/endCard';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 import { analyzeAudio } from '@/lib/voiceover';
 import { probe } from '@/lib/videoClean';
+import { purgeStaleTmp } from '@/lib/tmpClean';
 
 // Traitement d'une vidéo envoyée dans Storage (raw/<id>.<ext>) : suppression des
 // métadonnées sans réencodage, contrôle d'intégrité (empreintes identiques),
@@ -79,19 +80,6 @@ export async function processNextUploaded(): Promise<{ id: string; status: strin
     }
   }
   return null;
-}
-
-// Fichiers temporaires laissés par un traitement coupé (limite de 5 min) : le disque /tmp d'une
-// fonction Vercel (512 Mo) se remplissait et les vidéos suivantes échouaient en « No space left
-// on device » (13/10/2026). Tout fichier de plus de 10 min est supprimé avant chaque traitement.
-async function purgeStaleTmp() {
-  const dir = os.tmpdir();
-  const limit = Date.now() - 10 * 60_000;
-  for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
-    const p = path.join(dir, name);
-    const st = await fs.stat(p).catch(() => null);
-    if (st?.isFile() && st.mtimeMs < limit) await fs.rm(p, { force: true }).catch(() => {});
-  }
 }
 
 export async function processQueueItem(id: string) {

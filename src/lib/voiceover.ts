@@ -3,6 +3,7 @@ import os from 'os';
 import { createHash } from 'crypto';
 import path from 'path';
 import { supabase } from '@/lib/supabase';
+import { purgeStaleTmp } from '@/lib/tmpClean';
 import { run, probe } from '@/lib/videoClean';
 import { withEndCard, END_CARD_PATH } from '@/lib/endCard';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
@@ -493,8 +494,10 @@ async function renderVoiceover(base: string, takes: Take[], analysis: AudioAnaly
   try {
     await run(['-v', 'error', '-y', '-i', base, ...files.flatMap((x) => ['-i', x]),
       '-filter_complex', f.join(';'), '-map', '[vout]', '-map', '[aout]', '-t', T,
-      // Version intermédiaire (réencodée avec la fin CTA ensuite) : rapide et quasi sans perte
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '14', '-pix_fmt', 'yuv420p',
+      // Version intermédiaire (réencodée avec la fin CTA ensuite) : rapide, très haute qualité, mais
+      // débit plafonné à 16 Mb/s. Sans plafond (CRF 14 ultrafast), une vidéo de 60 s à 60 i/s
+      // dépassait 400 Mo et saturait le disque /tmp de 512 Mo (« No space left on device », 14/10/2026)
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-maxrate', '16M', '-bufsize', '32M', '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', output]);
   } finally {
     await Promise.all([assFile, ...files].map((p) => fs.rm(p, { force: true })));
@@ -846,6 +849,7 @@ export async function verifyVoiceover(id: string): Promise<VoiceoverState> {
 
 // Étape suivante d'un reel (cron et bouton « Tout enchaîner »)
 export async function runNextVoiceoverStep(id: string): Promise<{ step: string; state: VoiceoverState }> {
+  await purgeStaleTmp();
   const report = (await loadRow(id)).clean_report;
   const vo: VoiceoverState | undefined = report?.voiceover;
   // Pas de script, ou ancien commentaire d'avant le cahier des charges du 09/10 (sans hook) :
