@@ -54,15 +54,18 @@ export async function GET(request: NextRequest) {
       remove.push({ ...f, why: 'échec de plus de 7 jours' });
       continue;
     }
-    if (f.name.endsWith('-base.mp4') && row.clean_report?.audio?.voice !== true && !row.clean_report?.vo_extra && f.name !== row.storage_path) {
+    // (voix off sur tous les reels depuis le 13/10/2026 : la base reste tant que la VF n'est pas faite)
+    const voPending = !['done', 'skipped'].includes(row.clean_report?.voiceover?.status);
+    if (f.name.endsWith('-base.mp4') && !voPending && row.clean_report?.audio?.voice !== true && !row.clean_report?.vo_extra && f.name !== row.storage_path) {
       remove.push({ ...f, why: 'base inutile (pas de voix d\'origine)' });
       continue;
     }
     // Rendu voix off qui n'est plus la vidéo à publier (reel revenu à sa version d'origine)
     if (f.name.includes('-vf-') && f.name !== row.storage_path) { remove.push({ ...f, why: 'ancien rendu VF' }); continue; }
     // Original en double : la VF est la vidéo à publier et la base (sans fin CTA) permet de la refaire
-    // (sauf VF en plus : l'original sert de repli si la VF est refusée)
-    if (f.name === `clean/${row.id}.mp4` && String(row.storage_path ?? '').includes('-vf-') && row.clean_report?.vo_base?.path && !row.clean_report?.vo_extra) {
+    // (VF non vérifiée : l'original sert de repli si elle est refusée)
+    if (f.name === `clean/${row.id}.mp4` && String(row.storage_path ?? '').includes('-vf-') && row.clean_report?.vo_base?.path
+      && (!row.clean_report?.vo_extra || row.clean_report?.voiceover?.verify?.ok)) {
       remove.push({ ...f, why: 'original en double (VF montée)' });
     }
   }

@@ -62,6 +62,8 @@ export interface VoiceoverState {
   rendered_at?: string;
   render_path?: string;
   error?:       string;
+  reused_from?: string;           // voix off reprise d'un autre reel (aucun crédit ElevenLabs)
+  rerender?:    boolean;          // remontée plus rapide d'une voix déjà vérifiée (mêmes prises)
 }
 
 // Règle 0 (prioritaire) : aucune autre voix que celle de Lomig dans le rendu. Une voix dans la
@@ -88,8 +90,10 @@ const VOICE_VERSION = '2';
 const MODEL_CHOICE = 'assets/voice-model.json';
 const CTA_TRANSCRIPT = 'assets/cta-transcript.json';
 // Vitesse de la voix au montage, appliquée APRÈS les pauses du § 7.2 : calculée pour que la voix
-// tienne toute la vidéo (09/10/2026), entre ces deux bornes (1,2 visé par le cahier des charges)
-const MIN_SPEED = 0.92, MAX_SPEED = 1.38;
+// tienne toute la vidéo (09/10/2026), entre ces deux bornes. Plancher relevé à 1,15 le 13/10/2026
+// (demande de Lomig : voix trop lente, la rétention chute) ; une voix courte finit simplement avant
+// la vidéo. VOICEOVER_MIN_SPEED pour ajuster sans redéploiement de code.
+const MIN_SPEED = Number(process.env.VOICEOVER_MIN_SPEED ?? 1.15), MAX_SPEED = 1.38;
 // Durée de voix (pauses comprises, avant accélération)
 const rawDuration = (takes: Take[]) => takes.reduce((t, k, i) => t + span(k).len + gapAfter(takes, i), 0);
 const BUSY = ['voicing', 'rendering', 'verifying'];
@@ -588,6 +592,58 @@ export async function saveVoiceoverScript(id: string, raw: VoSegment[]): Promise
   return voiceover;
 }
 
+// ── Réutilisation d'une voix off déjà générée (13/10/2026) ──
+// Les scripts sont génériques (hook + sujet, sans lien avec les images) : une voix off complète et
+// vérifiée d'un autre reel est reprise telle quelle (mêmes prises, depuis le cache des voix), sans
+// aucun crédit ElevenLabs. Choix : une voix qui tient dans la vidéo entre ×MIN_SPEED et ×MAX_SPEED,
+// la moins réutilisée, en évitant les plus récemment reprises.
+export async function reuseVoiceover(id: string): Promise<VoiceoverState | null> {
+  const row = await loadRow(id);
+  const report = row.clean_report ?? {};
+  let duration: number = report.vo_base?.duration;
+  let audio: AudioAnalysis | null = report.audio ?? null;
+  if (!duration || !audio) {
+    const local = tmp(`${id}-${Date.now()}-base.mp4`);
+    try {
+      const base = await downloadBase(row, local);
+      duration = base.duration;
+      audio = audio ?? await analyzeAudio(local, id);
+    } finally {
+      await fs.rm(local, { force: true });
+    }
+  }
+  const available = Math.max(1, duration - 0.3);
+  const { data } = await db().from('content_queue').select('id, updated_at, clean_report')
+    .not('clean_report->voiceover->takes', 'is', null).limit(500);
+  const rows = (data ?? []) as any[];
+  const usage = new Map<string, number>();
+  const recent: string[] = [];
+  for (const r of [...rows].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))) {
+    const from = r.clean_report?.voiceover?.reused_from;
+    if (from) { usage.set(from, (usage.get(from) ?? 0) + 1); if (recent.length < 8) recent.push(from); }
+  }
+  const candidates = rows
+    .filter((r) => r.id !== id)
+    .map((r) => ({ id: r.id as string, vo: r.clean_report.voiceover as VoiceoverState }))
+    .filter(({ vo }) => vo.status === 'done' && vo.verify?.ok && vo.takes?.length && !vo.reused_from && vo.hook)
+    .map((c) => ({ ...c, raw: rawDuration(c.vo.takes!) }))
+    // Tient dans la vidéo au plus vite (×MAX_SPEED) ; idéalement la remplit à ×MIN_SPEED
+    .filter((c) => c.raw / MAX_SPEED <= available + 0.3);
+  if (!candidates.length) return null;
+  const fill = (raw: number) => Math.abs(Math.min(1, (raw / MIN_SPEED) / available) - 1);
+  candidates.sort((a, b) =>
+    Number(recent.includes(a.id)) - Number(recent.includes(b.id))
+    || (usage.get(a.id) ?? 0) - (usage.get(b.id) ?? 0)
+    || fill(a.raw) - fill(b.raw));
+  const d = candidates[0];
+  const voiceover: VoiceoverState = {
+    status: 'voiced', hook: d.vo.hook, subject: d.vo.subject, segments: d.vo.segments, annotated: d.vo.annotated,
+    model: d.vo.model, takes: d.vo.takes, verify: null, reused_from: d.id, updated_at: new Date().toISOString(),
+  };
+  await saveReport(id, { voiceover, audio });
+  return voiceover;
+}
+
 // Étape 2 : voix phrase par phrase, contrôlée
 export async function generateVoice(id: string): Promise<VoiceoverState> {
   if (!voiceoverEnabled()) throw new VoiceoverError('ElevenLabs non configuré (ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)', 400);
@@ -790,9 +846,28 @@ export async function verifyVoiceover(id: string): Promise<VoiceoverState> {
 
 // Étape suivante d'un reel (cron et bouton « Tout enchaîner »)
 export async function runNextVoiceoverStep(id: string): Promise<{ step: string; state: VoiceoverState }> {
-  const vo: VoiceoverState | undefined = (await loadRow(id)).clean_report?.voiceover;
-  // Pas de script, ou ancien commentaire d'avant le cahier des charges du 09/10 (sans hook)
-  if (!vo?.segments?.length || !vo.hook) return { step: 'script', state: await prepareVoiceoverScript(id, true) };
+  const report = (await loadRow(id)).clean_report;
+  const vo: VoiceoverState | undefined = report?.voiceover;
+  // Pas de script, ou ancien commentaire d'avant le cahier des charges du 09/10 (sans hook) :
+  // d'abord une voix déjà générée ; sinon nouvelle voix seulement si la vidéo l'exige (voix d'origine
+  // à remplacer), pour ne pas dépenser de crédits sur les reels où la VF est un bonus
+  if (!vo?.segments?.length || !vo.hook) {
+    const reused = await reuseVoiceover(id);
+    if (reused) return { step: 'reuse', state: reused };
+    if (report?.audio?.voice !== true) {
+      const skipped: VoiceoverState = { status: 'skipped', segments: [], error: 'Aucune voix déjà générée ne tient dans cette vidéo : publiée sans voix off', updated_at: new Date().toISOString() };
+      await saveReport(id, { voiceover: skipped });
+      return { step: 'skip', state: skipped };
+    }
+    return { step: 'script', state: await prepareVoiceoverScript(id, true) };
+  }
+  // Voix reprise : déjà contrôlée sur son reel d'origine, et le son d'origine est retiré dès qu'il
+  // contient une voix ou des paroles → pas de nouvelle transcription (crédits économisés)
+  if (vo.status === 'done' && !vo.verify && (vo.reused_from || vo.rerender)) {
+    const ok: VoiceoverState = { ...vo, verify: { ok: true, extra: [], transcript: '(voix reprise, déjà vérifiée)', at: new Date().toISOString() } };
+    await saveReport(id, { voiceover: ok });
+    return { step: 'verify', state: ok };
+  }
   if (vo.status === 'script' || (vo.status === 'voicing')) return { step: 'voice', state: await generateVoice(id) };
   if (vo.status === 'voiced' || vo.status === 'rendering') return { step: 'render', state: await renderQueueVoiceover(id) };
   if (vo.status === 'done' && !vo.verify) return { step: 'verify', state: await verifyVoiceover(id) };
@@ -804,8 +879,12 @@ export async function runNextVoiceoverStep(id: string): Promise<{ step: string; 
 // Lomig du 09/10/2026) ; les autres (musique, bruits de chantier) sont publiées telles quelles.
 // + « VF en plus » (demande de Lomig du 11/10/2026) : 2 reels sans voix d'origine par jour, choisis
 // parmi ceux qui ont une musique (gardée sous la voix), tant que le budget ElevenLabs le permet.
-export const needsVoiceover = (report: any) => report?.audio?.voice === true || report?.vo_extra === true;
-const isExtra = (report: any) => report?.vo_extra === true && report?.audio?.voice !== true;
+// 13/10/2026 : voix off de Lomig sur TOUS les reels (VOICEOVER_ALL=false pour revenir en arrière),
+// en réutilisant d'abord les voix déjà générées. Pour un reel sans voix d'origine, la VF reste non
+// bloquante : si elle n'est pas prête à l'heure, la version d'origine part.
+const VOICE_ALL = process.env.VOICEOVER_ALL !== 'false';
+export const needsVoiceover = (report: any) => report?.audio?.voice === true || report?.vo_extra === true || (VOICE_ALL && !!report);
+const isExtra = (report: any) => report?.audio?.voice !== true && (report?.vo_extra === true || VOICE_ALL);
 const EXTRA_PER_DAY = Number(process.env.VOICEOVER_EXTRA_PER_DAY ?? 2);
 const CREDIT_FLOOR  = Number(process.env.VOICEOVER_CREDIT_FLOOR ?? 5000);   // réserve pour les vidéos avec voix d'origine
 
