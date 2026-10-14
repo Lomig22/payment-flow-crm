@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     });
     s.account_state = 'active';
   }
-  if (!inWorkingHours(s, now)) return idle('Hors fenêtre d\'activité (lun.–ven., 9 h – 18 h 30, pause 12 h 30 – 13 h 45)');
+  // Fenêtre d'activité : elle ne limite que les invitations (et ce qui les entoure). Acceptations,
+  // réponses et messages tournent à toute heure : le premier message part dès que son délai
+  // après l'acceptation est écoulé (demande de Lomig, 14/10/2026)
+  const open = inWorkingHours(s, now);
   if (s.next_action_at && new Date(s.next_action_at) > now) return idle('Pause entre deux actions');
 
   // Leads « aperçu » (test de qualité des messages) : visite du profil seulement, jamais d'envoi
@@ -112,8 +115,8 @@ export async function GET(request: NextRequest) {
     if (names.length) return serve({ type: 'inbox', url: LI_INBOX_URL, names });
   }
 
-  // 3. Invitations en attente depuis trop longtemps : retrait
-  {
+  // 3. Invitations en attente depuis trop longtemps : retrait (dans la fenêtre seulement)
+  if (open) {
     const limit = new Date(now.getTime() - s.invite_expiry_days * 86_400_000).toISOString();
     const { data } = await db.from('leads').select('id, linkedin_url').eq('li_status', 'invited').lte('li_invited_at', limit)
       .order('li_invited_at', { ascending: true }).limit(1);
@@ -158,6 +161,8 @@ export async function GET(request: NextRequest) {
     const url = lead && linkedinActivityUrl(lead.linkedin_url);
     if (url) return serve({ type: 'posts', lead_id: lead.id, url });
   }
+
+  if (!open) return idle('Hors fenêtre des invitations : rien d\'autre à faire pour l\'instant');
 
   // 7. Invitations en attente sur LinkedIn : relevé quotidien (page « Invitations envoyées »)
   if (!s.pending_count_at || now.getTime() - new Date(s.pending_count_at).getTime() > 20 * 3600_000) {

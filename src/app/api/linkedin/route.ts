@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     state: s.account_state === 'blocked' || s.stop_reason ? 'stopped' : s.account_state === 'cooldown' ? 'cooldown' : !s.enabled ? 'paused' : !inWorkingHours(s, now) ? 'outside' : 'active',
     reason: s.account_state === 'blocked' || s.stop_reason ? (s.stop_reason ?? 'compte bloqué')
       : s.account_state === 'cooldown' ? `Cooldown jusqu'au ${s.cooldown_until ? new Date(s.cooldown_until).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'medium', timeStyle: 'short' }) : '—'}`
-      : !s.enabled ? 'Séquence désactivée' : !inWorkingHours(s, now) ? 'Hors fenêtre d\'activité (lun.–ven., 9 h – 18 h 30, pause 12 h 30 – 13 h 45)' : null,
+      : !s.enabled ? 'Séquence désactivée' : !inWorkingHours(s, now) ? 'Hors fenêtre des invitations : les messages, acceptations et réponses continuent' : null,
     invites_today: invitesToday, invites_per_day: invitesPerDay(s, now), ramp_week: s.tier,
     invites_week: invitesWeek, weekly_cap: weeklyCap(s),
     messages_today: messagesToday, messages_per_day: s.dms_per_day,
