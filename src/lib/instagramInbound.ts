@@ -1,13 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import { igGet, igPost, loadTokens } from '@/lib/instagramGraph';
 import { igProfileUrl } from '@/lib/instagram';
+import { recordComments, reelKeyword, type Interaction } from '@/lib/inbound';
 
 // Phase 4 — captation inbound : commentaires à mot-clé et nouvelles conversations
 // → leads inbound attribués au contenu d'origine. Appelé par le cron de synchro.
 // En mode Développement de l'app Meta, seuls les comptes ayant un rôle dans l'app
 // sont visibles : la captation des vrais prospects démarre après l'App Review.
 
-type Channel = 'comment_keyword' | 'dm_inbound' | 'story_reply';
+export type Channel = 'comment_keyword' | 'dm_inbound' | 'story_reply';
 
 interface Tok { account_username: string; ig_user_id: string; access_token: string }
 
@@ -32,7 +33,7 @@ export function matchKeyword(text: string, keywords: string[]): string | null {
 const likeExact = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 // Crée le lead inbound, ou rattache le lead existant (même pseudo Instagram)
-async function upsertInboundLead(username: string, channel: Channel, contentId: string | null, note: string): Promise<string | null> {
+export async function upsertInboundLead(username: string, channel: Channel, contentId: string | null, note: string): Promise<string | null> {
   const db = supabase as any;
   const { data: existing } = await db.from('leads')
     .select('id, origin, origin_content_id')
@@ -81,10 +82,10 @@ async function settingsFor(account: string): Promise<{ keywords: string[]; auto_
 // Commentaires : seulement les contenus dont le nombre de commentaires a augmenté
 async function syncComments(tok: Tok, keywords: string[], autoReply: string | null) {
   const db = supabase as any;
-  const stats = { comments: 0, leads: 0, replies: 0, errors: [] as string[] };
+  const stats = { comments: 0, leads: 0, replies: 0, hidden: 0, errors: [] as string[] };
 
   const { data: contents } = await db.from('ig_content')
-    .select('id, ig_media_id, comments')
+    .select('id, ig_media_id, comments, caption, permalink')
     .eq('account_username', tok.account_username)
     .in('format', ['reel', 'post', 'carousel'])
     .gte('published_at', new Date(Date.now() - 30 * DAY).toISOString())
@@ -108,18 +109,22 @@ async function syncComments(tok: Tok, keywords: string[], autoReply: string | nu
       continue;
     }
 
+    // Commentaires invisibles alors que le contenu en compte : app Meta en mode développement
+    if (!list.length && c.comments > 0) stats.hidden += c.comments;
+    const own = reelKeyword(c.caption);
+    const fresh: Interaction[] = [];
     for (const cm of list) {
       if (knownIds.has(cm.id)) continue;
       const username = cm.from?.username ?? cm.username ?? null;
       if (!username || username === tok.account_username) continue;
-      const keyword = cm.text ? matchKeyword(cm.text, keywords) : null;
-
-      let leadId: string | null = null;
-      if (keyword) {
-        leadId = await upsertInboundLead(username, 'comment_keyword', c.id,
-          `A commenté « ${cm.text} » (mot-clé ${keyword}) sous un contenu Instagram`);
-        if (leadId) stats.leads++;
-      }
+      // Mot-clé du reel (« Commente « SIMULATEUR » ») ou mot-clé général
+      const keyword = cm.text ? matchKeyword(cm.text, [...(own ? [own] : []), ...keywords]) : null;
+      const leadId: string | null = null;   // lead créé par recordComments (mot-clé ou intérêt)
+      fresh.push({
+        id: `ig:${cm.id}`, platform: 'instagram', kind: 'comment', media_ref: c.ig_media_id, permalink: c.permalink ?? null,
+        content_caption: c.caption ?? null, author_handle: username, author_name: username, author_id: cm.from?.id ?? null,
+        text: cm.text ?? null, occurred_at: cm.timestamp ?? null,
+      });
 
       let replied_at: string | null = null, reply_error: string | null = null;
       if (keyword && autoReply) {
@@ -142,6 +147,9 @@ async function syncComments(tok: Tok, keywords: string[], autoReply: string | nu
       }, { onConflict: 'id', ignoreDuplicates: true });
       stats.comments++;
     }
+    // Feuille Inbound : tous les commentaires, qualifiés (mot-clé / intérêt), leads et alerte
+    const r = await recordComments(fresh, (i, note) => upsertInboundLead(i.author_handle!, 'comment_keyword', c.id, note));
+    stats.leads += r.leads;
   }
   return stats;
 }
@@ -201,6 +209,14 @@ async function syncConversations(tok: Tok) {
       if (leadId) stats.leads++;
     }
 
+    if (leadId) {
+      await db.from('inbound_interactions').upsert({
+        id: `dm:ig:${conv.id}`, platform: 'instagram', kind: channel === 'story_reply' ? 'story_reply' : 'dm',
+        author_handle: other.username, author_name: other.username, author_id: other.id, lead_id: leadId,
+        intent: 'interest', intent_reason: channel === 'story_reply' ? 'a répondu à une story' : 'a écrit en DM',
+        occurred_at: firstAt, permalink: `https://www.instagram.com/direct/inbox/`,
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    }
     await db.from('ig_conversations').upsert({
       id: conv.id, account_username: tok.account_username,
       participant_id: other.id, participant_username: other.username,
@@ -217,6 +233,13 @@ export async function syncInbound() {
     const s = await settingsFor(tok.account_username);
     const comments = await syncComments(tok, s.keywords, s.auto_reply_text);
     const convs    = await syncConversations(tok);
+    // État de la captation, affiché sur /inbound
+    await (supabase as any).from('inbound_settings').update({
+      ig_last_sync_at: new Date().toISOString(),
+      ig_last_error: comments.hidden
+        ? `${comments.hidden} commentaire(s) invisibles : l'application Meta est en mode développement (validation Meta requise)`
+        : [...comments.errors, ...convs.errors].join(' · ').slice(0, 500) || null,
+    }).eq('account_username', tok.account_username);
     results.push({
       account:       tok.account_username,
       comments:      comments.comments,

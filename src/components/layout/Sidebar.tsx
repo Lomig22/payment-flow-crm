@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Upload, UsersRound, LogOut, Zap, User, X,
   MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
   Users, Kanban, ChevronDown, Award, Megaphone, Clapperboard, CalendarClock, Linkedin,
-  CheckSquare, Gauge, Settings2,
+  CheckSquare, Gauge, Settings2, Inbox,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -103,6 +103,8 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         {/* Dashboard */}
         <NavLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} />
+        {/* Inbound : commentaires, abonnements, DM sur Instagram et Facebook */}
+        {isAdmin && <NavLink href="/inbound" icon={Inbox} label="Inbound" onClick={onClose} />}
 
         {/* ── Pôle Instagram ── */}
         {showInstagram && (

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { syncInstagramContent } from '@/lib/instagramGraph';
 import { publishDue } from '@/lib/instagramPublish';
 import { syncInbound } from '@/lib/instagramInbound';
+import { syncFacebookComments } from '@/lib/inbound';
 import { cleanupStaleUploads } from '@/lib/queueProcess';
 import { autoScheduleDrafts } from '@/lib/autoSchedule';
 import { captionMissing } from '@/lib/captionAI';
@@ -47,12 +48,14 @@ export async function GET(request: NextRequest) {
     const synced    = syncDue ? await syncInstagramContent() : [];
     // Commentaires à mot-clé et nouveaux DM → leads (après la synchro des compteurs)
     const inbound   = syncDue ? await syncInbound() : [];
+    // Commentaires de la Page Facebook → feuille Inbound (même rythme que la synchro Instagram)
+    const facebook  = syncDue ? await syncFacebookComments() : null;
     const stale_uploads_removed = await cleanupStaleUploads();
     // Légendes manquantes, puis contenus prêts → prochains créneaux (si pilote automatique)
     // (une seule par passage, et seulement s'il reste du temps : limite de 60 s)
     const captioned      = published.length || Date.now() - started > 25_000 ? 0 : await captionMissing(1);
     const auto_scheduled = await autoScheduleDrafts();
-    return NextResponse.json({ published, crossposted, backfilled, synced, inbound, stale_uploads_removed, captioned, auto_scheduled });
+    return NextResponse.json({ published, crossposted, backfilled, synced, inbound, facebook, stale_uploads_removed, captioned, auto_scheduled });
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }

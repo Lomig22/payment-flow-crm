@@ -423,6 +423,27 @@ export interface LinkedinImportReport {
   warnings: { line: number; name: string; warning: string }[];
 }
 
+// ── Inbound (sprint47) : commentaires Instagram et Facebook, abonnements, DM
+export interface InboundItem {
+  id: string; platform: 'instagram' | 'facebook'; kind: 'comment' | 'follow' | 'dm' | 'story_reply';
+  content_queue_id: string | null; media_ref: string | null; permalink: string | null; content_caption: string | null;
+  author_name: string | null; author_handle: string | null; author_id: string | null; text: string | null;
+  keyword: string | null; intent: 'keyword' | 'interest' | 'other' | null; intent_reason: string | null;
+  lead_id: string | null; status: 'new' | 'handled' | 'ignored'; occurred_at: string | null; created_at: string;
+  leads: { first_name: string; last_name: string; status: string } | null;
+}
+export interface InboundSheet {
+  items: InboundItem[];
+  settings: { account_username: string; keywords: string[]; auto_reply_text: string | null;
+    ig_last_sync_at: string | null; ig_last_error: string | null; fb_last_sync_at: string | null; fb_last_error: string | null } | null;
+  followers: { day: string; total: number; gained: number }[];
+}
+export const inboundSheetApi = {
+  overview: () => api.get<InboundSheet>('/inbound'),
+  setStatus: (action: 'handled' | 'ignored' | 'new', ids: string[]) => api.post('/inbound', { action, ids }),
+  createLead: (id: string) => api.post<{ lead_id: string }>('/inbound', { action: 'lead', id }),
+};
+
 export const linkedinApi = {
   overview: () => api.get<LinkedinOverview>('/linkedin'),
   saveSettings: (data: Partial<LinkedinSettings>) => api.put<LinkedinSettings>('/linkedin', data),

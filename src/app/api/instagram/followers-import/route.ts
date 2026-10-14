@@ -87,5 +87,20 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Feuille Inbound : un abonnement = une interaction (rattachée au lead quand il existe)
+  const leadByName = new Map<string, string>();
+  for (let i = 0; i < names.length; i += 300) {
+    const { data } = await db.from('leads').select('id, instagram_username').in('instagram_username', names.slice(i, i + 300));
+    for (const l of data ?? []) leadByName.set(String(l.instagram_username).toLowerCase(), l.id);
+  }
+  const follows = Array.from(byName.entries()).map(([username, at]) => ({
+    id: `follow:ig:${acc.username}:${username}`, platform: 'instagram', kind: 'follow',
+    author_handle: username, author_name: username, lead_id: leadByName.get(username) ?? null,
+    intent: 'interest', intent_reason: `abonné à @${acc.username}`, occurred_at: at, permalink: igProfileUrl(username),
+  }));
+  for (let i = 0; i < follows.length; i += 500) {
+    await db.from('inbound_interactions').upsert(follows.slice(i, i + 500), { onConflict: 'id', ignoreDuplicates: true });
+  }
+
   return NextResponse.json({ created, promoted: toPromote.length, in_conversation: inConversation, too_old: tooOld, excluded });
 }
