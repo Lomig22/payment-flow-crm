@@ -1,0 +1,12 @@
+{
+  "_doc": "Réécritures phonétiques appliquées au texte AVANT la synthèse vocale (le texte affiché à l'écran ne change pas). Clé = expression régulière (insensible à la casse, mot entier), valeur = ce que la voix doit lire.",
+  "devis": "devi",
+  "CRM": "cé erre aime",
+  "prospects": "prospès",
+  "prospect": "prospè",
+  "SEO": "S E O",
+  "Google Ads": "Gougueul adz",
+  "Meta": "Méta",
+  "RDV": "rendez-vous",
+  "k€": "mille euros"
+}
