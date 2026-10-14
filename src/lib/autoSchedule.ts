@@ -61,8 +61,14 @@ function candidates(format: 'reel' | 'story', s: PublishingSettings): number[] {
 // `force` : programmation demandée à la main (« Valider et programmer »), même pilote désactivé
 export async function autoScheduleDrafts(account?: string, force = false): Promise<number> {
   const db = supabase as any;
-  const username = account ?? (await db.from('instagram_tokens').select('account_username').order('account_username').limit(1).maybeSingle()).data?.account_username;
-  if (!username) return 0;
+  // Sans compte précisé : chaque compte connecté, sur ses propres créneaux
+  if (!account) {
+    const { data: tokens } = await db.from('instagram_tokens').select('account_username');
+    let n = 0;
+    for (const t of tokens ?? []) n += await autoScheduleDrafts(t.account_username, force);
+    return n;
+  }
+  const username = account;
   const settings = await getPublishingSettings(username);
   if (!settings.auto_schedule && !force) return 0;
 

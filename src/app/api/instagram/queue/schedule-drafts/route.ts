@@ -13,9 +13,11 @@ export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
   if (user.role !== 'admin') return forbidden();
-  const scheduled = await autoScheduleDrafts(undefined, true);
-  const { data: drafts } = await (supabase as any).from('content_queue')
-    .select('file_name, format, caption, clean_report').eq('status', 'draft');
+  const acc = request.nextUrl.searchParams.get('account') ?? undefined;
+  const scheduled = await autoScheduleDrafts(acc, true);
+  let q = (supabase as any).from('content_queue').select('file_name, format, caption, clean_report').eq('status', 'draft');
+  if (acc) q = q.eq('account_username', acc);
+  const { data: drafts } = await q;
   const blocked = (drafts ?? [])
     .filter((d: any) => d.format === 'reel' && voiceoverBlocks(d.clean_report))
     .map((d: any) => ({ file_name: d.file_name, reason: voiceoverBlocks(d.clean_report) }));

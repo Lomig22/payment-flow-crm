@@ -9,6 +9,15 @@ export const dynamic = 'force-dynamic';
 
 const COLUMNS = 'id, account_username, format, caption, caption_ai, caption_source, media_url, frame_paths, crosspost, status, scheduled_at, file_name, file_size, clean_report, lossless, permalink, published_at, error, attempts, created_at';
 
+// Compte demandé s'il est connecté, sinon le premier connecté
+async function accountOrDefault(wanted?: string): Promise<string> {
+  if (wanted) {
+    const { data } = await (supabase as any).from('instagram_tokens').select('account_username').eq('account_username', wanted).maybeSingle();
+    if (data) return wanted;
+  }
+  return defaultAccount();
+}
+
 async function defaultAccount(): Promise<string> {
   const { data } = await (supabase as any).from('instagram_tokens').select('account_username').order('account_username').limit(1);
   return data?.[0]?.account_username ?? 'lomig_guegueniat';
@@ -21,10 +30,13 @@ export async function GET(request: NextRequest) {
 
   // À venir + tout ce qui a bougé ces 7 derniers jours
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const { data, error } = await (supabase as any)
+  const acc = request.nextUrl.searchParams.get('account');
+  let query = (supabase as any)
     .from('content_queue')
     .select(COLUMNS)
-    .or(`status.in.(uploading,draft,scheduled,publishing),updated_at.gte.${since}`)
+    .or(`status.in.(uploading,draft,scheduled,publishing),updated_at.gte.${since}`);
+  if (acc) query = query.eq('account_username', acc);
+  const { data, error } = await query
     .order('scheduled_at', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true });
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
@@ -40,7 +52,7 @@ export async function POST(request: NextRequest) {
   if (!user) return unauthorized();
   if (user.role !== 'admin') return forbidden();
 
-  const { format, caption, scheduled_at, file_name, file_size } = await request.json();
+  const { format, caption, scheduled_at, file_name, file_size, account } = await request.json();
   // Limite par fichier du stockage Supabase (offre gratuite) : refus clair avant l'envoi
   if (Number(file_size) > 50 * 1_048_576) {
     return NextResponse.json({ message: `Vidéo de ${Math.round(Number(file_size) / 1_048_576)} Mo : 50 Mo maximum` }, { status: 400 });
@@ -62,7 +74,7 @@ export async function POST(request: NextRequest) {
   const { data: row, error } = await db
     .from('content_queue')
     .insert({
-      account_username: await defaultAccount(),
+      account_username: await accountOrDefault(account),
       format,
       caption:      format === 'reel' ? caption || null : null,
       caption_source: format === 'reel' && caption ? 'manual' : null,

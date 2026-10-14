@@ -185,14 +185,14 @@ export interface VoiceoverState {
 export interface AudioAnalysis { voice: boolean; language: string | null; kind: string; excerpt: string | null; foreign_voice: boolean }
 
 export const queueApi = {
-  settings:     () => api.get<PublishingSettings>('/instagram/publishing-settings'),
-  scheduleDrafts: () => api.post<{ scheduled: number; blocked: { file_name: string | null; reason: string }[]; no_caption: number }>('/instagram/queue/schedule-drafts'),
+  settings:     (account?: string) => api.get<PublishingSettings>('/instagram/publishing-settings', { params: account ? { account } : {} }),
+  scheduleDrafts: (account?: string) => api.post<{ scheduled: number; blocked: { file_name: string | null; reason: string }[]; no_caption: number }>('/instagram/queue/schedule-drafts', null, { params: account ? { account } : {} }),
   platforms:    () => api.get<Record<'facebook' | 'youtube' | 'tiktok', { connected: boolean; name: string | null; since: string | null; can_connect?: boolean }>>('/instagram/platforms'),
   tiktokAuthUrl: () => api.get<{ url: string }>('/tiktok/auth-url'),
-  saveSettings: (s: PublishingSettings) =>
-    api.put<PublishingSettings & { scheduled: number }>('/instagram/publishing-settings', s),
-  list:    () => api.get<QueueItem[]>('/instagram/queue'),
-  create:  (data: { format: 'reel' | 'story'; caption?: string; scheduled_at?: string | null; file_name: string; file_size: number }) =>
+  saveSettings: (s: PublishingSettings, account?: string) =>
+    api.put<PublishingSettings & { scheduled: number }>('/instagram/publishing-settings', s, { params: account ? { account } : {} }),
+  list:    (account?: string) => api.get<QueueItem[]>('/instagram/queue', { params: account ? { account } : {} }),
+  create:  (data: { format: 'reel' | 'story'; caption?: string; scheduled_at?: string | null; file_name: string; file_size: number; account?: string }) =>
     api.post<{ id: string; upload_url: string }>('/instagram/queue', data),
   process: (id: string) => api.post<{
     id: string; status: QueueStatus | 'duplicate'; clean_report: CleanReport | null; lossless: boolean | null;

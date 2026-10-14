@@ -6,16 +6,19 @@ import { getPublishingSettings, autoScheduleDrafts } from '@/lib/autoSchedule';
 // Réglages de la programmation automatique (page Publication)
 export const dynamic = 'force-dynamic';
 
-async function account(): Promise<string> {
-  const { data } = await (supabase as any).from('instagram_tokens').select('account_username').order('account_username').limit(1);
-  return data?.[0]?.account_username ?? 'lomig_guegueniat';
+// Compte demandé (?account=), sinon le premier connecté
+async function account(request: NextRequest): Promise<string> {
+  const wanted = request.nextUrl.searchParams.get('account');
+  const { data } = await (supabase as any).from('instagram_tokens').select('account_username').order('account_username');
+  const list = (data ?? []).map((t: any) => t.account_username);
+  return wanted && list.includes(wanted) ? wanted : list[0] ?? 'lomig_guegueniat';
 }
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorized();
   if (user.role !== 'admin') return forbidden();
-  return NextResponse.json(await getPublishingSettings(await account()));
+  return NextResponse.json(await getPublishingSettings(await account(request)));
 }
 
 export async function PUT(request: NextRequest) {
@@ -33,7 +36,7 @@ export async function PUT(request: NextRequest) {
   }
   if (!reel.length) return badRequest('Au moins un créneau prioritaire');
 
-  const username = await account();
+  const username = await account(request);
   const { data, error } = await (supabase as any).from('publishing_settings').upsert({
     account_username: username,
     auto_schedule:    !!b.auto_schedule,

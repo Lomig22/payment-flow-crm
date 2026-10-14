@@ -6,7 +6,7 @@ import { cleanVideo, extractFrames, imageDHash } from '@/lib/videoClean';
 import { findDuplicate, describeDuplicate } from '@/lib/duplicates';
 import { withEndCard } from '@/lib/endCard';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
-import { analyzeAudio } from '@/lib/voiceover';
+import { analyzeAudio, VOICE_ACCOUNT } from '@/lib/voiceover';
 import { probe } from '@/lib/videoClean';
 import { purgeStaleTmp } from '@/lib/tmpClean';
 
@@ -111,7 +111,11 @@ export async function processQueueItem(id: string) {
     const sourceHadCard = row.republish_of
       ? !!(await db.from('content_queue').select('id').eq('ig_media_id', row.republish_of).eq('clean_report->>end_card', 'true').limit(1)).data?.length
       : false;
-    if (row.format === 'reel') {
+    // Compte agence (reels motion design générés) : voix off et appel à l'action déjà dans la
+    // vidéo → ni analyse audio, ni voix off de Lomig, ni fin CTA de son compte
+    const personal = row.account_username === VOICE_ACCOUNT;
+    if (!personal) (report as any).voiceover = { status: 'skipped', segments: [], error: 'Compte agence : voix off déjà montée dans la vidéo', updated_at: new Date().toISOString() };
+    if (row.format === 'reel' && personal) {
       // Analyse de la piste audio : une voix d'origine déclenche la voix off de Lomig. La vidéo
       // de base (sans fin CTA) n'est gardée que dans ce cas (stockage limité à 1 Go)
       const audio = await analyzeAudio(tmpOut, row.id).catch(() => undefined);
@@ -123,7 +127,7 @@ export async function processQueueItem(id: string) {
         if (!baseErr) (report as any).vo_base = { path: basePath, duration: (await probe(tmpOut)).duration };
       }
     }
-    if (row.format === 'reel' && !sourceHadCard) {
+    if (row.format === 'reel' && personal && !sourceHadCard) {
       const withCard = await withEndCard(tmpOut, row.id);
       finalPath = withCard.path;
       (report as any).end_card = withCard.appended;

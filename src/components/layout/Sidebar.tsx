@@ -9,10 +9,10 @@ import {
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/lib/api';
+import api, { authApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -76,6 +76,12 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     router.push('/login');
   };
 
+  // Comptes Instagram connectés : une page Publication par compte
+  const { data: igAccounts = [] } = useQuery({
+    queryKey: ['ig-accounts'],
+    queryFn: () => api.get<{ account_username: string }[]>('/instagram/accounts').then((r) => r.data),
+    enabled: isAdmin, staleTime: 5 * 60_000,
+  });
   const sources       = user?.acquisition_sources ?? [];
   const showInstagram = isAdmin || sources.length === 0 || sources.includes('instagram');
   const showFacebook  = isAdmin || sources.length === 0 || sources.includes('facebook');
@@ -112,7 +118,9 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
             {isAdmin && <NavLink href="/instagram/contenu" icon={Clapperboard} label="Contenu" onClick={onClose} />}
-            {isAdmin && <NavLink href="/instagram/publication" icon={CalendarClock} label="Publication" onClick={onClose} />}
+            {isAdmin && (igAccounts.length
+              ? igAccounts.map((a) => <NavLink key={a.account_username} href={`/instagram/publication/${a.account_username}`} icon={CalendarClock} label={`Publication @${a.account_username}`} onClick={onClose} />)
+              : <NavLink href="/instagram/publication" icon={CalendarClock} label="Publication" onClick={onClose} />)}
           </PoleSection>
         )}
 

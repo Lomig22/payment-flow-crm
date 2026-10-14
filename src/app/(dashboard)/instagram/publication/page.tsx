@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Upload, Film, CircleDot, Send, Trash2, RotateCcw, ExternalLink, ShieldCheck,
@@ -38,7 +39,14 @@ const JOB_LABEL: Record<FileJob['state'], string> = {
   error: 'Erreur', cancelled: 'Annulé',
 };
 
+// Compte perso de Lomig : les blocs qui ne concernent que lui (fin CTA, YouTube, republication)
+const PERSONAL = 'lomig_guegueniat';
+
+// Une page par compte Instagram : /instagram/publication/<compte> (sans compte : compte perso)
 export default function PublicationPage() {
+  const params  = useParams<{ account?: string }>();
+  const account = params?.account ? decodeURIComponent(params.account) : PERSONAL;
+  const personal = account === PERSONAL;
   const qc      = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -60,13 +68,13 @@ export default function PublicationPage() {
   const cancelAll = () => jobs.forEach((j, i) => { if (!['queued', 'skipped', 'error', 'cancelled'].includes(j.state)) cancelJob(i); });
 
   const { data: queue = [], isLoading } = useQuery({
-    queryKey: ['content-queue'],
-    queryFn:  () => queueApi.list().then((r) => r.data),
+    queryKey: ['content-queue', account],
+    queryFn:  () => queueApi.list(account).then((r) => r.data),
     enabled:  isAdmin,
     refetchInterval: (q) => (q.state.data ?? []).some((i) => ['uploading', 'publishing'].includes(i.status)) ? 10_000 : 60_000,
   });
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ['content-queue'] });
+  const refresh = () => qc.invalidateQueries({ queryKey: ['content-queue', account] });
   const setJob  = (i: number, patch: Partial<FileJob>) =>
     setJobs((js) => js.map((j, k) => (k === i ? { ...j, ...patch } : j)));
 
@@ -100,6 +108,7 @@ export default function PublicationPage() {
       try {
         setJob(i, { state: 'upload' });
         const { data: created } = await queueApi.create({
+          account,
           format, caption: format === 'reel' && list.length === 1 ? caption : undefined,
           scheduled_at: null, file_name: file.name, file_size: file.size,
         });
@@ -129,7 +138,7 @@ export default function PublicationPage() {
 
   // Validation : mêmes créneaux que le pilote automatique (calculés côté serveur)
   const validateAll = useMutation({
-    mutationFn: async (_drafts: QueueItem[]) => (await queueApi.scheduleDrafts()).data,
+    mutationFn: async (_drafts: QueueItem[]) => (await queueApi.scheduleDrafts(account)).data,
     onSuccess: ({ scheduled, blocked, no_caption }) => {
       if (scheduled) toast.success(`${scheduled} contenu(s) programmé(s)`);
       // Rien de programmé : on dit pourquoi
@@ -153,12 +162,15 @@ export default function PublicationPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold text-gray-900">Publication · @{account}</h1>
+      </div>
       <InstagramAccounts />
-      <AutoScheduleCard onChange={refresh} />
+      <AutoScheduleCard onChange={refresh} account={account} />
       <PlatformsCard />
-      <EndCardCard />
-      <YouTubeQueue />
-      <RepublishTop onAdded={refresh} />
+      {personal && <EndCardCard />}
+      {personal && <YouTubeQueue />}
+      {personal && <RepublishTop onAdded={refresh} />}
 
       {/* Dépôt des vidéos */}
       <div className="card p-5 space-y-4">
@@ -458,13 +470,13 @@ function QueueRow({ q, onChange }: { q: QueueItem; onChange: () => void }) {
 }
 
 // Pilote automatique : les contenus prêts (reel avec légende, story) sont programmés seuls
-function AutoScheduleCard({ onChange }: { onChange: () => void }) {
+function AutoScheduleCard({ onChange, account }: { onChange: () => void; account: string }) {
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ['publishing-settings'], queryFn: () => queueApi.settings().then((r) => r.data) });
+  const { data } = useQuery({ queryKey: ['publishing-settings', account], queryFn: () => queueApi.settings(account).then((r) => r.data) });
   const save = useMutation({
-    mutationFn: (s: PublishingSettings) => queueApi.saveSettings(s).then((r) => r.data),
+    mutationFn: (s: PublishingSettings) => queueApi.saveSettings(s, account).then((r) => r.data),
     onSuccess:  (d) => {
-      qc.setQueryData(['publishing-settings'], d);
+      qc.setQueryData(['publishing-settings', account], d);
       toast.success(d.auto_schedule
         ? `Pilote automatique activé${d.scheduled ? ` : ${d.scheduled} contenu(s) programmé(s)` : ''}`
         : 'Pilote automatique désactivé');
