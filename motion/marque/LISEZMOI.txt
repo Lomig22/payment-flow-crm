@@ -1,0 +1,9 @@
+Dépose ici l'identité de Payment Flow pour les reels du compte @paymentflow :
+
+- ton logo : de préférence en SVG, sinon en PNG sur fond transparent (au moins 1000 px de large) ;
+  si tu en as plusieurs versions (complet, icône seule, blanc), mets-les toutes ;
+- tes couleurs, si tu les connais (codes #RRGGBB), dans un petit fichier texte, sinon je les prends dans le logo ;
+- ta police, si l'agence en a une (fichiers .woff2, .ttf ou .otf) ;
+- tes vrais témoignages clients (vidéos, captures d'avis Google) : ils peuvent aller dans motion/references/temoignages/.
+
+Le contenu de ce dossier n'est pas envoyé sur GitHub.

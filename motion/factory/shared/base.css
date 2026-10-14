@@ -17,7 +17,7 @@ em { font-style: normal; color: #a5b4fc; }
 .hook2 { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 70px; line-height: 1.05; letter-spacing: -0.03em; color: #a5b4fc; max-width: 960px; }
 .title { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 68px; line-height: 1.05; letter-spacing: -0.03em; max-width: 940px; }
 .sub { font-size: 36px; color: #b4b1e0; line-height: 1.3; max-width: 900px; }
-.card { width: 920px; background: #16133a; border: 3px solid #2c2870; border-radius: 30px; text-align: left; box-shadow: 0 40px 120px rgba(99,102,241,0.35); padding: 34px 36px; display: flex; flex-direction: column; gap: 18px; }
+.card { width: 960px; background: #16133a; border: 3px solid #2c2870; border-radius: 30px; text-align: left; box-shadow: 0 40px 120px rgba(99,102,241,0.35); padding: 36px 38px; display: flex; flex-direction: column; gap: 20px; }
 .num { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 150px; line-height: 0.9; color: #6366f1; }
 .big { font-size: 44px; font-weight: 700; line-height: 1.2; }
 .small { font-size: 32px; color: #b4b1e0; line-height: 1.35; }
@@ -25,6 +25,31 @@ em { font-style: normal; color: #a5b4fc; }
 .pill em { color: #e0e7ff; }
 .handle { font-family: "JetBrains Mono", monospace; font-size: 30px; color: #b4b1e0; letter-spacing: 0.06em; }
 .mark { width: 130px; height: 130px; border-radius: 36px; background: #6366f1; display: flex; align-items: center; justify-content: center; font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 74px; box-shadow: 0 0 120px rgba(99,102,241,0.7); }
-.row { display: flex; align-items: center; gap: 18px; font-size: 34px; line-height: 1.25; }
-.ck { width: 46px; height: 46px; border-radius: 50%; background: #34d399; color: #0a0820; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }
-.ko { width: 46px; height: 46px; border-radius: 50%; background: #4b4790; color: #f1f0ff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }
+.row { display: flex; align-items: center; gap: 20px; font-size: 40px; line-height: 1.25; }
+.ck { width: 54px; height: 54px; border-radius: 50%; background: #34d399; color: #0a0820; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }
+.ko { width: 54px; height: 54px; border-radius: 50%; background: #4b4790; color: #f1f0ff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }
+
+/* v2 : mots animés, barre de progression, flash, battement du halo */
+.w { display: inline-block; }
+.w.em { color: #a5b4fc; }
+#halo-beat { position: absolute; z-index: 1; width: 1300px; height: 1300px; left: -110px; top: 310px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, rgba(165,180,252,0.5) 0%, rgba(99,102,241,0.2) 40%, rgba(99,102,241,0) 70%); }
+#flash { position: absolute; inset: 0; z-index: 8; background: #e0e7ff; opacity: 0; }
+#prog { position: absolute; z-index: 7; left: 70px; right: 70px; top: 252px; height: 8px; border-radius: 8px; background: rgba(165,180,252,0.18); overflow: hidden; }
+#prog-fill { width: 100%; height: 100%; background: #6366f1; transform-origin: left center; transform: scaleX(0); }
+#scenes { position: absolute; inset: 0; z-index: 2; }
+/* Conversation SMS */
+.bubble { max-width: 780px; padding: 24px 30px; border-radius: 32px; font-size: 38px; line-height: 1.3; }
+.bubble.them { align-self: flex-start; background: #1d1a4a; border-bottom-left-radius: 8px; }
+.bubble.me { align-self: flex-end; background: #4f46e5; border-bottom-right-radius: 8px; }
+/* Notifications */
+.notif { width: 960px; display: flex; align-items: center; gap: 20px; padding: 22px 26px; background: #f1f0ff; color: #16133a; border-radius: 28px; text-align: left; box-shadow: 0 24px 70px rgba(10,8,32,0.55); }
+.notif .ic { width: 62px; height: 62px; border-radius: 18px; background: #6366f1; color: #f1f0ff; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; flex-shrink: 0; }
+.notif .a { font-family: "Unbounded", sans-serif; font-size: 32px; font-weight: 800; }
+.notif .b { font-size: 28px; color: #4b4790; margin-top: 4px; }
+/* Agenda */
+.cal { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.cal .day { font-family: "JetBrains Mono", monospace; font-size: 28px; font-weight: 700; color: #b4b1e0; text-align: center; }
+.cal .col { display: flex; flex-direction: column; gap: 10px; min-height: 320px; padding: 10px; background: #1d1a4a; border-radius: 16px; }
+.cal .slot { padding: 14px 8px; border-radius: 12px; background: #34d399; color: #0a0820; font-size: 24px; font-weight: 800; line-height: 1.2; text-align: center; }
+.arrow { font-size: 90px; line-height: 1; color: #a5b4fc; }

@@ -4,6 +4,17 @@ window.PF = (function () {
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // Texte sûr ; *mot* → mot en couleur d'accent
   const rich = (s) => esc(s).replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  // Texte découpé en mots (animation mot par mot) ; *mot* → mot en couleur d'accent
+  const words = (s) => {
+    let em = false;
+    return esc(s).split(/\s+/).filter(Boolean).map((w) => {
+      const open = w.startsWith("*"), close = w.endsWith("*") && (w.length > 1 || em);
+      if (open) em = true;
+      const cls = em ? "w em" : "w";
+      if (close) em = false;
+      return `<span class="${cls}">${w.replace(/\*/g, "")}</span>`;
+    }).join(" ");
+  };
   const fill = (id, text) => { const el = document.getElementById(id); if (el) el.innerHTML = rich(text); };
   // Étoiles : générateur à graine fixe (rendu identique à chaque fois)
   const stars = () => {
@@ -25,11 +36,40 @@ window.PF = (function () {
       tl.to("#ring", { rotation: 90, duration: END - 0.7, ease: "none" }, 0.7);
       tl.fromTo("#stars", { y: 0 }, { y: -260, duration: END, ease: "none" }, 0);
     },
-    swap(from, to, t) {
-      tl.to(from, { y: -260, filter: "blur(16px)", opacity: 0, duration: 0.22, ease: "power3.in" }, t);
-      tl.fromTo(to, { y: 300, filter: "blur(16px)", opacity: 0 }, { y: 0, filter: "blur(0px)", opacity: 1, duration: 0.3, ease: "power3.out" }, t + 0.1);
+    // Transitions éclair, quatre styles en alternance
+    swap(from, to, t, k) {
+      switch ((k || 0) % 4) {
+        case 1:   // fouetté latéral
+          tl.to(from, { x: -520, filter: "blur(22px)", opacity: 0, duration: 0.18, ease: "power3.in" }, t);
+          tl.fromTo(to, { x: 620, filter: "blur(22px)", opacity: 0 }, { x: 0, filter: "blur(0px)", opacity: 1, duration: 0.28, ease: "expo.out" }, t + 0.08);
+          break;
+        case 2:   // plongée (zoom à travers)
+          tl.to(from, { scale: 1.6, filter: "blur(18px)", opacity: 0, duration: 0.2, ease: "power2.in" }, t);
+          tl.fromTo(to, { scale: 0.62, filter: "blur(14px)", opacity: 0 }, { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.3, ease: "expo.out" }, t + 0.1);
+          break;
+        case 3:   // flash
+          tl.fromTo("#flash", { opacity: 0 }, { opacity: 0.55, duration: 0.06, ease: "none", yoyo: true, repeat: 1 }, t);
+          tl.to(from, { opacity: 0, duration: 0.05, ease: "none" }, t + 0.05);
+          tl.fromTo(to, { scale: 1.12, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.26, ease: "power4.out" }, t + 0.06);
+          break;
+        default:  // poussée verticale
+          tl.to(from, { y: -300, filter: "blur(16px)", opacity: 0, duration: 0.2, ease: "power3.in" }, t);
+          tl.fromTo(to, { y: 320, filter: "blur(16px)", opacity: 0 }, { y: 0, filter: "blur(0px)", opacity: 1, duration: 0.28, ease: "power3.out" }, t + 0.08);
+      }
+      // Le halo bat à chaque coupe
+      tl.fromTo("#halo-beat", { opacity: 0.0, scale: 0.9 }, { opacity: 0.55, scale: 1.08, duration: 0.12, ease: "power2.out", yoyo: true, repeat: 1 }, t + 0.06);
     },
-    drift(sel, t, d) { tl.fromTo(sel, { scale: 1 }, { scale: 1.045, duration: Math.max(0.3, d), ease: "none" }, t); },
+    // Mots qui tombent un par un, puis le mot d'accent qui claque
+    words(sel, t, step) {
+      tl.fromTo(`${sel} .w`, { opacity: 0, y: 70, rotationX: -70, scale: 0.8, transformPerspective: 900 },
+        { opacity: 1, y: 0, rotationX: 0, scale: 1, transformPerspective: 900, duration: 0.3, ease: "back.out(2)", stagger: step || 0.055 }, t);
+      const n = document.querySelectorAll(sel + " .w").length, after = t + n * (step || 0.055) + 0.2;
+      if (document.querySelector(sel + " .em")) tl.fromTo(`${sel} .em`, { scale: 1 }, { scale: 1.16, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 }, after);
+    },
+    shake(t, power) { tl.fromTo("#scenes", { x: 0, y: 0 }, { x: power || 10, y: -(power || 10) / 2, duration: 0.035, ease: "none", yoyo: true, repeat: 5, immediateRender: false }, t); },
+    float(sel, t, d) { if (d > 0.6) tl.to(sel, { y: -14, duration: d / 2, ease: "sine.inOut", yoyo: true, repeat: 1 }, t); },
+    progress() { tl.fromTo("#prog-fill", { scaleX: 0 }, { scaleX: 1, duration: END, ease: "none" }, 0); },
+    drift(sel, t, d, k) { tl.fromTo(sel, { scale: 1, rotation: 0 }, { scale: 1.07, rotation: (k || 0) % 2 ? -0.8 : 0.8, duration: Math.max(0.3, d), ease: "none" }, t); },
     pop(sel, t, ease) { tl.fromTo(sel, { opacity: 0, y: 50, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: ease || "power4.out" }, t); },
     slam(sel, t) { tl.fromTo(sel, { opacity: 0, scale: 1.35, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.3, ease: "power4.out" }, t); },
     slide(sel, t, dir) { tl.fromTo(sel, { opacity: 0, x: (dir || -1) * 140 }, { opacity: 1, x: 0, duration: 0.28, ease: "expo.out" }, t); },
@@ -41,5 +81,5 @@ window.PF = (function () {
     },
     fadeOut(sel) { tl.to(sel, { opacity: 0, duration: 0.3, ease: "power2.in" }, END - 0.35); },
   });
-  return { esc, rich, fill, stars, kit };
+  return { esc, rich, words, fill, stars, kit };
 })();

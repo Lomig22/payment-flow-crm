@@ -32,7 +32,7 @@ try {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "vo"), { recursive: true });
   cpSync(join(HERE, "template", "index.html"), join(dir, "index.html"));
-  for (const f of ["base.css", "base.js"]) cpSync(join(HERE, "shared", f), join(dir, f));
+  for (const f of ["base.css", "base.js", "beats.js"]) cpSync(join(HERE, "shared", f), join(dir, f));
   cpSync(join(HERE, "shared", "fonts"), join(dir, "fonts"), { recursive: true });
   writeFileSync(join(dir, "hyperframes.json"), JSON.stringify({ media: { autoProxy: true } }));
   writeFileSync(join(dir, "data.json"), JSON.stringify(job.data));

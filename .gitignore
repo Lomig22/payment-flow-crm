@@ -47,3 +47,5 @@ motion/**/.hyperframes/
 motion/**/vo/.*.wav
 motion/**/audio.wav
 motion/factory/work/
+motion/marque/*
+!motion/marque/LISEZMOI.txt

@@ -20,22 +20,23 @@ const VOICE_ID = process.env.AGENCY_VOICE_ID ?? 'Jrq4GqCKqYpigdQsZRkP';
 const TTS_MODEL = 'eleven_flash_v2_5';
 const VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.8, style: 0.3, speed: 1.12, use_speaker_boost: true };
 const CREDIT_RESERVE = Number(process.env.AGENCY_VOICE_RESERVE ?? 500);
-// Phrase de fin des reels MOFU/BOFU : toujours la même, donc générée une seule fois (cache)
-export const OFFER_VO = "Commente DEVIS : je t'offre un audit gratuit et ton plan d'action concret pour obtenir quinze demandes de devis de plus par mois.";
+// Phrases de fin : toujours les mêmes, donc générées une seule fois (cache)
+export const OFFER_VO  = "Commente DEVIS : je t'offre ton audit et ton plan d'action pour quinze demandes de devis de plus par mois.";
+export const FOLLOW_VO = "Abonne-toi, et commente DEVIS pour recevoir ton plan d'action offert.";
 
 export type Funnel = 'tofu' | 'mofu' | 'bofu';
 const db = () => supabase as any;
 
 // ── Plan du jour (Claude) ──
 
-const TYPES = ['hook', 'point', 'checklist', 'versus', 'number', 'search', 'leads', 'cta'] as const;
+const TYPES = ['hook', 'point', 'checklist', 'versus', 'number', 'search', 'leads', 'chat', 'notifs', 'calendar', 'cta'] as const;
 // Sans types nullables (limite des sorties structurées) : chaîne vide, 0 ou [] = champ absent
 const str = { type: 'string' };
 const strs = { type: 'array', items: { type: 'string' } };
 const SCENE = {
   type: 'object', additionalProperties: false,
   required: ['type', 'kicker', 'text', 'text2', 'num', 'title', 'sub', 'items', 'icon', 'left_label', 'left_items', 'right_label', 'right_items',
-    'value', 'prefix', 'suffix', 'label', 'note', 'query', 'business', 'total', 'leads', 'vo'],
+    'value', 'prefix', 'suffix', 'label', 'note', 'query', 'business', 'total', 'leads', 'contact', 'messages', 'notifs', 'slots', 'vo'],
   properties: {
     type: { type: 'string', enum: TYPES as unknown as string[] },
     kicker: str, text: str, text2: str, num: str, title: str, sub: str, items: strs,
@@ -47,7 +48,11 @@ const SCENE = {
       type: 'array',
       items: { type: 'object', additionalProperties: false, required: ['name', 'project', 'budget'], properties: { name: { type: 'string' }, project: { type: 'string' }, budget: { type: 'string' } } },
     },
-    vo: { ...str, description: 'Phrase dite par la voix off pendant la scène (MOFU/BOFU), nombres écrits en lettres' },
+    contact: str,
+    messages: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['from', 'text'], properties: { from: { type: 'string', enum: ['client', 'toi'] }, text: { type: 'string' } } } },
+    notifs:   { type: 'array', items: { type: 'object', additionalProperties: false, required: ['title', 'sub'], properties: { title: { type: 'string' }, sub: { type: 'string' } } } },
+    slots:    { type: 'array', items: { type: 'object', additionalProperties: false, required: ['day', 'label'], properties: { day: { type: 'integer' }, label: { type: 'string' } } } },
+    vo: { ...str, description: 'Phrase dite par la voix off pendant la scène, 4 à 10 mots, nombres écrits en lettres' },
   },
 };
 const PLAN_SCHEMA = {
@@ -75,23 +80,32 @@ CIBLE : artisans et entreprises du bâtiment et de l'habitat (plombiers, électr
 
 CE QUE FAIT PAYMENT FLOW : rendre l'artisan visible là où ses clients le cherchent (Google, fiche Google, publicités, réseaux sociaux), lui apporter des demandes de devis déjà qualifiées (projet, budget, délai), gérer tout le reste (réponses, relances, prises de rendez-vous) pendant qu'il reste sur ses chantiers.
 
+FORMAT REEL : l'attention se gagne à la seconde. Rythme très rapide, une idée par scène, une coupe toutes les 2 à 3 secondes. Le reel fait 15 à 25 secondes au total.
+- 6 à 8 scènes avant la scène finale (cta).
+- Chaque scène a une voix off (vo) : 4 à 10 mots, une seule phrase courte et percutante, à l'oral, qui va avec l'écran. Celle de l'accroche fait 8 mots au plus et doit stopper le pouce (question choc, chiffre, contradiction).
+- Au moins 3 scènes visuelles (search, leads, chat, notifs, calendar, checklist, versus, number). Jamais deux scènes point d'affilée.
+- Les textes à l'écran sont plus courts que la voix : quelques mots forts.
+
 ENTONNOIR :
-- tofu (découverte, viser le « waouh » et les clics) : accroche choc, erreurs, idées reçues, avant/après, astuces surprenantes. 4 à 6 scènes. Pas de voix off (vo vide partout). Dernière scène : cta en mode follow.
-- mofu (éducatif, engagement) : une méthode concrète et applicable, étape par étape, checklist. 5 à 7 scènes. Voix off sur chaque scène sauf la dernière. Dernière scène : cta en mode offer.
-- bofu (vente) : le parcours avec Payment Flow (visible → demandes qualifiées → tu restes sur tes chantiers → l'étape supérieure), en s'appuyant sur les scènes search et leads. 5 à 6 scènes. Voix off sur chaque scène sauf la dernière. Dernière scène : cta en mode offer.
+- tofu (découverte, viser le « waouh » et les partages) : accroche choc, erreurs, idées reçues, avant/après, astuces surprenantes. Dernière scène : cta en mode follow.
+- mofu (éducatif, engagement) : une méthode concrète et applicable, étape par étape, checklist. Dernière scène : cta en mode offer.
+- bofu (vente) : le parcours avec Payment Flow (visible → demandes qualifiées → tu restes sur tes chantiers → l'étape supérieure), avec les scènes search, leads, notifs, calendar. Dernière scène : cta en mode offer.
 
 TYPES DE SCÈNES (champs utilisés ; les autres : chaîne vide, 0 ou liste vide) :
-- hook : kicker (facultatif, 1 à 3 mots), text (≤ 60 car.), text2 (facultatif, ≤ 45 car., la chute). Toujours en première scène.
-- point : kicker (ex. « Erreur 2 / 3 »), num (facultatif, ex. « 02 »), title (≤ 40 car.), sub (facultatif, ≤ 70 car.).
-- checklist : kicker (facultatif), title (≤ 36 car.), items (3 ou 4, ≤ 34 car. chacun), icon « ok » (à faire) ou « ko » (à éviter).
-- versus : title (≤ 30 car.), left_label / right_label (≤ 16 car., ex. « Aujourd'hui » / « Ce qu'il faut »), left_items et right_items (2 ou 3 chacun, ≤ 30 car.).
-- number : kicker (facultatif), value (entier), prefix / suffix (facultatifs, ex. « + », « € », « % »), label (≤ 40 car.), note (obligatoire si le chiffre n'est pas un simple calcul : « Exemple »).
-- search : title (≤ 30 car.), sub (facultatif), query (recherche Google réaliste, ex. « plombier nantes »), business (ex. « Ton entreprise · Plombier »).
-- leads : title (≤ 30 car.), sub (facultatif), total (entier, 8 à 20), leads (exactement 3 : prénom + initiale, projet ≤ 22 car., budget réaliste).
-- cta : mode « follow » (tofu) ou « offer » (mofu, bofu). Aucun autre champ ; vo vide.
+- hook : kicker (facultatif, 1 à 3 mots), text (≤ 50 car.), text2 (facultatif, ≤ 40 car., la chute). Toujours en première scène.
+- point : kicker (ex. « Erreur 2 / 3 »), num (facultatif, ex. « 02 »), title (≤ 36 car.), sub (facultatif, ≤ 60 car.).
+- checklist : kicker (facultatif), title (≤ 32 car.), items (3 ou 4, ≤ 30 car. chacun), icon « ok » (à faire) ou « ko » (à éviter).
+- versus : title (≤ 28 car.), left_label / right_label (≤ 16 car., ex. « Aujourd'hui » / « Ce qu'il faut »), left_items et right_items (2 ou 3 chacun, ≤ 28 car.).
+- number : kicker (facultatif), value (entier), prefix / suffix (facultatifs, ex. « + », « € », « % »), label (≤ 36 car.), note (obligatoire si le chiffre n'est pas un simple calcul : « Exemple »).
+- search : title (≤ 28 car.), query (recherche Google réaliste, ex. « plombier nantes »), business (ex. « Ton entreprise · Plombier »).
+- leads : title (≤ 28 car.), total (entier, 8 à 20), leads (exactement 3 : prénom + initiale, projet ≤ 22 car., budget réaliste).
+- chat : title (≤ 28 car.), contact (prénom du client), messages (2 à 4 SMS ≤ 55 car., from « client » ou « toi ») : une relance, une réponse rapide, une prise de rendez-vous…
+- notifs : title (≤ 28 car.), notifs (2 à 4 notifications : title ≤ 26 car. ex. « Nouvelle demande de devis », sub ≤ 38 car.).
+- calendar : title (≤ 28 car.), sub (facultatif), slots (4 à 7 créneaux : day de 0 = lundi à 4 = vendredi, label ≤ 14 car. ex. « Devis cuisine »).
+- cta : mode « follow » (tofu) ou « offer » (mofu, bofu). Aucun autre champ ; vo vide (la phrase de fin est fixe).
 Dans les textes affichés, entoure UN mot clé par texte d'astérisques pour le colorer (*visible*). Jamais plus d'un par texte.
 
-VOIX OFF (vo) : une phrase naturelle à l'oral, 6 à 20 mots, qui dit la même idée que l'écran sans forcément le recopier. Nombres en toutes lettres.
+VOIX OFF (vo) : naturelle à l'oral, tutoiement, nombres en toutes lettres, pas d'abréviation.
 
 RÈGLES ABSOLUES :
 - N'invente jamais de statistique, d'étude, de client, de témoignage ni de résultat garanti. Un chiffre n'est permis que comme exemple explicite (note « Exemple ») ou calcul simple et vrai.
@@ -107,7 +121,7 @@ const list = (a: any, n: number, len: number) => (Array.isArray(a) ? a.map((x) =
 
 // Scène au format du gabarit (motion/factory/template), textes bornés
 export function toTemplateScene(s: RawScene, funnel: Funnel): Record<string, any> | null {
-  const vo = funnel === 'tofu' ? undefined : cut(s.vo, 160);
+  const vo = cut(s.vo, 110);
   switch (s.type) {
     case 'hook':      return s.text ? { type: 'hook', kicker: cut(s.kicker, 24), text: cut(s.text, 70), text2: cut(s.text2, 55), vo } : null;
     case 'point':     return s.title ? { type: 'point', kicker: cut(s.kicker, 24), num: cut(s.num, 3), title: cut(s.title, 48), sub: cut(s.sub, 80), vo } : null;
@@ -119,15 +133,28 @@ export function toTemplateScene(s: RawScene, funnel: Funnel): Record<string, any
       const leads = (Array.isArray(s.leads) ? s.leads : []).slice(0, 3).map((l: any) => ({ name: cut(l?.name, 16), project: cut(l?.project, 24), budget: cut(l?.budget, 10) })).filter((l: any) => l.name && l.project);
       return s.title && leads.length === 3 ? { type: 'leads', title: cut(s.title, 36), sub: cut(s.sub, 60), total: Math.max(3, Math.min(30, Number(s.total) || 12)), items: leads, vo } : null;
     }
+    case 'chat': {
+      const messages = (Array.isArray(s.messages) ? s.messages : []).slice(0, 4).map((m: any) => ({ from: m?.from === 'toi' ? 'toi' : 'client', text: cut(m?.text, 60) })).filter((m: any) => m.text);
+      return s.title && messages.length >= 2 ? { type: 'chat', title: cut(s.title, 36), contact: cut(s.contact, 20), messages, vo } : null;
+    }
+    case 'notifs': {
+      const items = (Array.isArray(s.notifs) ? s.notifs : []).slice(0, 4).map((n: any) => ({ title: cut(n?.title, 28), sub: cut(n?.sub, 40) })).filter((n: any) => n.title);
+      return s.title && items.length >= 2 ? { type: 'notifs', title: cut(s.title, 36), items, vo } : null;
+    }
+    case 'calendar': {
+      const slots = (Array.isArray(s.slots) ? s.slots : []).slice(0, 7).map((z: any) => ({ day: Math.max(0, Math.min(4, Number(z?.day) || 0)), label: cut(z?.label, 16) })).filter((z: any) => z.label);
+      return s.title && slots.length >= 3 ? { type: 'calendar', title: cut(s.title, 36), sub: cut(s.sub, 60), slots, vo } : null;
+    }
     default: return null;
   }
 }
 
 export function normalizeReel(r: RawReel): { funnel: Funnel; topic: string; scenes: Record<string, any>[]; caption: string } | null {
   if (!['tofu', 'mofu', 'bofu'].includes(r?.funnel) || !Array.isArray(r.scenes)) return null;
-  const body = r.scenes.filter((s) => s?.type !== 'cta').map((s) => toTemplateScene(s, r.funnel)).filter(Boolean).slice(0, 6) as Record<string, any>[];
-  if (body.length < 3 || body[0].type !== 'hook') return null;
-  const cta = r.funnel === 'tofu' ? { type: 'cta', mode: 'follow', keyword: 'DEVIS' } : { type: 'cta', mode: 'offer', keyword: 'DEVIS', vo: OFFER_VO };
+  const body = r.scenes.filter((s) => s?.type !== 'cta').map((s) => toTemplateScene(s, r.funnel)).filter(Boolean).slice(0, 8) as Record<string, any>[];
+  // Chaque scène parlée (un reel sans voix ne retient personne), au moins 5 scènes avant la fin
+  if (body.length < 5 || body[0].type !== 'hook' || body.some((x) => !x.vo)) return null;
+  const cta = r.funnel === 'tofu' ? { type: 'cta', mode: 'follow', keyword: 'DEVIS', vo: FOLLOW_VO } : { type: 'cta', mode: 'offer', keyword: 'DEVIS', vo: OFFER_VO };
   const tags = (r.hashtags ?? []).map((h) => '#' + String(h).replace(/^#+/, '').replace(/\s+/g, '').toLowerCase()).filter((h) => h.length > 2).slice(0, 8);
   const caption = `${String(r.caption ?? '').trim()}\n\n${tags.join(' ')}`.trim().slice(0, 2200);
   return { funnel: r.funnel, topic: String(r.topic ?? '').slice(0, 200), scenes: [...body, cta], caption };
@@ -141,7 +168,7 @@ const BATCH = 4;   // reels écrits par appel (un appel tient dans les 5 min de 
 
 // Écrit le prochain lot de reels manquants du jour. Idempotent : à rappeler jusqu'à remaining = 0.
 export async function planDay(day = parisDay()): Promise<{ day: string; planned: number; remaining: number }> {
-  const { data: existing } = await db().from('agency_reels').select('funnel').eq('day', day);
+  const { data: existing } = await db().from('agency_reels').select('funnel').eq('day', day).neq('status', 'failed');
   const have: Record<Funnel, number> = { tofu: 0, mofu: 0, bofu: 0 };
   for (const r of existing ?? []) have[r.funnel as Funnel]++;
   const todo: Funnel[] = [];
@@ -179,7 +206,7 @@ ${(history ?? []).map((h: any) => `- ${h.topic}`).join('\n') || '(aucun)'}`;
     const i = pool.findIndex((r) => r.funnel === f);
     if (i < 0) continue;
     const [r] = pool.splice(i, 1);
-    const { error } = await db().from('agency_reels').insert({ account_username: AGENCY_ACCOUNT, day, funnel: r.funnel, topic: r.topic, spec: { scenes: r.scenes }, caption: r.caption, voiced: r.funnel !== 'tofu' });
+    const { error } = await db().from('agency_reels').insert({ account_username: AGENCY_ACCOUNT, day, funnel: r.funnel, topic: r.topic, spec: { scenes: r.scenes }, caption: r.caption, voiced: true });
     if (error) throw new Error(`agency_reels : ${error.message}`);
     planned++;
   }
@@ -190,9 +217,21 @@ ${(history ?? []).map((h: any) => `- ${h.topic}`).join('\n') || '(aucun)'}`;
 
 const RULES = Object.entries(PRONOUNCE as Record<string, string>).filter(([k]) => !k.startsWith('_'));
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-export const pronounce = (t: string) => RULES.reduce((x, [k, v]) => x.replace(new RegExp(`(?<![\\p{L}])${escRe(k)}(?![\\p{L}])`, 'giu'), v), t);
-const voPath = (text: string) => `agency/vo/${createHash('sha1').update(JSON.stringify([VOICE_ID, TTS_MODEL, VOICE_SETTINGS, pronounce(text)])).digest('hex')}.mp3`;
-const credits = (text: string) => Math.ceil(pronounce(text).length * 0.5);
+export const pronounce = (t: string, rules = RULES) => rules.reduce((x, [k, v]) => x.replace(new RegExp(`(?<![\\p{L}])${escRe(k)}(?![\\p{L}])`, 'giu'), v), t);
+// Voix Google (Chirp 3 HD, gratuite jusqu'à 1 million de caractères par mois) dès que la clé est
+// configurée ; sinon Anatole sur ElevenLabs, dans la limite des crédits
+const GOOGLE_VOICE = process.env.AGENCY_GOOGLE_VOICE ?? 'fr-FR-Chirp3-HD-Charon';
+const GOOGLE_RATE = Number(process.env.AGENCY_GOOGLE_RATE ?? 1.12);
+const GOOGLE_MONTHLY_CAP = 900_000;   // marge sous le million gratuit
+const useGoogle = () => !!process.env.GOOGLE_TTS_API_KEY;
+// « devis » : correction propre à ElevenLabs (il lisait « Davis »)
+const GOOGLE_RULES = RULES.filter(([k]) => k !== 'devis');
+const spoken = (text: string) => (useGoogle() ? pronounce(text, GOOGLE_RULES) : pronounce(text));
+const voPath = (text: string) => `agency/vo/${createHash('sha1').update(JSON.stringify(useGoogle()
+  ? ['google', GOOGLE_VOICE, GOOGLE_RATE, spoken(text)]
+  : [VOICE_ID, TTS_MODEL, VOICE_SETTINGS, spoken(text)])).digest('hex')}.mp3`;
+// Coût : crédits ElevenLabs (0,5 par caractère) ou caractères Google
+const credits = (text: string) => (useGoogle() ? spoken(text).length : Math.ceil(spoken(text).length * 0.5));
 
 async function cached(path: string): Promise<boolean> {
   const dir = path.slice(0, path.lastIndexOf('/')), name = path.slice(path.lastIndexOf('/') + 1);
@@ -204,6 +243,11 @@ async function cached(path: string): Promise<boolean> {
 // Les jours sans voix s'accumulent (3 au plus) pour pouvoir payer un reel entier ; on retire ce
 // que la fabrique a déjà dépensé aujourd'hui
 async function voiceBudgetToday(): Promise<number> {
+  if (useGoogle()) {
+    const month = parisDay().slice(0, 7);
+    const { data } = await db().from('agency_reels').select('voice_credits').gte('day', `${month}-01`).gt('voice_credits', 0);
+    return GOOGLE_MONTHLY_CAP - (data ?? []).reduce((n: number, r: any) => n + r.voice_credits, 0);
+  }
   const res = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY ?? '' }, cache: 'no-store' });
   if (!res.ok) return 0;
   const s = await res.json();
@@ -221,9 +265,20 @@ async function voiceBudgetToday(): Promise<number> {
 }
 
 async function tts(text: string, path: string): Promise<void> {
+  if (useGoogle()) {
+    const r = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_TTS_API_KEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: { text: spoken(text) }, voice: { languageCode: 'fr-FR', name: GOOGLE_VOICE }, audioConfig: { audioEncoding: 'MP3', speakingRate: GOOGLE_RATE, sampleRateHertz: 44100 } }),
+    });
+    if (!r.ok) throw new Error(`Google TTS ${r.status} : ${(await r.text()).slice(0, 200)}`);
+    const { audioContent } = await r.json();
+    const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, Buffer.from(audioContent, 'base64'), { contentType: 'audio/mpeg', upsert: true });
+    if (error) throw new Error(`Stockage : ${error.message}`);
+    return;
+  }
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}?output_format=mp3_44100_128`, {
     method: 'POST', headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY ?? '', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: pronounce(text), model_id: TTS_MODEL, language_code: 'fr', voice_settings: VOICE_SETTINGS }),
+    body: JSON.stringify({ text: spoken(text), model_id: TTS_MODEL, language_code: 'fr', voice_settings: VOICE_SETTINGS }),
   });
   if (!r.ok) throw new Error(`ElevenLabs ${r.status} : ${(await r.text()).slice(0, 200)}`);
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, Buffer.from(await r.arrayBuffer()), { contentType: 'audio/mpeg', upsert: true });
@@ -234,7 +289,7 @@ async function tts(text: string, path: string): Promise<void> {
 async function prepareVoices(reel: any): Promise<{ urls: Record<number, string>; credits: number }> {
   const scenes: any[] = reel.spec.scenes;
   const lines = scenes.map((s, i) => (s.vo ? { i, text: s.vo as string, path: voPath(s.vo) } : null)).filter(Boolean) as { i: number; text: string; path: string }[];
-  if (!lines.length || !process.env.ELEVENLABS_API_KEY) return { urls: {}, credits: 0 };
+  if (!lines.length || !(useGoogle() || process.env.ELEVENLABS_API_KEY)) return { urls: {}, credits: 0 };
   const missing = [];
   for (const l of lines) if (!(await cached(l.path))) missing.push(l);
   const cost = missing.reduce((n, l) => n + credits(l.text), 0);

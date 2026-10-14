@@ -9,17 +9,17 @@
       @font-face { font-family: "Unbounded"; src: url("fonts/Unbounded-800.woff2") format("woff2"); font-weight: 800; }
       @font-face { font-family: "DM Sans"; src: url("fonts/DMSans.woff2") format("woff2"); font-weight: 100 1000; }
       /* Fenêtres d'interface (scènes recherche et demandes) */
-      .bar { display: flex; align-items: center; gap: 12px; padding: 20px 26px; border-bottom: 2px solid #2c2870; font-size: 24px; color: #b4b1e0; margin: -34px -36px 4px; }
+      .bar { display: flex; align-items: center; gap: 12px; padding: 22px 28px; border-bottom: 2px solid #2c2870; font-size: 28px; color: #b4b1e0; margin: -34px -36px 4px; }
       .bar .d { width: 14px; height: 14px; border-radius: 50%; background: #4b4790; }
       .bar .t { margin-left: 10px; font-weight: 700; color: #f1f0ff; }
       .bar .c { margin-left: auto; color: #a5b4fc; font-family: "JetBrains Mono", monospace; }
       .item { display: flex; align-items: center; gap: 20px; padding: 20px 22px; background: #1d1a4a; border-radius: 20px; }
       .item.top { border: 3px solid #4f46e5; }
       .item .rk, .item .av { width: 56px; height: 56px; border-radius: 16px; background: #4f46e5; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 26px; flex-shrink: 0; }
-      .item .n { font-size: 31px; font-weight: 700; }
-      .item .s { font-size: 24px; color: #b4b1e0; margin-top: 4px; }
+      .item .n { font-size: 36px; font-weight: 700; }
+      .item .s { font-size: 28px; color: #b4b1e0; margin-top: 4px; }
       .item .badge { margin-left: auto; padding: 8px 16px; border-radius: 999px; background: #34d399; color: #0a0820; font-size: 22px; font-weight: 800; }
-      .search { display: flex; align-items: center; gap: 16px; padding: 18px 26px; border: 3px solid #4b4790; border-radius: 999px; font-size: 36px; font-weight: 700; min-height: 84px; }
+      .search { display: flex; align-items: center; gap: 16px; padding: 20px 28px; border: 3px solid #4b4790; border-radius: 999px; font-size: 42px; font-weight: 700; min-height: 84px; }
       .search .lens { color: #a5b4fc; }
       .gold { color: #fbbf24; }
       .vs-label { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b4b1e0; }
@@ -27,97 +27,113 @@
       .card.hot { border-color: #4f46e5; }
       .card.hot .vs-label { color: #a5b4fc; }
       .offer { border-color: #4f46e5; }
-      .offer .row { font-size: 34px; align-items: flex-start; }
+      .offer .row { font-size: 38px; align-items: flex-start; }
       .offer .row b { font-weight: 700; }
       .name { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 60px; letter-spacing: -0.02em; }
       .note { font-size: 24px; color: #8f8bc4; }
+      .bar-u { width: 220px; height: 10px; border-radius: 10px; background: #6366f1; transform-origin: center; }
     </style>
   </head>
   <body>
     <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="20">
       <div id="stars" data-layout-ignore></div>
       <div id="halo" data-layout-allow-overflow></div>
+      <div id="halo-beat" data-layout-allow-overflow></div>
       <div id="ring" data-layout-allow-overflow></div>
-      <div id="scenes"></div>
+      <div id="scenes" data-layout-allow-overflow></div>
+      <div id="prog" data-layout-ignore><div id="prog-fill"></div></div>
+      <div id="flash" data-layout-ignore></div>
       <audio id="audio" data-start="0" data-duration="20" data-track-index="10" src="audio.wav" data-volume="1"></audio>
     </div>
 
     <script src="base.js"></script>
+    <script src="beats.js"></script>
     <script src="data.js"></script>
     <script src="timing.js"></script>
     <script>
-      // Reel piloté par données : data.js (textes écrits par Claude) + timing.js (calé sur la voix)
+      // Reel piloté par données (v2, ultra animé) : data.js (textes écrits par Claude) + timing.js (calé
+      // sur la voix off) + beats.js (temps forts de chaque type de scène, partagés avec build.mjs)
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
       const D = window.__PF_DATA, T = window.__PF_T.T, END = window.__PF_T.END;
-      const { rich, esc } = PF;
+      const { words, rich, esc } = PF;
       const K = PF.kit(tl, END);
       const size = (s, steps) => { const n = String(s || "").length; for (const [max, px] of steps) if (n <= max) return px; return steps[steps.length - 1][1]; };
+      const W = (id, text, steps, cls) => `<div class="${cls || "title"}" id="${id}" style="font-size:${size(text, steps)}px">${words(text)}</div>`;
+      const TITLE = [[22, 76], [40, 66], [999, 56]];
+      const initials = (n) => String(n || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
-      // ── Gabarits de scène : HTML (état final) + entrées ──
+      // ── Gabarits de scène : HTML (état final) + animations aux temps forts (beats.js) ──
       const SCENES = {
         hook: {
           html: (s, i) => `${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
-            <div class="hook" id="s${i}-a" style="font-size:${size(s.text, [[28, 96], [48, 84], [70, 72], [999, 62]])}px">${rich(s.text)}</div>
-            ${s.text2 ? `<div class="hook2" id="s${i}-b" style="font-size:${size(s.text2, [[30, 80], [55, 66], [999, 56]])}px">${rich(s.text2)}</div>` : ""}`,
-          anim: (s, i, t, d) => {
-            if (s.kicker) K.fade(`#s${i}-k`, t + 0.05);
-            K.slam(`#s${i}-a`, t + 0.08);
-            if (s.text2) tl.fromTo(`#s${i}-b`, { opacity: 0, y: 90, scale: 0.85 }, { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "back.out(1.8)" }, t + Math.min(1.1, d * 0.45));
+            ${W(`s${i}-a`, s.text, [[28, 100], [48, 86], [70, 74], [999, 64]], "hook")}
+            ${s.text2 ? W(`s${i}-b`, s.text2, [[30, 80], [55, 66], [999, 56]], "hook2") : ""}`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.slide(`#s${i}-k`, t + 0.02, -1);
+            K.words(`#s${i}-a`, t + b.words, 0.06);
+            if (s.text2) { tl.fromTo(`#s${i}-b`, { opacity: 0, scale: 1.6, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.26, ease: "power4.out" }, t + b.text2); K.shake(t + b.shake, 12); }
           },
         },
         point: {
           html: (s, i) => `${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
             ${s.num ? `<div class="num" id="s${i}-n">${esc(s.num)}</div>` : ""}
-            <div class="title" id="s${i}-t" style="font-size:${size(s.title, [[24, 76], [44, 66], [999, 56]])}px">${rich(s.title)}</div>
-            ${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}`,
-          anim: (s, i, t) => {
-            if (s.kicker) tl.fromTo(`#s${i}-k`, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, t + 0.1);
-            if (s.num) tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 0.4, rotation: -12 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.35, ease: "back.out(2.2)" }, t + 0.14);
-            K.pop(`#s${i}-t`, t + 0.22, "expo.out");
-            if (s.sub) K.fade(`#s${i}-s`, t + 0.5);
+            ${W(`s${i}-t`, s.title, TITLE)}
+            ${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}
+            <div class="bar-u" id="s${i}-u"></div>`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) tl.fromTo(`#s${i}-k`, { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" }, t + b.kicker);
+            if (s.num) { tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 2.4, rotation: -14 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.28, ease: "power4.out" }, t + b.num); K.shake(t + b.shake, 9); }
+            K.words(`#s${i}-t`, t + b.words);
+            if (s.sub) tl.fromTo(`#s${i}-s`, { opacity: 0, y: 24, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: "sine.out" }, t + b.sub);
+            tl.fromTo(`#s${i}-u`, { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "expo.out" }, t + b.bar);
           },
         },
         checklist: {
           html: (s, i) => `${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
-            <div class="title" id="s${i}-t" style="font-size:${size(s.title, [[24, 68], [44, 60], [999, 52]])}px">${rich(s.title)}</div>
+            ${W(`s${i}-t`, s.title, [[24, 68], [44, 60], [999, 52]])}
             <div class="card" id="s${i}-c">${(s.items || []).map((it, j) => `<div class="row" id="s${i}-r${j}"><span class="${s.icon === "ko" ? "ko" : "ck"}">${s.icon === "ko" ? "✕" : "✓"}</span><span>${rich(it)}</span></div>`).join("")}</div>`,
-          anim: (s, i, t) => {
-            if (s.kicker) K.fade(`#s${i}-k`, t + 0.08);
-            K.pop(`#s${i}-t`, t + 0.14, "expo.out");
-            K.card(`#s${i}-c`, t + 0.3);
-            (s.items || []).forEach((_, j) => {
-              K.slide(`#s${i}-r${j}`, t + 0.6 + j * 0.3, -1);
-              tl.fromTo(`#s${i}-r${j} > span:first-child`, { scale: 0, rotation: -40 }, { scale: 1, rotation: 0, duration: 0.25, ease: "back.out(2.6)" }, t + 0.7 + j * 0.3);
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.fade(`#s${i}-k`, t + b.kicker);
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              K.slide(`#s${i}-r${j}`, t + at, j % 2 ? 1 : -1);
+              tl.fromTo(`#s${i}-r${j} > span:first-child`, { scale: 0, rotation: -60 }, { scale: 1, rotation: 0, duration: 0.24, ease: "back.out(3)" }, t + at + 0.08);
             });
+            K.float(`#s${i}-c`, t + b.card + 0.5, d - b.card - 0.6);
           },
         },
         versus: {
-          html: (s, i) => `<div class="title" id="s${i}-t" style="font-size:${size(s.title, [[24, 64], [44, 56], [999, 50]])}px">${rich(s.title)}</div>
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 64], [44, 56], [999, 50]])}
             <div class="card dim" id="s${i}-l"><div class="vs-label">${esc(s.left?.label || "Avant")}</div>${(s.left?.items || []).map((it) => `<div class="row"><span class="ko">✕</span><span>${rich(it)}</span></div>`).join("")}</div>
             <div class="card hot" id="s${i}-r"><div class="vs-label">${esc(s.right?.label || "Après")}</div>${(s.right?.items || []).map((it) => `<div class="row"><span class="ck">✓</span><span>${rich(it)}</span></div>`).join("")}</div>`,
-          anim: (s, i, t, d) => {
-            K.pop(`#s${i}-t`, t + 0.1, "expo.out");
-            tl.fromTo(`#s${i}-l`, { opacity: 0, x: -160 }, { opacity: 0.75, x: 0, duration: 0.32, ease: "power4.out" }, t + 0.35);
-            tl.fromTo(`#s${i}-r`, { opacity: 0, x: 160, scale: 0.94 }, { opacity: 1, x: 0, scale: 1, duration: 0.36, ease: "back.out(1.6)" }, t + Math.min(1.4, d * 0.45));
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            tl.fromTo(`#s${i}-l`, { opacity: 0, x: -240, rotation: -4 }, { opacity: 0.75, x: 0, rotation: 0, duration: 0.3, ease: "power4.out" }, t + b.left);
+            tl.fromTo(`#s${i}-l .row`, { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.2, ease: "power2.out", stagger: 0.12 }, t + b.left + 0.15);
+            tl.fromTo(`#s${i}-r`, { opacity: 0, x: 260, scale: 0.9, rotation: 4 }, { opacity: 1, x: 0, scale: 1, rotation: 0, duration: 0.32, ease: "back.out(1.7)" }, t + b.right);
+            tl.fromTo(`#s${i}-r .row`, { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.2, ease: "expo.out", stagger: 0.12 }, t + b.right + 0.15);
+            K.shake(t + b.shake, 8);
           },
         },
         number: {
           html: (s, i) => `${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
-            <div class="num mono" id="s${i}-n" style="font-size:${String(s.prefix || "").length + String(s.value).length + String(s.suffix || "").length > 6 ? 120 : 170}px">${esc(s.prefix || "")}0${esc(s.suffix || "")}</div>
-            <div class="title" id="s${i}-t" style="font-size:${size(s.label, [[24, 62], [44, 54], [999, 48]])}px">${rich(s.label)}</div>
+            <div class="num mono" id="s${i}-n" style="font-size:${String(s.prefix || "").length + String(s.value).length + String(s.suffix || "").length > 6 ? 130 : 190}px">${esc(s.prefix || "")}0${esc(s.suffix || "")}</div>
+            ${W(`s${i}-t`, s.label, [[24, 62], [44, 54], [999, 48]])}
             ${s.note ? `<div class="note" id="s${i}-o">${esc(s.note)}</div>` : ""}`,
-          anim: (s, i, t) => {
-            if (s.kicker) K.fade(`#s${i}-k`, t + 0.06);
-            tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power4.out" }, t + 0.1);
-            K.count(`#s${i}-n`, 0, Number(s.value) || 0, t + 0.15, 0.9, (v) => `${s.prefix || ""}${Math.round(v).toLocaleString("fr-FR")}${s.suffix || ""}`);
-            K.pop(`#s${i}-t`, t + 0.45, "power3.out");
-            if (s.note) K.fade(`#s${i}-o`, t + 0.8);
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.fade(`#s${i}-k`, t + b.kicker);
+            tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2)" }, t + b.num);
+            K.count(`#s${i}-n`, 0, Number(s.value) || 0, t + b.count, 0.85, (v) => `${s.prefix || ""}${Math.round(v).toLocaleString("fr-FR")}${s.suffix || ""}`);
+            tl.fromTo(`#s${i}-n`, { scale: 1 }, { scale: 1.18, duration: 0.12, ease: "power2.out", yoyo: true, repeat: 1 }, t + b.shake);
+            K.shake(t + b.shake, 11);
+            K.words(`#s${i}-t`, t + b.words);
+            if (s.note) K.fade(`#s${i}-o`, t + b.note);
           },
         },
         search: {
-          html: (s, i) => `<div class="title" id="s${i}-t" style="font-size:${size(s.title, [[24, 66], [44, 58], [999, 50]])}px">${rich(s.title)}</div>
-            ${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 66], [44, 58], [999, 50]])}
             <div class="card" id="s${i}-c">
               <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Recherche</span></div>
               <div class="search"><span class="lens">⌕</span><span id="s${i}-q"></span></div>
@@ -125,59 +141,109 @@
               <div class="item" id="s${i}-r1"><div class="rk">2</div><div><div class="n">Concurrent A</div><div class="s">★★★★☆ 4,1 · 9 avis</div></div></div>
               <div class="item" id="s${i}-r2"><div class="rk">3</div><div><div class="n">Concurrent B</div><div class="s">Pas d'avis</div></div></div>
             </div>`,
-          anim: (s, i, t) => {
-            K.pop(`#s${i}-t`, t + 0.12, "expo.out");
-            if (s.sub) K.fade(`#s${i}-s`, t + 0.3);
-            K.card(`#s${i}-c`, t + 0.3);
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
             const q = String(s.query || ""), o = { n: 0 };
-            tl.to(o, { n: q.length, duration: 0.6, ease: "none", onUpdate: () => { document.getElementById("s" + i + "-q").textContent = q.slice(0, Math.round(o.n)); } }, t + 0.55);
-            tl.fromTo(`#s${i}-r0`, { opacity: 0, y: 30, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(1.7)" }, t + 1.25);
-            tl.fromTo(`#s${i}-r1`, { opacity: 0, y: 30 }, { opacity: 0.55, y: 0, duration: 0.25, ease: "power3.out" }, t + 1.4);
-            tl.fromTo(`#s${i}-r2`, { opacity: 0, y: 30 }, { opacity: 0.4, y: 0, duration: 0.25, ease: "power2.out" }, t + 1.5);
+            tl.to(o, { n: q.length, duration: 0.5, ease: "none", onUpdate: () => { document.getElementById("s" + i + "-q").textContent = q.slice(0, Math.round(o.n)); } }, t + b.type);
+            tl.fromTo(`#s${i}-r0`, { opacity: 0, y: 40, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "back.out(2)" }, t + b.results);
+            tl.fromTo(`#s${i}-r1`, { opacity: 0, y: 30 }, { opacity: 0.55, y: 0, duration: 0.22, ease: "power3.out" }, t + b.results + 0.12);
+            tl.fromTo(`#s${i}-r2`, { opacity: 0, y: 30 }, { opacity: 0.4, y: 0, duration: 0.22, ease: "power2.out" }, t + b.results + 0.22);
+            tl.fromTo(`#s${i}-r0`, { boxShadow: "0 0 0 0 rgba(165,180,252,0)" }, { boxShadow: "0 0 0 8px rgba(165,180,252,0.9)", duration: 0.25, ease: "power2.out" }, t + b.glow);
+            K.float(`#s${i}-c`, t + b.glow + 0.3, d - b.glow - 0.4);
           },
         },
         leads: {
-          html: (s, i) => `<div class="title" id="s${i}-t" style="font-size:${size(s.title, [[24, 66], [44, 58], [999, 50]])}px">${rich(s.title)}</div>
-            ${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 66], [44, 58], [999, 50]])}
             <div class="card" id="s${i}-c">
               <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Demandes de devis</span><span class="c" id="s${i}-n">0</span></div>
-              ${(s.items || []).slice(0, 3).map((l, j) => `<div class="item" id="s${i}-l${j}"><div class="av">${esc(String(l.name || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</div><div><div class="n">${esc(l.name)}</div><div class="s">${esc(l.project)}${l.budget ? ` · ${esc(l.budget)}` : ""}</div></div><div class="badge">Qualifié</div></div>`).join("")}
+              ${(s.items || []).slice(0, 3).map((l, j) => `<div class="item" id="s${i}-l${j}"><div class="av">${esc(initials(l.name))}</div><div><div class="n">${esc(l.name)}</div><div class="s">${esc(l.project)}${l.budget ? ` · ${esc(l.budget)}` : ""}</div></div><div class="badge">Qualifié</div></div>`).join("")}
+            </div>
+            <div class="notif" id="s${i}-x"><div class="ic">+1</div><div><div class="a">Nouvelle demande de devis</div><div class="b">Projet, budget et délai confirmés</div></div></div>`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              K.slide(`#s${i}-l${j}`, t + at, j % 2 ? 1 : -1);
+              tl.fromTo(`#s${i}-l${j} .badge`, { scale: 0 }, { scale: 1, duration: 0.22, ease: "back.out(3)" }, t + at + 0.15);
+            });
+            K.count(`#s${i}-n`, 0, Number(s.total) || 12, t + b.items[0], b.notif - b.items[0], (v) => { const n = Math.round(v); return `${n} demande${n > 1 ? "s" : ""}`; });
+            tl.fromTo(`#s${i}-x`, { opacity: 0, y: -200, scale: 0.85 }, { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "back.out(2)" }, t + b.notif);
+            K.shake(t + b.notif + 0.1, 7);
+          },
+        },
+        chat: {
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 64], [44, 56], [999, 50]])}
+            <div class="card" id="s${i}-c" style="gap:16px">
+              <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">${esc(s.contact || "Client")}</span><span class="c">SMS</span></div>
+              ${(s.messages || []).slice(0, 4).map((m, j) => `<div class="bubble ${m.from === "toi" ? "me" : "them"}" id="s${i}-m${j}">${esc(m.text)}</div>`).join("")}
             </div>`,
-          anim: (s, i, t) => {
-            K.pop(`#s${i}-t`, t + 0.12, "expo.out");
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              const me = (s.messages[j] || {}).from === "toi";
+              tl.fromTo(`#s${i}-m${j}`, { opacity: 0, scale: 0.4, x: me ? 120 : -120, transformOrigin: me ? "right bottom" : "left bottom" }, { opacity: 1, scale: 1, x: 0, duration: 0.26, ease: "back.out(2.2)" }, t + at);
+            });
+          },
+        },
+        notifs: {
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 66], [44, 58], [999, 50]])}
+            ${(s.items || []).slice(0, 4).map((n, j) => `<div class="notif" id="s${i}-x${j}"><div class="ic">${j + 1}</div><div><div class="a">${esc(n.title)}</div><div class="b">${esc(n.sub || "")}</div></div></div>`).join("")}`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            b.items.forEach((at, j) => {
+              tl.fromTo(`#s${i}-x${j}`, { opacity: 0, y: -260, scale: 0.8, rotation: j % 2 ? 3 : -3 }, { opacity: 1, y: 0, scale: 1, rotation: 0, duration: 0.3, ease: "back.out(2.2)" }, t + at);
+            });
+            K.shake(t + b.items[b.items.length - 1] + 0.1, 8);
+          },
+        },
+        calendar: {
+          html: (s, i) => {
+            const cols = ["LUN", "MAR", "MER", "JEU", "VEN"].map((day, k) => `<div><div class="day">${day}</div><div class="col">${(s.slots || []).map((sl, j) => (sl.day === k ? `<div class="slot" id="s${i}-z${j}">${esc(sl.label)}</div>` : "")).join("")}</div></div>`).join("");
+            return `${W(`s${i}-t`, s.title, [[24, 66], [44, 58], [999, 50]])}${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}
+              <div class="card" id="s${i}-c"><div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Ton agenda</span></div><div class="cal">${cols}</div></div>`;
+          },
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
             if (s.sub) K.fade(`#s${i}-s`, t + 0.3);
-            K.card(`#s${i}-c`, t + 0.3);
-            (s.items || []).slice(0, 3).forEach((_, j) => K.slide(`#s${i}-l${j}`, t + 0.75 + j * 0.3, j % 2 ? 1 : -1));
-            const total = Number(s.total) || 12;
-            K.count(`#s${i}-n`, 0, total, t + 0.75, 1.3, (v) => { const n = Math.round(v); return `${n} demande${n > 1 ? "s" : ""}`; });
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => tl.fromTo(`#s${i}-z${j}`, { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.24, ease: "back.out(2.6)" }, t + at));
           },
         },
         cta: {
           html: (s, i) => s.mode === "offer"
             ? `<div class="mark" id="s${i}-m">P</div><div class="name" id="s${i}-na">PAYMENT FLOW</div>
                <div class="pill" id="s${i}-p">Commente <em>${esc(s.keyword || "DEVIS")}</em></div>
+               <div class="arrow" id="s${i}-ar">↓</div>
                <div class="card offer" id="s${i}-c"><div class="vs-label" style="color:#a5b4fc">Tu reçois gratuitement</div>
                  <div class="row" id="s${i}-o1"><span class="ck">✓</span><span>Un audit offert de ta visibilité, <b>avec Lomig</b></span></div>
                  <div class="row" id="s${i}-o2"><span class="ck">✓</span><span>Ton plan d'action pour <b>+15 demandes de devis</b> par mois</span></div>
                  <div class="small">100 % gratuit · sans engagement</div></div>`
             : `<div class="mark" id="s${i}-m">P</div>
-               <div class="title" id="s${i}-t">Abonne-toi à <em>@paymentflow</em></div>
+               ${W(`s${i}-t`, "Abonne-toi à *@paymentflow*", TITLE)}
                <div class="sub" id="s${i}-s">${rich(s.line || "Chaque jour, une idée pour recevoir plus de demandes de devis")}</div>
                <div class="pill" id="s${i}-p">Commente <em>${esc(s.keyword || "DEVIS")}</em> : plan d'action offert</div>`,
-          anim: (s, i, t) => {
-            tl.fromTo(`#s${i}-m`, { opacity: 0, scale: 0.3, rotation: -25 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.35, ease: "back.out(2.2)" }, t + 0.15);
+          anim: (s, i, t, d, b) => {
+            tl.fromTo(`#s${i}-m`, { opacity: 0, scale: 0.2, rotation: -40 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.32, ease: "back.out(2.4)" }, t + b.mark);
             if (s.mode === "offer") {
-              K.pop(`#s${i}-na`, t + 0.4, "expo.out");
-              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.55)" }, t + 0.65);
-              tl.fromTo(`#s${i}-c`, { opacity: 0, y: 80 }, { opacity: 1, y: 0, duration: 0.35, ease: "power4.out" }, t + 1.1);
-              K.slide(`#s${i}-o1`, t + 1.45, -1);
-              K.slide(`#s${i}-o2`, t + 2.2, -1);
+              K.pop(`#s${i}-na`, t + b.name, "expo.out");
+              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.5)" }, t + b.pill);
+              K.shake(t + b.pill + 0.05, 9);
+              tl.fromTo(`#s${i}-c`, { opacity: 0, y: 120 }, { opacity: 1, y: 0, duration: 0.32, ease: "power4.out" }, t + b.card);
+              K.slide(`#s${i}-o1`, t + b.o1, -1);
+              K.slide(`#s${i}-o2`, t + b.o2, 1);
             } else {
-              K.pop(`#s${i}-t`, t + 0.4, "expo.out");
-              K.fade(`#s${i}-s`, t + 0.7);
-              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.55)" }, t + 1.1);
+              K.words(`#s${i}-t`, t + b.words);
+              K.fade(`#s${i}-s`, t + b.sub);
+              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.5)" }, t + b.pill);
+              K.shake(t + b.pill + 0.05, 9);
             }
-            tl.to(`#s${i}-p`, { scale: 1.06, duration: 0.25, ease: "sine.inOut", yoyo: true, repeat: 1 }, t + 2.8);
+            // Jusqu'à la fin : le bouton bat, la flèche rebondit (pas d'image figée)
+            const beats = Math.max(1, Math.floor((d - b.pulse - 0.4) / 0.5));
+            tl.to(`#s${i}-p`, { scale: 1.08, duration: 0.25, ease: "sine.inOut", yoyo: true, repeat: beats * 2 - 1 }, t + b.pulse);
+            if (s.mode === "offer") tl.fromTo(`#s${i}-ar`, { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, t + b.pill + 0.3);
+            if (s.mode === "offer") tl.to(`#s${i}-ar`, { y: 22, duration: 0.25, ease: "sine.inOut", yoyo: true, repeat: beats * 2 - 1 }, t + b.pulse);
           },
         },
       };
@@ -195,11 +261,16 @@
 
       // ── Animation ──
       K.ambient();
+      K.progress();
       D.scenes.forEach((s, i) => {
-        const t = T[i], next = i + 1 < T.length ? T[i + 1] : END;
-        if (i > 0) K.swap(`#s${i - 1}`, `#s${i}`, t);
-        SCENES[s.type].anim(s, i, t, next - t);
-        K.drift(`#s${i} .scene-content`, t + 0.3, next - t - 0.3);
+        const t = T[i], next = i + 1 < T.length ? T[i + 1] : END, d = next - t;
+        if (i > 0) K.swap(`#s${i - 1}`, `#s${i}`, t, i - 1);
+        SCENES[s.type].anim(s, i, t, d, PF_BEATS.times(s, d));
+        K.drift(`#s${i} .scene-content`, t + 0.25, d - 0.25, i);
+        if (s.type !== "cta" && d > 2.8 && document.querySelector("#s" + i + " .em")) {
+          tl.fromTo(`#s${i} .em`, { scale: 1 }, { scale: 1.2, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 }, t + d * 0.68);
+          K.shake(t + d * 0.68, 5);
+        }
       });
       K.fadeOut(`#s${D.scenes.length - 1} .scene-content`);
       window.__timelines["main"] = tl;
