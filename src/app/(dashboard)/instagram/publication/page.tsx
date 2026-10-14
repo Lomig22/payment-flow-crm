@@ -13,6 +13,7 @@ import ReelPreview from '@/components/instagram/ReelPreview';
 import VoiceoverPanel from '@/components/instagram/VoiceoverPanel';
 import YouTubeQueue from '@/components/instagram/YouTubeQueue';
 import RepublishTop from '@/components/instagram/RepublishTop';
+import InstagramAccounts from '@/components/instagram/InstagramAccounts';
 
 const STATUS_META: Record<QueueStatus, { label: string; cls: string }> = {
   uploading:  { label: 'Envoi ou traitement en cours', cls: 'bg-gray-100 text-gray-600' },
@@ -152,6 +153,7 @@ export default function PublicationPage() {
 
   return (
     <div className="space-y-6">
+      <InstagramAccounts />
       <AutoScheduleCard onChange={refresh} />
       <PlatformsCard />
       <EndCardCard />

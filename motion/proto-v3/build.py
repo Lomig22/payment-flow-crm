@@ -36,7 +36,7 @@ for i in range(N):
 T = [0.0]
 for i in range(N - 1):
     T.append(round(T[i] + max(MIN[i], LEAD + d[i] + TAIL), 2))
-END = round(T[-1] + max(MIN[-1], LEAD + d[-1] + 0.6), 2)
+END = round(T[-1] + max(MIN[-1], LEAD + d[-1] + 1.0), 2)   # la fin reste lisible après la voix
 open("timing.js", "w").write(
     "// Généré par build.py : début de chaque scène, calé sur la voix off\n"
     f"window.__PF_T = {json.dumps({'T': T, 'END': END})};\n")
@@ -49,7 +49,7 @@ cues += [("pop", T[1] + 0.3, 0.3), ("typing", T[1] + 0.55, 0.45), ("pop", T[1] +
          ("pop", T[2] + 0.3, 0.3), ("pop", T[2] + 1.05, 0.3), ("notif", T[2] + 1.9, 0.6),
          ("pop", T[3] + 0.3, 0.3), ("pop", T[3] + 0.95, 0.3), ("pop", T[3] + 1.45, 0.3), ("impact", T[3] + 1.85, 0.35),
          ("pop", T[4] + 0.3, 0.3), ("riser", T[4] + 0.6, 0.35), ("impact", T[4] + 1.2, 0.45),
-         ("impact", T[5] + 0.2, 0.5), ("pop", T[5] + 0.95, 0.4)]
+         ("impact", T[5] + 0.2, 0.5), ("pop", T[5] + 0.7, 0.4), ("pop", T[5] + 1.6, 0.3), ("pop", T[5] + 3.0, 0.3)]
 
 inputs, parts, voice_labels, fx_labels = [], [], [], []
 for i in range(N):

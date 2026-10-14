@@ -887,6 +887,9 @@ export async function runNextVoiceoverStep(id: string): Promise<{ step: string; 
 // en réutilisant d'abord les voix déjà générées. Pour un reel sans voix d'origine, la VF reste non
 // bloquante : si elle n'est pas prête à l'heure, la version d'origine part.
 const VOICE_ALL = process.env.VOICEOVER_ALL !== 'false';
+// Voix de Lomig : uniquement sur SON compte (les reels du compte agence ont leur propre voix off,
+// déjà montée dans la vidéo)
+export const VOICE_ACCOUNT = process.env.VOICEOVER_ACCOUNT ?? 'lomig_guegueniat';
 export const needsVoiceover = (report: any) => report?.audio?.voice === true || report?.vo_extra === true || (VOICE_ALL && !!report);
 const isExtra = (report: any) => report?.audio?.voice !== true && (report?.vo_extra === true || VOICE_ALL);
 const EXTRA_PER_DAY = Number(process.env.VOICEOVER_EXTRA_PER_DAY ?? 2);
@@ -908,7 +911,7 @@ export async function selectExtraVoiceovers(): Promise<number> {
   if (left == null || left < CREDIT_FLOOR) return 0;
   const from = new Date(Date.now() + 90 * 60_000).toISOString();   // le temps de monter la VF
   const { data } = await db().from('content_queue')
-    .select('id, scheduled_at, clean_report').eq('format', 'reel').eq('status', 'scheduled')
+    .select('id, scheduled_at, clean_report').eq('format', 'reel').eq('status', 'scheduled').eq('account_username', VOICE_ACCOUNT)
     .gte('scheduled_at', from).order('scheduled_at', { ascending: true }).limit(200);
   const day = (iso: string) => new Date(iso).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   const perDay = new Map<string, number>();
@@ -946,7 +949,7 @@ export async function nextVoiceoverCandidate(): Promise<string | null> {
   const soon = new Date(Date.now() + 45 * 60_000).toISOString();
   const { data } = await db().from('content_queue')
     .select('id, status, scheduled_at, clean_report')
-    .eq('format', 'reel').in('status', ['draft', 'scheduled'])
+    .eq('format', 'reel').in('status', ['draft', 'scheduled']).eq('account_username', VOICE_ACCOUNT)
     .order('scheduled_at', { ascending: true, nullsFirst: false }).limit(50);
   const stale = Date.now() - 10 * 60_000;
   const c = (data ?? []).find((r: any) => {
