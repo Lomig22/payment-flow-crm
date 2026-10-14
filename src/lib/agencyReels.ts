@@ -200,17 +200,24 @@ async function cached(path: string): Promise<boolean> {
   return !!data?.some((f: any) => f.name === name);
 }
 
-// Crédits utilisables aujourd'hui : solde (moins une réserve) réparti jusqu'au renouvellement,
-// moins ce que la fabrique a déjà dépensé aujourd'hui
+// Crédits utilisables aujourd'hui : solde (moins une réserve) réparti jusqu'au renouvellement.
+// Les jours sans voix s'accumulent (3 au plus) pour pouvoir payer un reel entier ; on retire ce
+// que la fabrique a déjà dépensé aujourd'hui
 async function voiceBudgetToday(): Promise<number> {
   const res = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY ?? '' }, cache: 'no-store' });
   if (!res.ok) return 0;
   const s = await res.json();
   const left = (s.character_limit ?? 0) - (s.character_count ?? 0) - CREDIT_RESERVE;
   const days = s.next_character_count_reset_unix ? Math.max(1, Math.ceil((s.next_character_count_reset_unix * 1000 - Date.now()) / 86_400_000)) : 30;
-  const { data } = await db().from('agency_reels').select('voice_credits').eq('day', parisDay()).gt('voice_credits', 0);
-  const spent = (data ?? []).reduce((n: number, r: any) => n + r.voice_credits, 0);
-  return Math.floor(left / days) - spent;
+  const today = parisDay();
+  const [{ data: spentRows }, { data: last }] = await Promise.all([
+    db().from('agency_reels').select('voice_credits').eq('day', today).gt('voice_credits', 0),
+    db().from('agency_reels').select('day').lt('day', today).gt('voice_credits', 0).order('day', { ascending: false }).limit(1),
+  ]);
+  const spent = (spentRows ?? []).reduce((n: number, r: any) => n + r.voice_credits, 0);
+  const since = last?.[0]?.day ? Math.round((Date.parse(today) - Date.parse(last[0].day)) / 86_400_000) : 2;
+  const perDay = left / days;
+  return Math.min(left, Math.floor(perDay * Math.min(3, Math.max(1, since)))) - spent;
 }
 
 async function tts(text: string, path: string): Promise<void> {
