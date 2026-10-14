@@ -149,10 +149,21 @@ export function addBusinessDays(from: Date, n: number): Date {
   return d;
 }
 
-// Échéance du premier message : 2 à 24 h après l'acceptation (le worker n'agit que dans la fenêtre)
+// Échéance du premier message : 2 à 24 h après l'acceptation, ramenée dans la fenêtre d'activité
+// du worker (sinon l'heure affichée, ex. 20 h 15, était fausse : le message partait le lendemain)
 export function firstMessageDue(s: LinkedinSettings, acceptedAt = new Date()): Date {
   const h = s.first_msg_min_hours + Math.random() * Math.max(0, s.first_msg_max_hours - s.first_msg_min_hours);
-  return new Date(acceptedAt.getTime() + h * 3600_000);
+  return intoActivityWindow(s, new Date(acceptedAt.getTime() + h * 3600_000));
+}
+
+// Premier instant de la fenêtre d'activité à partir de `at` (pas de 5 min), plus un léger aléa
+// quand il a fallu décaler (pas tous les messages à 9 h pile)
+export function intoActivityWindow(s: LinkedinSettings, at: Date): Date {
+  if (inActivityWindow(s, at)) return at;
+  let t = at.getTime();
+  for (let i = 0; i < 2000 && !inActivityWindow(s, new Date(t)); i++) t += 5 * 60_000;
+  const jittered = t + Math.floor(Math.random() * 45) * 60_000;
+  return new Date(inActivityWindow(s, new Date(jittered)) ? jittered : t);
 }
 
 // ── Plafonds ──
