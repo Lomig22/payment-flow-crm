@@ -177,8 +177,13 @@ export async function planDay(day = parisDay()): Promise<{ day: string; planned:
   const batch = todo.slice(0, BATCH);
   const want = (['tofu', 'mofu', 'bofu'] as Funnel[]).map((f) => [f, batch.filter((x) => x === f).length] as const).filter(([, n]) => n > 0);
 
-  const { data: history } = await db().from('agency_reels').select('topic').order('created_at', { ascending: false }).limit(150);
+  const [{ data: history }, { data: reviews }] = await Promise.all([
+    db().from('agency_reels').select('topic').order('created_at', { ascending: false }).limit(150),
+    db().from('agency_reels').select('funnel, topic, review_status, feedback').not('feedback', 'is', null).order('reviewed_at', { ascending: false }).limit(20),
+  ]);
+  const notes = (reviews ?? []).map((r: any) => `- ${r.review_status === 'approved' ? 'Validé' : 'Refusé'} (${r.funnel}, « ${r.topic} ») : ${r.feedback}`).join('\n');
   const prompt = `Écris ${want.map(([f, n]) => `${n} reel(s) ${f}`).join(', ')} pour le ${day}.
+${notes ? `\nRetours de Lomig sur les reels précédents (à appliquer en priorité) :\n${notes}\n` : ''}
 
 Sujets déjà traités (ne pas reprendre) :
 ${(history ?? []).map((h: any) => `- ${h.topic}`).join('\n') || '(aucun)'}`;
@@ -323,9 +328,15 @@ export async function nextJob(): Promise<null | { id: string; funnel: Funnel; da
     if (!got?.length) continue;
     let vo: Record<number, string> = {};
     if (row.voiced) {
-      const v = await prepareVoices(row).catch(() => ({ urls: {}, credits: 0 }));
+      const v = await prepareVoices(row).catch((e) => ({ urls: {} as Record<number, string>, credits: 0, error: e?.message as string }));
       vo = v.urls;
-      await db().from('agency_reels').update({ voiced: Object.keys(vo).length > 0, voice_credits: row.voice_credits + v.credits }).eq('id', row.id);
+      // Un reel sans voix ne retient personne : il attend (clé Google ou crédits)
+      if (!Object.keys(vo).length) {
+        await db().from('agency_reels').update({ status: 'planned', attempts: row.attempts, render_started_at: null, voice_credits: row.voice_credits + v.credits,
+          error: (v as any).error ?? 'En attente de voix : clé Google TTS manquante ou crédits ElevenLabs épuisés', updated_at: new Date().toISOString() }).eq('id', row.id);
+        return null;
+      }
+      await db().from('agency_reels').update({ voice_credits: row.voice_credits + v.credits, error: null }).eq('id', row.id);
     }
     // Les textes de voix ne vont pas dans la vidéo
     const scenes = row.spec.scenes.map(({ vo: _vo, ...s }: any) => s);
@@ -367,4 +378,22 @@ export async function markFailed(id: string, error: string): Promise<void> {
   await db().from('agency_reels').update({
     status: (reel?.attempts ?? 0) >= MAX_ATTEMPTS ? 'failed' : 'planned', error: error.slice(0, 1000), updated_at: new Date().toISOString(),
   }).eq('id', id);
+}
+
+// ── Validation par Lomig (page Fabrique du CRM) ──
+
+export async function reviewReel(id: string, action: 'approve' | 'reject', feedback?: string): Promise<{ scheduled: number }> {
+  const { data: reel } = await db().from('agency_reels').select('id, queue_id, account_username').eq('id', id).single();
+  if (!reel) throw new Error('Reel introuvable');
+  await db().from('agency_reels').update({
+    review_status: action === 'approve' ? 'approved' : 'rejected', feedback: feedback?.trim() || null,
+    reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  }).eq('id', id);
+  if (action === 'reject') {
+    if (reel.queue_id) await db().from('content_queue').update({ status: 'failed', error: `Refusé à la validation${feedback ? ` : ${feedback.trim().slice(0, 300)}` : ''}`, updated_at: new Date().toISOString() })
+      .eq('id', reel.queue_id).in('status', ['draft', 'scheduled', 'uploading']);
+    return { scheduled: 0 };
+  }
+  const { autoScheduleDrafts } = await import('@/lib/autoSchedule');
+  return { scheduled: await autoScheduleDrafts(reel.account_username, true) };
 }

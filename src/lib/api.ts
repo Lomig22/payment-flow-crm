@@ -457,3 +457,36 @@ export const linkedinApi = {
   importCsv: (csv: string, filename: string, opts: { dry_run?: boolean; enqueue?: boolean }) =>
     api.post<LinkedinImportReport>('/linkedin/import', { csv, filename, ...opts }),
 };
+
+// ── Fabrique de reels @paymentflow (validation avant programmation) ──
+export interface FabriqueReel {
+  id: string; day: string; funnel: 'tofu' | 'mofu' | 'bofu'; topic: string; caption: string;
+  status: 'planned' | 'rendering' | 'uploaded' | 'failed'; voiced: boolean;
+  review_status: 'pending' | 'approved' | 'rejected'; feedback: string | null; error: string | null;
+  video_url: string | null; cover_url: string | null; queue_status: string | null; queue_error: string | null;
+  scheduled_at: string | null; published_at: string | null; permalink: string | null; created_at: string;
+}
+export const fabriqueApi = {
+  list:   () => api.get<{ preview_url: string; reels: FabriqueReel[] }>('/instagram/fabrique'),
+  review: (id: string, action: 'approve' | 'reject', feedback?: string) => api.post<{ scheduled: number }>(`/instagram/fabrique/${id}`, { action, feedback }),
+};
+
+// ── Emailing (envois par l'agent Hermès) ──
+export interface EmailStepCfg { step: number; delay_days: number; subject: string; body: string }
+export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; send_days: number[]; send_from: number; send_to: number; instructions: string }
+export interface EmailStats {
+  settings: EmailSettingsCfg; by_status: Record<string, number>;
+  today: { sent: number; replied: number; bounced: number };
+  week: { sent: number; replied: number; bounced: number; interested: number };
+  last_event_at: string | null; agent_configured: boolean;
+}
+export interface EmailLeadRow {
+  id: string; email: string; first_name: string | null; last_name: string | null; company: string | null; sector: string | null; city: string | null;
+  status: string; step: number; last_sent_at: string | null; next_send_at: string | null; replied_at: string | null; mailbox: string | null;
+}
+export const emailingApi = {
+  stats:    () => api.get<EmailStats>('/emailing/stats'),
+  settings: (s: Partial<EmailSettingsCfg>) => api.put<EmailSettingsCfg>('/emailing/settings', s),
+  leads:    (params: { status?: string; q?: string; page?: number }) => api.get<{ leads: EmailLeadRow[]; total: number; page: number; size: number }>('/emailing/leads', { params }),
+  import:   (csv: string, file_name: string) => api.post<{ total: number; inserted: number; duplicates: number; invalid: number; dnc: number; errors: string[] }>('/emailing/leads', { csv, file_name }),
+};

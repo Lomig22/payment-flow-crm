@@ -1,0 +1,5 @@
+Dépose ici ton fichier de leads email (CSV ; si tu as un Excel : Fichier > Enregistrer sous > CSV UTF-8).
+Colonnes reconnues automatiquement (l'ordre et les accents n'ont pas d'importance) :
+email, prénom, nom, entreprise, poste, secteur/métier, ville, téléphone, site, linkedin.
+Les autres colonnes sont conservées et transmises à Hermès pour personnaliser les mails.
+Le contenu de ce dossier n'est pas envoyé sur GitHub.

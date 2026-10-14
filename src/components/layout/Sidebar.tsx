@@ -6,6 +6,7 @@ import {
   MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
   Users, Kanban, ChevronDown, Award, Megaphone, Clapperboard, CalendarClock, Linkedin,
   CheckSquare, Gauge, Settings2, Inbox,
+  Factory, Mail,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -118,6 +119,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             <NavLink href="/leads/instagram" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/instagram" icon={Kanban} label="Pipeline" onClick={onClose} />
             {isAdmin && <NavLink href="/instagram/contenu" icon={Clapperboard} label="Contenu" onClick={onClose} />}
+            {isAdmin && <NavLink href="/instagram/fabrique" icon={Factory} label="Fabrique @paymentflow" onClick={onClose} />}
             {isAdmin && (igAccounts.length
               ? igAccounts.map((a) => <NavLink key={a.account_username} href={`/instagram/publication/${a.account_username}`} icon={CalendarClock} label={`Publication @${a.account_username}`} onClick={onClose} />)
               : <NavLink href="/instagram/publication" icon={CalendarClock} label="Publication" onClick={onClose} />)}
@@ -143,6 +145,14 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             </p>
             <NavLink href="/leads/sea-ads" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/pipeline/sea-ads" icon={Kanban} label="Pipeline" onClick={onClose} />
+          </PoleSection>
+        )}
+
+        {/* ── Pôle Emailing (admins) : envois par l'agent Hermès ── */}
+        {isAdmin && (
+          <PoleSection icon={Mail} label="Emailing" color="text-indigo-500" segment="emailing">
+            <NavLink href="/emailing" icon={Gauge} label="Pilotage" onClick={onClose} exact />
+            <NavLink href="/emailing/leads" icon={Users} label="Leads" onClick={onClose} />
           </PoleSection>
         )}
 

@@ -49,3 +49,7 @@ motion/**/audio.wav
 motion/factory/work/
 motion/marque/*
 !motion/marque/LISEZMOI.txt
+imports/*
+!imports/emailing/
+imports/emailing/*
+!imports/emailing/LISEZMOI.txt

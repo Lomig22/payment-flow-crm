@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hasCronKey } from '@/lib/cronAuth';
 import { planDay, nextJob, uploadUrl, markDone, markFailed, AGENCY_ACCOUNT } from '@/lib/agencyReels';
 import { autoScheduleDrafts } from '@/lib/autoSchedule';
+import { supabase } from '@/lib/supabase';
+import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 
 // Fabrique de reels @paymentflow (sprint48), appelée par le VPS. Protégé par CRON_SECRET.
 //   GET  ?action=plan[&day=AAAA-MM-JJ]  écrit les reels du jour (Claude)
@@ -9,6 +11,7 @@ import { autoScheduleDrafts } from '@/lib/autoSchedule';
 //   POST {action:'upload', id, size}    entrée dans la file + URL signée de dépôt
 //   POST {action:'done', id}            vidéo déposée
 //   POST {action:'fail', id, error}     échec du rendu (nouvel essai, 3 au plus)
+//   POST {action:'preview'}             URL signée pour déposer l'aperçu du modèle (page Fabrique)
 export const dynamic     = 'force-dynamic';
 export const maxDuration = 300;
 
@@ -32,6 +35,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!hasCronKey(request)) return deny();
   const { action, id, size, error } = await request.json().catch(() => ({}));
+  if (action === 'preview') {
+    const { data, error: e } = await supabase.storage.from(MEDIA_BUCKET).createSignedUploadUrl('agency/apercu/modele.mp4', { upsert: true });
+    return e || !data ? fail(e) : NextResponse.json({ upload_url: data.signedUrl });
+  }
   if (!id) return NextResponse.json({ message: 'id manquant' }, { status: 400 });
   try {
     if (action === 'upload') return NextResponse.json(await uploadUrl(id, Number(size) || 0));

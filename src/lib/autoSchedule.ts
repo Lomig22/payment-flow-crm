@@ -32,7 +32,7 @@ export async function getPublishingSettings(account: string): Promise<Publishing
 }
 
 // Minuit (heure de Paris) du jour contenant `at`, en instant UTC
-function parisMidnight(at: Date): Date {
+export function parisMidnight(at: Date): Date {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/Paris', hourCycle: 'h23',
@@ -77,9 +77,12 @@ export async function autoScheduleDrafts(account?: string, force = false): Promi
     .eq('account_username', username)
     .eq('status', 'draft')
     .order('created_at', { ascending: true });
+  // Reels de la fabrique (compte agence) : seulement ceux que Lomig a validés
+  const { data: held } = await db.from('agency_reels').select('queue_id').neq('review_status', 'approved').not('queue_id', 'is', null);
+  const heldIds = new Set((held ?? []).map((h: any) => h.queue_id));
   // Reels : légende écrite, et voix off française montée si nécessaire (voir voiceover.ts)
-  const ready = (drafts ?? []).filter((d: any) => d.format === 'story'
-    || (d.caption && d.caption.trim() && !voiceoverBlocks(d.clean_report)));
+  const ready = (drafts ?? []).filter((d: any) => !heldIds.has(d.id) && (d.format === 'story'
+    || (d.caption && d.caption.trim() && !voiceoverBlocks(d.clean_report))));
   if (!ready.length) return 0;
 
   const since = parisMidnight(new Date()).toISOString();
