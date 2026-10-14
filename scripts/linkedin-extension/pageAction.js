@@ -124,7 +124,18 @@ async function pageAction(type, message) {
   // ── Lecture de la page « Relations » (triée par date d'ajout) ──
   if (type === 'scan') {
     await waitFor(() => document.querySelector('main a[href*="/in/"]'), 20000);
-    for (let i = 0; i < 5; i++) { window.scrollTo(0, document.body.scrollHeight); await sleep(rand(1200, 2200)); }
+    // Charger au moins 40 relations (les plus récentes d'abord) : défilement de la dernière carte et
+    // bouton « Afficher plus de résultats », jusqu'à ce que la liste ne grandisse plus
+    const countLinks = () => new Set(Array.from(document.querySelectorAll('main a[href*="/in/"]')).map((a) => a.getAttribute('href'))).size;
+    for (let i = 0, last = -1; i < 12 && countLinks() < 40 && countLinks() !== last; i++) {
+      last = countLinks();
+      const links = document.querySelectorAll('main a[href*="/in/"]');
+      if (links.length) links[links.length - 1].scrollIntoView({ block: 'end' });
+      window.scrollTo(0, document.body.scrollHeight);
+      const more = clickables(document.querySelector('main') || document).find((el) => /afficher plus de r[ée]sultats|show more results|voir plus|load more/.test(label(el)));
+      if (more) more.click();
+      await sleep(rand(1500, 2500));
+    }
     const slugs = new Set();
     document.querySelectorAll('main a[href*="/in/"]').forEach((a) => {
       const m = (a.getAttribute('href') || '').match(/\/in\/([^/?#]+)/);

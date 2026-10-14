@@ -99,7 +99,9 @@ export async function GET(request: NextRequest) {
 
   // 1. Acceptations
   const { count: pending } = await db.from('leads').select('id', { count: 'exact', head: true }).eq('li_status', 'invited');
-  if ((pending ?? 0) > 0 && (!s.last_scan_at || now.getTime() - new Date(s.last_scan_at).getTime() > SCAN_EVERY_MS)) {
+  const scanStale = !s.last_scan_at || now.getTime() - new Date(s.last_scan_at).getTime() > SCAN_EVERY_MS
+    || parisClock(new Date(s.last_scan_at)).date !== parisClock(now).date;   // première lecture de la journée
+  if ((pending ?? 0) > 0 && scanStale) {
     return serve({ type: 'scan', url: LI_CONNECTIONS_URL });
   }
 

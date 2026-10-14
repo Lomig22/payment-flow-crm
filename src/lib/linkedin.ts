@@ -77,7 +77,9 @@ export const ACTIVE = ['to_invite', 'invited', 'connected', 'to_validate', 'read
 export const LI_CONNECTIONS_URL = 'https://www.linkedin.com/mynetwork/invite-connect/connections/';
 export const LI_INBOX_URL       = 'https://www.linkedin.com/messaging/';
 // Une acceptation est repérée en relisant la page « Relations » (triée par date d'ajout)
-export const SCAN_EVERY_MS = 2 * 3600_000;
+// Toutes les heures, et dès la première action de la journée (14/10/2026 : des acceptations de la
+// soirée n'étaient lues que le lendemain midi)
+export const SCAN_EVERY_MS = 3600_000;
 // Au-delà, une erreur passe le lead en « failed » (sinon il est retenté plus tard)
 export const MAX_ATTEMPTS = 3;
 // Un profil lu il y a moins de 30 jours n'est pas revisité (une seule visite par lead)
