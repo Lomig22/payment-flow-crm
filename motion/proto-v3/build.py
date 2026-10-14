@@ -12,7 +12,7 @@ import json, subprocess, sys
 
 voice = sys.argv[1] if len(sys.argv) > 1 else "anatole"
 N = 6
-MIN = [2.0, 2.6, 2.7, 2.5, 2.1, 2.2]   # durée minimale de chaque scène (animations)
+MIN = [2.4, 2.4, 2.6, 2.4, 2.1, 2.2]   # durée minimale de chaque scène (animations)
 LEAD, TAIL = 0.12, 0.18                # la voix démarre 0,12 s après le début de scène
 
 def run(args):
@@ -42,13 +42,13 @@ open("timing.js", "w").write(
     f"window.__PF_T = {json.dumps({'T': T, 'END': END})};\n")
 
 # 3. Bruitages (relatifs au début des scènes), volontairement espacés
-cues = [("impact", T[0] + 0.55, 0.55)]
+cues = [("impact", 0.12 + (T[1] - 0.3) * 0.5, 0.5)]   # 2e ligne de l'accroche
 for i in range(1, N):
     cues.append(("whoosh", T[i] - 0.08, 0.45))
-cues += [("pop", T[1] + 0.3, 0.35), ("click", T[1] + 0.96, 0.6),
+cues += [("pop", T[1] + 0.3, 0.3), ("typing", T[1] + 0.55, 0.45), ("pop", T[1] + 1.25, 0.35),
          ("pop", T[2] + 0.3, 0.3), ("pop", T[2] + 1.05, 0.3), ("notif", T[2] + 1.9, 0.6),
-         ("pop", T[3] + 0.6, 0.3), ("riser", T[3] + 0.9, 0.35), ("impact", T[3] + 1.45, 0.5),
-         ("pop", T[4] + 0.3, 0.3), ("typing", T[4] + 0.6, 0.45), ("typing", T[4] + 1.05, 0.45), ("pop", T[4] + 1.6, 0.35),
+         ("pop", T[3] + 0.3, 0.3), ("pop", T[3] + 0.95, 0.3), ("pop", T[3] + 1.45, 0.3), ("impact", T[3] + 1.85, 0.35),
+         ("pop", T[4] + 0.3, 0.3), ("riser", T[4] + 0.6, 0.35), ("impact", T[4] + 1.2, 0.45),
          ("impact", T[5] + 0.2, 0.5), ("pop", T[5] + 0.95, 0.4)]
 
 inputs, parts, voice_labels, fx_labels = [], [], [], []
