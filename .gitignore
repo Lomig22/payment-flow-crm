@@ -44,3 +44,5 @@ motion/references/*
 motion/**/*.mp4
 motion/**/snaps/
 motion/**/.hyperframes/
+motion/**/vo/.*.wav
+motion/**/audio.wav

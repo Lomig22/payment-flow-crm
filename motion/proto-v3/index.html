@@ -99,7 +99,7 @@
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="17.5">
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="17.52">
       <div id="stars" data-layout-ignore></div>
       <div id="halo" data-layout-allow-overflow></div>
       <div id="ring" data-layout-allow-overflow></div>
@@ -202,14 +202,15 @@
       </div>
 
       <div id="cursor"></div>
-      <audio id="sfx" data-start="0" data-duration="17.5" data-track-index="10" src="sfx/sfx-track.wav" data-volume="1"></audio>
+      <audio id="audio" data-start="0" data-duration="17.52" data-track-index="10" src="audio.wav" data-volume="1"></audio>
     </div>
 
+    <script src="timing.js"></script>
     <script>
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      // Rythme Reel : accroche < 1 s, étapes de ~3 s, transitions éclair (bruitages calés : sfx/cues.json)
-      const T1 = 2.2, T2 = 5.4, T3 = 8.7, T4 = 12.0, T5 = 15.0, END = 17.5;
+      // Rythme Reel, calé sur la voix off : débuts de scène générés par build.py (timing.js)
+      const [, T1, T2, T3, T4, T5] = window.__PF_T.T, END = window.__PF_T.END;
 
       // Étoiles : générateur pseudo-aléatoire à graine fixe (rendu identique à chaque fois)
       (function () {
@@ -225,9 +226,9 @@
         }
       })();
       // Décor vivant (plus rapide qu'en v2)
-      tl.fromTo("#halo", { scale: 0.9, opacity: 0.8 }, { scale: 1.1, opacity: 1, duration: 1.45, ease: "sine.inOut", yoyo: true, repeat: 11 }, 0);
+      tl.fromTo("#halo", { scale: 0.9, opacity: 0.8 }, { scale: 1.1, opacity: 1, duration: 1.45, ease: "sine.inOut", yoyo: true, repeat: Math.max(0, Math.floor(END / 1.45) - 1) }, 0);
       tl.fromTo("#ring", { rotation: 0, scale: 0.5, opacity: 0 }, { rotation: 0, scale: 1, opacity: 1, duration: 0.6, ease: "expo.out" }, 0.1);
-      tl.to("#ring", { rotation: 90, duration: 16.8, ease: "none" }, 0.7);
+      tl.to("#ring", { rotation: 90, duration: END - 0.7, ease: "none" }, 0.7);
       tl.fromTo("#stars", { y: 0 }, { y: -260, duration: END, ease: "none" }, 0);
 
       // Transition éclair : poussée verticale floutée, ~0,3 s
@@ -255,14 +256,14 @@
       const fr = (n) => Math.round(n).toLocaleString("fr-FR");
 
       // ── Accroche : deux claques ──
-      tl.fromTo("#s0-a", { opacity: 0, scale: 1.6, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.28, ease: "power4.out" }, 0.08);
+      tl.fromTo("#s0-a", { opacity: 0, y: 40, filter: "blur(10px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.3, ease: "power3.out" }, 0.08);
       tl.fromTo("#s0-b", { opacity: 0, y: 90, scale: 0.85 }, { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "back.out(1.8)" }, 0.55);
-      drift("#s0 .scene-content", 0.4, 1.8);
+      drift("#s0 .scene-content", 0.4, T1 - 0.4);
 
       // ── Étape 1 : la pub tourne ──
       swap("#s0", "#s1", T1);
       stepIn(1, T1);
-      drift("#s1 .scene-content", T1 + 0.3, 2.9);
+      drift("#s1 .scene-content", T1 + 0.3, T2 - T1 - 0.3);
       tl.fromTo("#cursor", { opacity: 0, x: 1000, y: 1250 }, { opacity: 1, x: 900, y: 905, duration: 0.32, ease: "power3.out" }, T1 + 0.62);
       tl.fromTo("#cursor", { scale: 1 }, { scale: 0.7, duration: 0.08, ease: "power2.in", yoyo: true, repeat: 1 }, T1 + 0.96);
       tl.fromTo("#s1-toggle", { backgroundColor: "#4b4790" }, { backgroundColor: "#34d399", duration: 0.12, ease: "none" }, T1 + 1.0);
@@ -275,7 +276,7 @@
       // ── Étape 2 : les demandes arrivent ──
       swap("#s1", "#s2", T2);
       stepIn(2, T2);
-      drift("#s2 .scene-content", T2 + 0.3, 3.0);
+      drift("#s2 .scene-content", T2 + 0.3, T3 - T2 - 0.3);
       ["#s2-l1", "#s2-l2", "#s2-l3"].forEach((id, i) => {
         tl.fromTo(id, { opacity: 0, x: i % 2 ? 140 : -140, scale: 0.92 }, { opacity: 1, x: 0, scale: 1, duration: 0.26, ease: i === 1 ? "back.out(1.8)" : "power4.out" }, T2 + 0.75 + i * 0.3);
       });
@@ -286,7 +287,7 @@
       // ── Étape 3 : les chiffres ──
       swap("#s2", "#s3", T3);
       stepIn(3, T3);
-      drift("#s3 .scene-content", T3 + 0.3, 3.0);
+      drift("#s3 .scene-content", T3 + 0.3, T4 - T3 - 0.3);
       tl.fromTo("#s3-t1", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.24, ease: "back.out(2)" }, T3 + 0.6);
       tl.fromTo("#s3-t2", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.24, ease: "power4.out" }, T3 + 0.85);
       count("#s3-v1", 0, 10, T3 + 0.62, 0.45, (v) => Math.round(v) + " €");
@@ -298,7 +299,7 @@
       // ── Étape 4 : le simulateur ──
       swap("#s3", "#s4", T4);
       stepIn(4, T4);
-      drift("#s4 .scene-content", T4 + 0.3, 2.8);
+      drift("#s4 .scene-content", T4 + 0.3, T5 - T4 - 0.3);
       tl.fromTo("#s4-i1", { borderColor: "#4b4790" }, { borderColor: "#a5b4fc", duration: 0.1, ease: "none" }, T4 + 0.55);
       type("#s4-t1", "300 €", T4 + 0.6, 0.35);
       tl.fromTo("#s4-i2", { borderColor: "#4b4790" }, { borderColor: "#a5b4fc", duration: 0.1, ease: "none" }, T4 + 1.0);
