@@ -37,3 +37,10 @@ backend/uploads/
 ressource/
 package-lock.json
 next-env.d.ts
+
+# Vidéos de référence et rendus motion design (lourds)
+motion/references/*
+!motion/references/LISEZMOI.txt
+motion/**/*.mp4
+motion/**/snaps/
+motion/**/.hyperframes/

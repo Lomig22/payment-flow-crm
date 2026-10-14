@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="fr" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #0b0a1f; }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #0b0a1f; font-family: "Montserrat", sans-serif; color: #f1f0ff; }
+
+      /* Scènes : la 1re visible, les suivantes révélées par la timeline */
+      .scene { position: absolute; inset: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0a1f; }
+      #s2, #s3, #s4, #s5 { opacity: 0; }
+      .scene-content {
+        position: relative; z-index: 2; width: 100%; height: 100%;
+        display: flex; flex-direction: column; justify-content: center;
+        padding: 260px 90px 460px; gap: 36px; box-sizing: border-box;
+      }
+
+      /* Décor commun */
+      .glow { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,0.42) 0%, rgba(99,102,241,0) 70%); z-index: 0; }
+      .ghost { position: absolute; z-index: 1; font-weight: 900; color: #6366f1; opacity: 0.14; line-height: 0.8; letter-spacing: -0.06em; white-space: nowrap; }
+      .grid { position: absolute; inset: 0; z-index: 0; opacity: 0.22;
+        background-image: linear-gradient(rgba(165,180,252,0.18) 2px, rgba(165,180,252,0) 2px), linear-gradient(90deg, rgba(165,180,252,0.18) 2px, rgba(165,180,252,0) 2px);
+        background-size: 120px 120px; }
+      .rule { height: 6px; width: 100%; background: #6366f1; transform-origin: left center; border-radius: 3px; }
+      .mono { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+      .label { font-family: "JetBrains Mono", monospace; font-size: 30px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a5b4fc; }
+      .chip { align-self: flex-start; padding: 14px 26px; border: 3px solid #a5b4fc; border-radius: 999px; font-family: "JetBrains Mono", monospace; font-size: 28px; font-weight: 700; color: #a5b4fc; letter-spacing: 0.1em; text-transform: uppercase; }
+      .meta { position: absolute; z-index: 3; left: 90px; right: 90px; bottom: 470px; display: flex; justify-content: space-between; font-family: "JetBrains Mono", monospace; font-size: 24px; color: #b4b1e0; letter-spacing: 0.08em; }
+
+      /* Scène 1 : accroche */
+      #s1 .light { font-size: 92px; font-weight: 300; line-height: 1.05; letter-spacing: -0.03em; color: #f1f0ff; }
+      #s1 .big { font-size: 188px; font-weight: 900; line-height: 0.92; letter-spacing: -0.05em; }
+      #s1 .q { color: #a5b4fc; }
+
+      /* Scène 2 : la réponse habituelle */
+      #s2 .lead { font-size: 58px; font-weight: 300; line-height: 1.15; color: #b4b1e0; max-width: 860px; }
+      #s2 .answer { font-size: 150px; font-weight: 900; font-style: italic; line-height: 0.95; letter-spacing: -0.04em; }
+      #s2 .strike-wrap { position: relative; align-self: flex-start; }
+      #s2 .unknown { font-size: 120px; font-weight: 700; letter-spacing: 0.08em; color: #6366f1; }
+      #s2 .strike { position: absolute; left: -10px; right: -10px; top: 52%; height: 10px; background: #f1f0ff; transform-origin: left center; border-radius: 5px; }
+      #s2 .sub { font-size: 48px; font-weight: 300; line-height: 1.25; max-width: 880px; }
+      #s2 .sub b { font-weight: 900; color: #a5b4fc; }
+
+      /* Scène 3 : le calcul */
+      #s3 .row { display: flex; align-items: center; gap: 28px; padding: 34px 40px; background: #17153d; border: 3px solid rgba(165,180,252,0.35); border-radius: 28px; }
+      #s3 .val { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; font-size: 96px; font-weight: 700; color: #f1f0ff; min-width: 330px; }
+      #s3 .arrow { font-size: 64px; color: #a5b4fc; font-weight: 900; }
+      #s3 .what { font-size: 44px; font-weight: 300; line-height: 1.15; }
+      #s3 .blocks { display: flex; gap: 18px; }
+      #s3 .block { width: 1fr; flex: 1; height: 26px; background: #6366f1; border-radius: 8px; transform-origin: left center; }
+      #s3 .result { display: flex; align-items: baseline; gap: 26px; }
+      #s3 .eq { font-size: 110px; font-weight: 900; color: #a5b4fc; }
+      #s3 .total { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; font-size: 200px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+      #s3 .per { font-size: 46px; font-weight: 300; color: #b4b1e0; }
+
+      /* Scène 4 : ce que ça rapporte */
+      #s4 .basket { font-size: 52px; font-weight: 300; color: #b4b1e0; }
+      #s4 .basket b { font-family: "JetBrains Mono", monospace; font-weight: 700; color: #f1f0ff; }
+      #s4 .one { font-size: 96px; font-weight: 300; line-height: 1; }
+      #s4 .roi { display: flex; align-items: baseline; gap: 20px; }
+      #s4 .roi-n { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; font-size: 300px; font-weight: 700; line-height: 0.9; letter-spacing: -0.05em; color: #f1f0ff; }
+      #s4 .roi-u { font-size: 92px; font-weight: 900; color: #a5b4fc; }
+      #s4 .roi-l { font-size: 50px; font-weight: 300; line-height: 1.2; max-width: 860px; }
+      #s4 .bars { display: flex; flex-direction: column; gap: 22px; }
+      #s4 .bar-row { display: flex; align-items: center; gap: 24px; font-family: "JetBrains Mono", monospace; font-size: 30px; color: #b4b1e0; }
+      #s4 .bar { height: 54px; border-radius: 12px; transform-origin: left center; }
+      #s4 .bar.in { width: 14px; background: #b4b1e0; }
+      #s4 .bar.out { width: 900px; background: #6366f1; }
+
+      /* Scène 5 : appel à l'action */
+      #s5 .scene-content { justify-content: center; }
+      #s5 .calc { font-size: 104px; font-weight: 900; line-height: 0.98; letter-spacing: -0.04em; }
+      #s5 .calc span { color: #a5b4fc; }
+      #s5 .say { font-size: 54px; font-weight: 300; }
+      #s5 .pill { align-self: flex-start; padding: 34px 54px; background: #6366f1; border-radius: 36px; font-family: "JetBrains Mono", monospace; font-size: 92px; font-weight: 700; letter-spacing: 0.04em; color: #f1f0ff; box-shadow: 0 30px 80px rgba(99,102,241,0.45); }
+      #s5 .down { font-size: 90px; color: #a5b4fc; font-weight: 900; }
+      #s5 .brand { position: absolute; z-index: 3; left: 90px; bottom: 470px; display: flex; align-items: center; gap: 20px; font-weight: 900; font-size: 40px; letter-spacing: 0.06em; }
+      #s5 .mark { width: 54px; height: 54px; border-radius: 14px; background: #6366f1; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="25">
+
+      <!-- Scène 1 : accroche -->
+      <div id="s1" class="scene">
+        <div class="grid"></div>
+        <div class="glow" data-layout-allow-overflow id="s1-glow" style="width:1300px;height:1300px;left:-260px;top:420px;"></div>
+        <div class="ghost" data-layout-allow-overflow id="s1-ghost" style="font-size:1100px;right:-160px;top:380px;">€</div>
+        <div class="scene-content">
+          <div class="label" id="s1-label">Question du jour</div>
+          <div class="rule" id="s1-rule" style="width:220px;"></div>
+          <div class="light" id="s1-l1">Combien te coûte</div>
+          <div class="big" id="s1-big">UN client<span class="q">&nbsp;?</span></div>
+        </div>
+        <div class="meta" id="s1-meta"><span>Artisans · TPE</span><span>01 / 05</span></div>
+      </div>
+
+      <!-- Scène 2 : la réponse habituelle -->
+      <div id="s2" class="scene">
+        <div class="glow" data-layout-allow-overflow id="s2-glow" style="width:1100px;height:1100px;right:-380px;top:180px;"></div>
+        <div class="ghost" data-layout-allow-overflow id="s2-ghost" style="font-size:520px;left:-60px;top:1180px;">???</div>
+        <div class="scene-content">
+          <div class="lead" id="s2-lead">La réponse qu'on entend le plus :</div>
+          <div class="answer" id="s2-answer">« Aucune idée. »</div>
+          <div class="strike-wrap" id="s2-unk"><div class="unknown mono">€ ? ? ?</div><div class="strike" id="s2-strike"></div></div>
+          <div class="sub" id="s2-sub">Sans ce chiffre, impossible de savoir <b>combien investir</b> pour grandir.</div>
+        </div>
+        <div class="meta" id="s2-meta"><span>Le vrai problème</span><span>02 / 05</span></div>
+      </div>
+
+      <!-- Scène 3 : le calcul -->
+      <div id="s3" class="scene">
+        <div class="grid" id="s3-grid"></div>
+        <div class="glow" data-layout-allow-overflow id="s3-glow" style="width:1000px;height:1000px;left:-300px;top:1000px;"></div>
+        <div class="scene-content" style="gap:30px;">
+          <div class="chip" id="s3-chip">Exemple</div>
+          <div class="row" id="s3-r1"><div class="val">10 €</div><div class="arrow">→</div><div class="what">1 demande de devis</div></div>
+          <div class="row" id="s3-r2"><div class="val">× 4</div><div class="arrow">→</div><div class="what">4 demandes pour signer 1 client</div></div>
+          <div class="blocks" id="s3-blocks"><div class="block"></div><div class="block"></div><div class="block"></div><div class="block"></div></div>
+          <div class="result" id="s3-result"><div class="eq">=</div><div class="total" id="s3-total">0 €</div></div>
+          <div class="per" id="s3-per">pour un nouveau client</div>
+        </div>
+        <div class="meta" id="s3-meta"><span>Coût d'acquisition</span><span>03 / 05</span></div>
+      </div>
+
+      <!-- Scène 4 : ce que ça rapporte -->
+      <div id="s4" class="scene">
+        <div class="glow" data-layout-allow-overflow id="s4-glow" style="width:1400px;height:1400px;left:-160px;top:260px;"></div>
+        <div class="ghost" data-layout-allow-overflow id="s4-ghost" style="font-size:760px;left:-40px;top:300px;">×75</div>
+        <div class="scene-content" style="gap:30px;">
+          <div class="basket" id="s4-basket">Chantier moyen : <b>3 000 €</b></div>
+          <div class="one" id="s4-one">1 € investi</div>
+          <div class="roi" id="s4-roi"><div class="roi-n" id="s4-n">0</div><div class="roi-u">€</div></div>
+          <div class="roi-l" id="s4-l">de chiffre d'affaires en retour.</div>
+          <div class="bars" id="s4-bars">
+            <div class="bar-row"><div class="bar in" id="s4-bin"></div><span>investi</span></div>
+            <div class="bar-row"><div class="bar out" id="s4-bout"></div></div>
+            <div class="bar-row" id="s4-bout-l" style="justify-content:flex-end;"><span>rapporté ×75</span></div>
+          </div>
+        </div>
+        <div class="meta" id="s4-meta"><span>Exemple chiffré</span><span>04 / 05</span></div>
+      </div>
+
+      <!-- Scène 5 : appel à l'action -->
+      <div id="s5" class="scene">
+        <div class="grid"></div>
+        <div class="glow" data-layout-allow-overflow id="s5-glow" style="width:1300px;height:1300px;right:-300px;top:600px;"></div>
+        <div class="scene-content">
+          <div class="calc" id="s5-calc">Calcule <span>le tien</span> en 2 minutes.</div>
+          <div class="say" id="s5-say">Commente</div>
+          <div class="pill" id="s5-pill">SIMULATEUR</div>
+          <div class="down" id="s5-down">↓</div>
+        </div>
+        <div class="brand" id="s5-brand"><div class="mark"></div>PAYMENT FLOW</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const S1 = 0, S2 = 4.4, S3 = 9.8, S4 = 15.8, S5 = 20.8, END = 25;
+
+      // ── Scène 1 : la question CLAQUE ──
+      tl.fromTo("#s1-label", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6, ease: "expo.out" }, 0.2);
+      tl.fromTo("#s1-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.35);
+      tl.fromTo("#s1-l1", { opacity: 0, x: -80 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.5);
+      tl.fromTo("#s1-big", { opacity: 0, scale: 1.35, rotation: -3 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.45, ease: "back.out(2)" }, 0.95);
+      tl.fromTo("#s1-meta", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "sine.out" }, 1.3);
+      tl.fromTo("#s1-ghost", { opacity: 0, y: 120 }, { opacity: 0.14, y: 0, duration: 1.4, ease: "power2.out" }, 0.1);
+      tl.to("#s1-ghost", { y: -60, rotation: 4, duration: 2.9, ease: "sine.inOut" }, 1.5);
+      tl.fromTo("#s1-glow", { scale: 0.85 }, { scale: 1.1, duration: 2.1, ease: "sine.inOut", yoyo: true, repeat: 1 }, 0);
+
+      // Transition 1 → 2 : poussée verticale
+      tl.to("#s1", { y: -1920, duration: 0.5, ease: "power3.inOut" }, S2);
+      tl.fromTo("#s2", { y: 1920, opacity: 1 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, S2);
+
+      // ── Scène 2 : « Aucune idée. » ──
+      tl.fromTo("#s2-lead", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, S2 + 0.45);
+      tl.fromTo("#s2-answer", { opacity: 0, x: 140, skewX: -12 }, { opacity: 1, x: 0, skewX: 0, duration: 0.4, ease: "power4.out" }, S2 + 0.9);
+      tl.fromTo("#s2-unk", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.6)" }, S2 + 1.6);
+      tl.fromTo("#s2-strike", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power4.inOut" }, S2 + 2.3);
+      tl.fromTo("#s2-sub", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7, ease: "sine.out" }, S2 + 2.8);
+      tl.fromTo("#s2-meta", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, S2 + 1.0);
+      tl.fromTo("#s2-ghost", { x: -120 }, { x: 80, duration: 5.4, ease: "none" }, S2);
+      tl.fromTo("#s2-glow", { opacity: 0.6 }, { opacity: 1, duration: 1.3, ease: "sine.inOut", yoyo: true, repeat: 3 }, S2);
+
+      // Transition 2 → 3 : poussée verticale
+      tl.to("#s2", { y: -1920, duration: 0.5, ease: "power3.inOut" }, S3);
+      tl.fromTo("#s3", { y: 1920, opacity: 1 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, S3);
+
+      // ── Scène 3 : le calcul se construit ──
+      tl.fromTo("#s3-chip", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, S3 + 0.45);
+      tl.fromTo("#s3-r1", { opacity: 0, x: -200 }, { opacity: 1, x: 0, duration: 0.55, ease: "expo.out" }, S3 + 0.7);
+      tl.fromTo("#s3-r2", { opacity: 0, x: 200 }, { opacity: 1, x: 0, duration: 0.55, ease: "power4.out" }, S3 + 1.6);
+      tl.fromTo("#s3-blocks .block", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "power2.out", stagger: 0.12 }, S3 + 2.3);
+      tl.fromTo("#s3-result", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, S3 + 3.0);
+      const cac = { v: 0 };
+      tl.to(cac, { v: 40, duration: 1.1, ease: "power2.out", onUpdate: () => { document.getElementById("s3-total").textContent = Math.round(cac.v) + " €"; } }, S3 + 3.1);
+      tl.fromTo("#s3-per", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "sine.out" }, S3 + 3.9);
+      tl.fromTo("#s3-meta", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, S3 + 0.8);
+      tl.to("#s3-grid", { backgroundPosition: "0px 120px", duration: 6, ease: "none" }, S3);
+      tl.fromTo("#s3-glow", { scale: 0.9 }, { scale: 1.15, duration: 1.5, ease: "sine.inOut", yoyo: true, repeat: 3 }, S3);
+
+      // Transition 3 → 4 : traversée en zoom (moment fort)
+      tl.to("#s3", { scale: 2.2, opacity: 0, filter: "blur(10px)", duration: 0.4, ease: "power3.in" }, S4);
+      tl.fromTo("#s4", { scale: 0.55, opacity: 0, filter: "blur(10px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.45, ease: "power3.out" }, S4 + 0.15);
+
+      // ── Scène 4 : ×75 ──
+      tl.fromTo("#s4-basket", { opacity: 0, y: -40 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, S4 + 0.55);
+      tl.fromTo("#s4-one", { opacity: 0, x: -60 }, { opacity: 1, x: 0, duration: 0.5, ease: "expo.out" }, S4 + 1.1);
+      tl.fromTo("#s4-roi", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(1.8)" }, S4 + 1.6);
+      const roi = { v: 0 };
+      tl.to(roi, { v: 75, duration: 1.2, ease: "power3.out", onUpdate: () => { document.getElementById("s4-n").textContent = Math.round(roi.v); } }, S4 + 1.65);
+      tl.fromTo("#s4-l", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "sine.out" }, S4 + 2.6);
+      tl.fromTo("#s4-bin", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "power2.out" }, S4 + 3.0);
+      tl.fromTo("#s4-bout", { scaleX: 0 }, { scaleX: 1, duration: 1.0, ease: "power4.out" }, S4 + 3.2);
+      tl.fromTo("#s4-bout-l", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "sine.out" }, S4 + 3.9);
+      tl.fromTo("#s4-meta", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, S4 + 0.6);
+      tl.fromTo("#s4-ghost", { opacity: 0, x: 120 }, { opacity: 0.14, x: -60, duration: 5, ease: "none" }, S4);
+      tl.fromTo("#s4-glow", { scale: 0.8 }, { scale: 1.05, duration: 2.5, ease: "sine.inOut", yoyo: true, repeat: 1 }, S4);
+
+      // Transition 4 → 5 : poussée verticale
+      tl.to("#s4", { y: -1920, duration: 0.5, ease: "power3.inOut" }, S5);
+      tl.fromTo("#s5", { y: 1920, opacity: 1 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.inOut" }, S5);
+
+      // ── Scène 5 : appel à l'action ──
+      tl.fromTo("#s5-calc", { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, S5 + 0.45);
+      tl.fromTo("#s5-say", { opacity: 0, x: -50 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, S5 + 1.0);
+      tl.fromTo("#s5-pill", { opacity: 0, scale: 0.5, rotation: 4 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: "elastic.out(1, 0.6)" }, S5 + 1.3);
+      tl.fromTo("#s5-down", { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, S5 + 1.9);
+      tl.to("#s5-down", { y: 26, duration: 0.45, ease: "sine.inOut", yoyo: true, repeat: 3 }, S5 + 2.3);
+      tl.fromTo("#s5-brand", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "sine.out" }, S5 + 1.6);
+      tl.fromTo("#s5-glow", { scale: 0.9 }, { scale: 1.12, duration: 1.8, ease: "sine.inOut", yoyo: true, repeat: 1 }, S5);
+      // Fin : fondu au noir
+      tl.to("#s5 .scene-content, #s5-brand", { opacity: 0, duration: 0.4, ease: "power2.in" }, END - 0.45);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

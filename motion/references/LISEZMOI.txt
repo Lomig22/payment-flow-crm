@@ -1,0 +1,4 @@
+Déposez ici les vidéos MP4 de référence (TikTok, Reels…) dont le style vous plaît.
+Claude les analyse image par image (rythme, typographie, transitions, mise en page, son)
+pour en reprendre les codes dans les vidéos motion design de l'agence.
+Ces fichiers ne sont pas envoyés sur GitHub (voir .gitignore).
