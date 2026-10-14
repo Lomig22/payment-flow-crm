@@ -24,7 +24,11 @@ async function pageAction(type, message) {
   const findDialog = () => deepAll('[role="dialog"], [role="alertdialog"], dialog[open]').find((x) => x.getClientRects().length > 0) || null;
 
   // Vérification de sécurité / captcha : blocage, déblocage manuel. Page de connexion : déconnecté.
-  if (/\/checkpoint\//.test(location.pathname) || deepAll('iframe[src*="captcha"], iframe[title*="captcha" i], #captcha-internal').length) {
+  // Seulement un captcha AFFICHÉ : la messagerie charge en permanence un reCAPTCHA Enterprise
+  // invisible (iframe de 0 px), qui avait provoqué un faux blocage le 14/10/2026
+  const shownCaptcha = deepAll('iframe[src*="captcha"], iframe[title*="captcha" i], #captcha-internal')
+    .some((el) => { const r = el.getBoundingClientRect(); return r.width > 60 && r.height > 60 && getComputedStyle(el).visibility !== 'hidden'; });
+  if (/\/checkpoint\//.test(location.pathname) || shownCaptcha) {
     return { result: 'verify', detail: 'Vérification de sécurité ou captcha LinkedIn' };
   }
   if (/\/(login|authwall|uas)/.test(location.pathname)) {
