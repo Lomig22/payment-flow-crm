@@ -1,0 +1,30 @@
+/* Socle commun des reels Payment Flow (fabrique) : charte, décor, composants */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: #0a0820; }
+#root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #0a0820; font-family: "DM Sans", sans-serif; color: #f1f0ff; }
+#stars { position: absolute; inset: 0; z-index: 0; }
+.star { position: absolute; border-radius: 50%; background: #c7d2fe; }
+#halo { position: absolute; z-index: 0; width: 1500px; height: 1500px; left: -210px; top: 380px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.55) 0%, rgba(99,102,241,0.18) 38%, rgba(99,102,241,0) 68%); }
+#ring { position: absolute; z-index: 1; width: 980px; height: 980px; left: 50px; top: 520px; border-radius: 50%; border: 3px solid rgba(165,180,252,0.35); }
+.scene { position: absolute; inset: 0; z-index: 2; width: 1080px; height: 1920px; overflow: hidden; opacity: 0; }
+.scene.first { opacity: 1; }
+.scene-content { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 270px 70px 450px; gap: 24px; box-sizing: border-box; text-align: center; }
+em { font-style: normal; color: #a5b4fc; }
+.mono { font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+.kicker { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.16em; color: #a5b4fc; padding: 10px 22px; border: 2px solid rgba(165,180,252,0.45); border-radius: 999px; text-transform: uppercase; }
+.hook { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 82px; line-height: 1.04; letter-spacing: -0.035em; max-width: 960px; }
+.hook2 { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 70px; line-height: 1.05; letter-spacing: -0.03em; color: #a5b4fc; max-width: 960px; }
+.title { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 68px; line-height: 1.05; letter-spacing: -0.03em; max-width: 940px; }
+.sub { font-size: 36px; color: #b4b1e0; line-height: 1.3; max-width: 900px; }
+.card { width: 920px; background: #16133a; border: 3px solid #2c2870; border-radius: 30px; text-align: left; box-shadow: 0 40px 120px rgba(99,102,241,0.35); padding: 34px 36px; display: flex; flex-direction: column; gap: 18px; }
+.num { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 150px; line-height: 0.9; color: #6366f1; }
+.big { font-size: 44px; font-weight: 700; line-height: 1.2; }
+.small { font-size: 32px; color: #b4b1e0; line-height: 1.35; }
+.pill { padding: 28px 46px; border-radius: 999px; background: #4f46e5; font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 42px; box-shadow: 0 20px 70px rgba(99,102,241,0.55); }
+.pill em { color: #e0e7ff; }
+.handle { font-family: "JetBrains Mono", monospace; font-size: 30px; color: #b4b1e0; letter-spacing: 0.06em; }
+.mark { width: 130px; height: 130px; border-radius: 36px; background: #6366f1; display: flex; align-items: center; justify-content: center; font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 74px; box-shadow: 0 0 120px rgba(99,102,241,0.7); }
+.row { display: flex; align-items: center; gap: 18px; font-size: 34px; line-height: 1.25; }
+.ck { width: 46px; height: 46px; border-radius: 50%; background: #34d399; color: #0a0820; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }
+.ko { width: 46px; height: 46px; border-radius: 50%; background: #4b4790; color: #f1f0ff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 900; flex-shrink: 0; }

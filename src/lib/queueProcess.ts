@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { supabase } from '@/lib/supabase';
 import { cleanVideo, extractFrames, imageDHash } from '@/lib/videoClean';
-import { findDuplicate, describeDuplicate } from '@/lib/duplicates';
+import { findDuplicate, describeDuplicate, isFactoryFile } from '@/lib/duplicates';
 import { withEndCard } from '@/lib/endCard';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 import { analyzeAudio, VOICE_ACCOUNT } from '@/lib/voiceover';
@@ -147,7 +147,7 @@ export async function processQueueItem(id: string) {
       const hashes = (await Promise.all(local.map((f) => imageDHash(f).catch(() => null)))).filter((h): h is string => !!h);
       (report as any).frame_hashes = hashes;   // réutilisées par l'anti-doublon avant publication
       // Republication volontaire d'un reel : l'anti-doublon ne s'applique pas
-      const dup    = row.republish_of ? null : await findDuplicate(row.account_username, hashes, row.id);
+      const dup    = row.republish_of || isFactoryFile(row.file_name) ? null : await findDuplicate(row.account_username, hashes, row.id);
       if (dup) {
         await Promise.all(local.map((f) => fs.rm(f, { force: true })));
         await supabase.storage.from(MEDIA_BUCKET).remove([outPath]);

@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { fixEscapedEmoji } from '@/lib/utils';
 import { getAccountToken, igGet, igPost } from '@/lib/instagramGraph';
-import { findDuplicate, queueFrameHashes, describeDuplicate } from '@/lib/duplicates';
+import { findDuplicate, queueFrameHashes, describeDuplicate, isFactoryFile } from '@/lib/duplicates';
 import { pendingCrossPost, cleanupPublishedFiles } from '@/lib/crosspost';
 
 // Publication des vidéos de la file (content_queue) via l'API Instagram :
@@ -109,9 +109,9 @@ export async function publishQueueItem(row: QueueRow, deadline: number): Promise
 
   // Anti-doublon de dernière minute : la vidéo a pu être postée à la main depuis l'import
   if (row.format === 'reel') {
-    const { data: full } = await (supabase as any).from('content_queue').select('id, clean_report, frame_paths, republish_of').eq('id', row.id).single();
+    const { data: full } = await (supabase as any).from('content_queue').select('id, clean_report, frame_paths, republish_of, file_name').eq('id', row.id).single();
     // Republication volontaire d'un reel : autorisée par définition
-    const dup = full && !full.republish_of ? await findDuplicate(row.account_username, await queueFrameHashes(full), row.id, true) : null;
+    const dup = full && !full.republish_of && !isFactoryFile(full.file_name) ? await findDuplicate(row.account_username, await queueFrameHashes(full), row.id, true) : null;
     if (dup) { await fail(row, `Publication annulée — ${describeDuplicate(dup)}`); return 'failed'; }
   }
 

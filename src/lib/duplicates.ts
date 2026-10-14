@@ -21,6 +21,10 @@ export interface Duplicate {
   label:        string | null;   // légende ou nom de fichier
 }
 
+// Reels de la fabrique (compte agence) : même décor et même fin d'un reel à l'autre, donc
+// l'empreinte visuelle les confondrait ; chacun est écrit pour l'occasion, pas de doublon possible
+export const isFactoryFile = (name?: string | null) => !!name?.startsWith('fabrique-');
+
 const closest = (frameHashes: string[], other: string[]) =>
   Math.min(...frameHashes.flatMap((h) => other.map((o) => hashDistance(h, o))));
 
