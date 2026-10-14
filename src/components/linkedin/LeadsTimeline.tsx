@@ -42,7 +42,7 @@ export function nextStep(l: LinkedinLead, s: LinkedinSettings): { label: string;
       return { label: s.enabled ? 'Invitation : au-delà des plafonds actuels' : 'Invitation : séquence en pause', at: null };
     case 'invited': {
       const withdraw = l.li_invited_at ? new Date(new Date(l.li_invited_at).getTime() + s.invite_expiry_days * DAY).toISOString() : null;
-      return { label: `En attente d'acceptation, vérifiée toutes les heures (retrait le ${withdraw ? fmtDay(withdraw) : '—'})`, at: withdraw };
+      return { label: `En attente d'acceptation, vérifiée toutes les 15 min (retrait le ${withdraw ? fmtDay(withdraw) : '—'})`, at: withdraw };
     }
     case 'connected':   return { label: `Visite du profil puis rédaction ; premier message prévu ${when(l.li_due_at)}`, at: l.li_due_at };
     case 'to_validate': return { label: `Message prêt : à valider par vous (envoi prévu ${when(l.li_due_at)} une fois validé)`, at: l.li_due_at };
@@ -108,7 +108,7 @@ export default function LeadsTimeline({ leads, settings }: { leads: LinkedinLead
         <p className="text-sm font-semibold text-gray-900">Leads de la séquence ({leads.length})</p>
         <span className="text-xs text-gray-500">Triés par prochaine échéance. Cliquez sur une ligne pour voir son historique.</span>
         <p className="w-full text-xs text-gray-500">
-          Délais : acceptations vérifiées toutes les heures (lun.–ven., 9 h – 18 h 30) → visite du profil et rédaction du message →
+          Délais : acceptations vérifiées toutes les 15 min (lun.–ven., 9 h – 18 h 30) → visite du profil et rédaction du message →
           premier message {settings.first_msg_min_hours} à {settings.first_msg_max_hours} h après l&apos;acceptation → R1, R2, R3 à J+{settings.r1_days}, J+{settings.r2_days}, J+{settings.r3_days} ouvrés.
           {settings.manual_validation && <span className="text-amber-700"> Validation manuelle active : chaque premier message attend votre validation (onglet « À valider ») avant de partir.</span>}
         </p>
