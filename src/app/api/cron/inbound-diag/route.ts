@@ -62,6 +62,9 @@ export async function GET(request: NextRequest) {
     }));
     const reels = await fbGet(`${fb.page_id}/video_reels`, fb.access_token, { fields: 'id,created_time,comments.summary(true).limit(5){from,message},likes.summary(true)', limit: '15' });
     if (reels.error) out.facebook.reels_error = reels.error.message;
+    out.facebook.reels_returned = (reels.data ?? []).length;
+    out.facebook.reels_summary = (reels.data ?? []).slice(0, 12).map((r: any) => ({ id: r.id, at: r.created_time, comments: r.comments?.summary?.total_count ?? null, returned: r.comments?.data?.length ?? 0, likes: r.likes?.summary?.total_count ?? null, err: r.comments ? undefined : 'pas de champ comments' }));
+    out.facebook.feed_returned = (feed.data ?? []).length;
     out.facebook.reels = (reels.data ?? []).filter((r: any) => (r.comments?.summary?.total_count ?? 0) > 0).slice(0, 8).map((r: any) => ({
       id: r.id, at: r.created_time, comments: r.comments?.summary?.total_count ?? 0, returned: r.comments?.data?.length ?? 0,
       with_author: (r.comments?.data ?? []).filter((c: any) => c.from?.id).length,
