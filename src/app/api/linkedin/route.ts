@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ensureInviteSlots } from '@/lib/linkedinRampServer';
+import { parisClock } from '@/lib/linkedinRamp';
 import { getAuthUser, unauthorized, forbidden, badRequest } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import {
@@ -67,8 +69,15 @@ export async function GET(request: NextRequest) {
   const queued = (leads ?? []).filter((l: any) => l.li_status === 'to_invite')
     .sort((a: any, b: any) => String(a.li_enqueued_at).localeCompare(String(b.li_enqueued_at)) || a.id.localeCompare(b.id))
     .map((l: any) => l.id);
-  const forecast = forecastInvites(s, queued, invitesToday, last6, now);
-  for (const l of leads ?? []) if (forecast.has(l.id)) l.invite_forecast = forecast.get(l.id)!.toISOString();
+  // Aujourd'hui : l'heure exacte fixée par le plan du jour ; les jours suivants : le jour seulement
+  const planned = await ensureInviteSlots(s, now).catch(() => s);
+  const todayPlan = planned.day_plan?.date === parisClock(now).date ? planned.day_plan : null;
+  const slotAt = new Map((todayPlan?.slots ?? []).map((x) => [x.lead_id, x.at]));
+  const forecast = forecastInvites(s, queued.filter((id: string) => !slotAt.has(id)), invitesToday + slotAt.size, last6, now);
+  for (const l of leads ?? []) {
+    if (slotAt.has(l.id)) { l.invite_forecast = slotAt.get(l.id); l.invite_exact = true; }
+    else if (forecast.has(l.id)) l.invite_forecast = forecast.get(l.id)!.toISOString();
+  }
 
   // Montée en charge : taux d'acceptation et de réponse, par variante d'invitation et par secteur
   const all = (leads ?? []) as any[];

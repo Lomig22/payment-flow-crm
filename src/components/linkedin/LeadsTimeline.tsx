@@ -38,7 +38,12 @@ export function nextStep(l: LinkedinLead, s: LinkedinSettings): { label: string;
   const R: Record<string, string> = { first_sent: 'R1 (ou relance post)', r1_sent: 'R2 (ou relance post)', r2_sent: 'R3 (ou relance post)' };
   switch (l.li_status) {
     case 'to_invite':
-      if (l.invite_forecast) return { label: `Invitation prévue ${fmtDay(l.invite_forecast)}`, at: l.invite_forecast };
+      if (l.invite_forecast && l.invite_exact) {
+        const t = new Date(l.invite_forecast);
+        const late = t.getTime() < Date.now();
+        return { label: late ? 'Invitation : envoi imminent' : `Invitation prévue ${fmtDay(l.invite_forecast)} à ${t.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' })}`, at: l.invite_forecast };
+      }
+      if (l.invite_forecast) return { label: `Invitation prévue ${fmtDay(l.invite_forecast)} (heure fixée le jour même)`, at: l.invite_forecast };
       return { label: s.enabled ? 'Invitation : au-delà des plafonds actuels' : 'Invitation : séquence en pause', at: null };
     case 'invited': {
       const withdraw = l.li_invited_at ? new Date(new Date(l.li_invited_at).getTime() + s.invite_expiry_days * DAY).toISOString() : null;

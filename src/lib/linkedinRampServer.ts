@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { accountEvent, type LinkedinSettings } from '@/lib/linkedin';
-import { evaluateTier, planDay, parisClock, type Invite } from '@/lib/linkedinRamp';
+import { accountEvent, countToday, countInvitesWeek, type LinkedinSettings } from '@/lib/linkedin';
+import { evaluateTier, planDay, parisClock, scheduleSlots, weeklyCap, type Invite } from '@/lib/linkedinRamp';
 
 // Montée en charge (sprint46), partie base de données : une fois par jour, évaluation du palier
 // (taux d'acceptation, incidents) puis plan du jour (cible ±20 %, 2 ou 3 sessions).
@@ -32,4 +32,36 @@ export async function ensureDayPlan(s: LinkedinSettings, now = new Date()): Prom
   const day_plan = planDay({ ...s, tier }, today, Math.random, undefined, parisClock(now).minutes);
   await db.from('linkedin_settings').update({ tier, tier_since: tierSince, day_plan, tier_reason: ev.reason }).eq('id', 1);
   return { ...s, tier, tier_since: tierSince, day_plan };
+}
+
+// Horaires exacts des invitations du jour (plan.slots) : on retire les leads déjà invités ou sortis
+// de la file, puis on planifie à la suite autant de leads que la cible du jour le permet. Le worker
+// envoie chaque invitation à son heure ; le pipeline affiche cette heure.
+export async function ensureInviteSlots(s: LinkedinSettings, now = new Date()): Promise<LinkedinSettings> {
+  const plan = s.day_plan;
+  const clock = parisClock(now);
+  if (!plan || plan.date !== clock.date) return s;
+  const db = supabase as any;
+  const slots = plan.slots ?? [];
+  const { data: live } = slots.length
+    ? await db.from('leads').select('id').in('id', slots.map((x) => x.lead_id)).eq('li_status', 'to_invite').eq('do_not_contact', false)
+    : { data: [] };
+  const liveIds = new Set((live ?? []).map((l: any) => l.id));
+  const pending = slots.filter((x) => liveIds.has(x.lead_id));
+  const [sentToday, sentWeek] = await Promise.all([countToday('invite'), countInvitesWeek()]);
+  const want = Math.min(plan.target - sentToday, weeklyCap(s) - sentWeek) - pending.length;
+  let added: { lead_id: string; at: string }[] = [];
+  if (want > 0) {
+    // Même ordre que l'envoi : leads visités d'abord, puis les plus anciens de la file ; jamais réinvité
+    const { data: cands } = await db.from('leads').select('id')
+      .eq('li_status', 'to_invite').eq('do_not_contact', false).is('li_expired_at', null)
+      .order('li_visited_at', { ascending: true, nullsFirst: false }).order('li_enqueued_at', { ascending: true, nullsFirst: false })
+      .limit(want + pending.length);
+    const ids = (cands ?? []).map((l: any) => l.id).filter((id: string) => !liveIds.has(id)).slice(0, want);
+    added = scheduleSlots(s, plan, pending, ids, now, clock.minutes);
+  }
+  if (!added.length && pending.length === slots.length) return s;
+  const day_plan = { ...plan, slots: [...pending, ...added] };
+  await db.from('linkedin_settings').update({ day_plan }).eq('id', 1);
+  return { ...s, day_plan };
 }

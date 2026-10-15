@@ -26,7 +26,8 @@ export interface RampSettings {
 
 export interface Invite { invited_at: string; connected_at: string | null }
 export interface Session { start: number; end: number; count: number }   // minutes depuis minuit (Paris)
-export interface DayPlan { date: string; target: number; sessions: Session[] }
+export interface Slot { lead_id: string; at: string }   // heure exacte prévue d'une invitation (ISO)
+export interface DayPlan { date: string; target: number; sessions: Session[]; slots?: Slot[] }
 
 const DAY = 86_400_000;
 type Rng = () => number;
@@ -166,4 +167,26 @@ export function inviteDelayMs(s: Pick<RampSettings, 'invite_gap_min' | 'invite_g
   const jitter = (rng() - 0.5) * 0.15;
   const x = Math.min(1, Math.max(0, u + jitter));
   return Math.round((s.invite_gap_min + x * (s.invite_gap_max - s.invite_gap_min)) * 60_000);
+}
+
+// ── Horaires exacts des invitations du jour ──
+// Les leads reçoivent chacun une heure d'envoi, à la suite des créneaux déjà fixés, espacées du
+// délai d'invitation et uniquement dans les sessions restantes. `nowMin` : minute de Paris de `now`.
+export function scheduleSlots(s: Pick<RampSettings, 'invite_gap_min' | 'invite_gap_max'>, plan: DayPlan, existing: Slot[], leadIds: string[],
+  now: Date, nowMin: number, rng: Rng = Math.random): Slot[] {
+  const midnight = now.getTime() - nowMin * 60_000 - (now.getTime() % 60_000);
+  const windows = plan.sessions.map((x) => [midnight + x.start * 60_000, midnight + x.end * 60_000] as const).filter(([, b]) => b > now.getTime());
+  const last = existing.length ? Math.max(...existing.map((x) => Date.parse(x.at))) : 0;
+  let cursor = Math.max(now.getTime() + 60_000, last);
+  const out: Slot[] = [];
+  for (const id of leadIds) {
+    let t = cursor + (out.length || existing.length ? inviteDelayMs(s, rng) : 0);
+    const w = windows.find(([, b]) => b > t);
+    if (!w) break;
+    if (t < w[0]) t = w[0];
+    t -= t % 60_000;   // à la minute
+    out.push({ lead_id: id, at: new Date(t).toISOString() });
+    cursor = t;
+  }
+  return out;
 }

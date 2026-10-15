@@ -5,8 +5,8 @@ import {
   liEvent, LI_CONNECTIONS_URL, LI_INBOX_URL, SCAN_EVERY_MS, PROFILE_FRESH_MS, MESSAGED,
 } from '@/lib/linkedin';
 import { generateFor } from '@/lib/linkedinFlow';
-import { ensureDayPlan } from '@/lib/linkedinRampServer';
-import { inviteRoom, parisClock } from '@/lib/linkedinRamp';
+import { ensureDayPlan, ensureInviteSlots } from '@/lib/linkedinRampServer';
+import { parisClock, weeklyCap, fmtMin } from '@/lib/linkedinRamp';
 
 // GET → la prochaine action du worker (une seule par appel), par ordre de priorité :
 //   scan     : relire la page « Relations » (acceptations), toutes les 2 h s'il y a des invitations
@@ -169,11 +169,20 @@ export async function GET(request: NextRequest) {
     return serve({ type: 'pending', url: 'https://www.linkedin.com/mynetwork/invitation-manager/sent/' });
   }
 
-  // 8. Invitations : plan du jour (sessions), plafond 7 jours glissants, invitations en attente
+  // 8. Invitations : chacune à son heure exacte (plan.slots), dans la cible du jour, le plafond sur
+  // 7 jours glissants et la limite d'invitations en attente
+  Object.assign(s, await ensureInviteSlots(s, now));
   const sentToday = await countToday('invite');
-  const { room, reason: roomReason } = inviteRoom(s, s.day_plan, sentToday, await countInvitesWeek(), parisClock(now).minutes);
-  let block: string | null = roomReason;
-  if (!block && (s.pending_count ?? 0) >= s.pending_suspend) block = `${s.pending_count} invitations en attente (≥ ${s.pending_suspend}) : nouveaux envois suspendus`;
+  const capLeft = weeklyCap(s) - await countInvitesWeek();
+  const slots = [...(s.day_plan?.slots ?? [])].sort((a, b) => a.at.localeCompare(b.at));
+  const due = slots.find((x) => new Date(x.at) <= now);
+  const room = slots.length;
+  const hm = (iso: string) => { const m = parisClock(new Date(iso)).minutes; return fmtMin(m); };
+  let block: string | null = capLeft <= 0 ? `plafond de ${weeklyCap(s)} invitations sur 7 jours glissants atteint`
+    : s.day_plan && sentToday >= s.day_plan.target ? `cible du jour atteinte (${sentToday}/${s.day_plan.target})`
+    : (s.pending_count ?? 0) >= s.pending_suspend ? `${s.pending_count} invitations en attente (≥ ${s.pending_suspend}) : nouveaux envois suspendus`
+    : !due ? (slots.length ? `prochaine invitation à ${hm(slots[0].at)}` : 'aucune invitation planifiée (file vide ou sessions du jour terminées)')
+    : null;
 
   // Visite des profils 1 à 2 jours avant l'invitation (une visite par lead, quelques-unes par jour)
   if (s.previsit_enabled && s.day_plan) {
@@ -190,15 +199,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (!block) {
-    // Jamais réinvité : pas de lead dont une invitation a déjà expiré ou été retirée.
-    // De préférence un lead visité la veille ou l'avant-veille.
-    const base = () => db.from('leads').select('id, linkedin_url, first_name, company, li_sector')
-      .eq('li_status', 'to_invite').eq('do_not_contact', false).is('li_expired_at', null)
-      .order('li_enqueued_at', { ascending: true, nullsFirst: false }).limit(1);
-    const dayAgo = new Date(now.getTime() - 20 * 3600_000).toISOString();
-    const { data: visited } = await base().not('li_visited_at', 'is', null).lte('li_visited_at', dayAgo);
-    const lead = visited?.[0] ?? (await base()).data?.[0];
+  if (!block && due) {
+    // Le lead dont l'heure est arrivée (le plus en retard d'abord)
+    const { data } = await db.from('leads').select('id, linkedin_url, first_name, company, li_sector, li_status')
+      .eq('id', due.lead_id).eq('li_status', 'to_invite').eq('do_not_contact', false).limit(1);
+    const lead = data?.[0];
+    if (!lead) return idle('Créneau obsolète : replanifié au prochain passage');
     if (lead) {
       const url = linkedinProfileUrl(lead.linkedin_url);
       if (!url) {

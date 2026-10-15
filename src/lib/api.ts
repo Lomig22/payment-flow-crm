@@ -389,6 +389,7 @@ export interface LinkedinLead {
   li_reply_text: string | null; li_thread_url: string | null; li_handled_at: string | null; li_error: string | null;
   li_preview: boolean; li_expired_at: string | null; do_not_contact: boolean;
   invite_forecast?: string;   // jour prévu de l'invitation (leads « en séquence »)
+  invite_exact?: boolean;     // invite_forecast est l'heure exacte (invitations du jour)
 }
 export interface LinkedinCandidate {
   id: string; first_name: string | null; last_name: string | null; company: string | null; job_title: string | null;
