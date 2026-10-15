@@ -1,0 +1,13 @@
+# Surveillance du VPS (worker LinkedIn, rendu des reels) : le CRM envoie un mail à Lomig si le
+# worker ne donne plus signe de vie depuis 15 min, puis à son retour.
+name: Surveillance du VPS
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl -fsS -m 60 https://payment-flow-crm-delta.vercel.app/api/cron/vps-watchdog
