@@ -3,6 +3,7 @@ import {
   getLinkedinSettings, nextQuestion, liEvent, notifyLomig, addBusinessDays, linkedinProfileUrl,
   capitalizeName, LI_STATUS_LABELS, type LinkedinSettings, type Question, type Stage,
 } from '@/lib/linkedin';
+import { relancesOf, stageOfStatus, stageName, stageIndex, statusOfStage } from '@/lib/linkedinSequence';
 import { writeFirstMessage, writePostRelance, relanceMessage, messageC, checkMessage, type LiProfile } from '@/lib/linkedinAgent';
 
 // Étapes de la séquence LinkedIn partagées par le compte rendu du worker (/api/linkedin/ext/report)
@@ -11,9 +12,9 @@ import { writeFirstMessage, writePostRelance, relanceMessage, messageC, checkMes
 const db = () => supabase as any;
 const LEAD = 'id, first_name, last_name, company, job_title, linkedin_url, li_status, li_question, li_profile, li_preview, li_pending, li_msg, li_dm_sent_at, li_last_sent_at, li_last_kind';
 
-// Prochain message : { stage, kind, message, … } ; kind = first | r1 | r2 | r3 | post
+// Prochain message : { stage, kind, message, … } ; kind = first | r1 … r16 | post
 export interface Pending {
-  stage: Stage; kind: 'first' | 'r1' | 'r2' | 'r3' | 'post'; message: string;
+  stage: Stage; kind: Stage | 'post'; message: string;
   variante?: string; question?: Question; element_cite?: string; source?: string; confiance?: string; raison?: string;
   generated_at: string;
 }
@@ -43,13 +44,17 @@ export async function generateFor(leadId: string): Promise<void> {
     `${lead.li_preview ? '[test] ' : ''}premier message rédigé (variante ${out.variante}, ${q}${out.raison ? ` ; ${out.raison}` : ''})`);
 }
 
-// ── Relance : relance « post » si le lead a publié depuis le dernier message, sinon R1 / R2 / R3 ──
-const NEXT_STAGE: Record<string, Stage> = { first_sent: 'r1', r1_sent: 'r2', r2_sent: 'r3' };
+// ── Relance : relance « post » si le lead a publié depuis le dernier message, sinon R1 … RN ──
+// (N = nombre de relances réglé dans l'onglet Messages)
+function nextStage(s: LinkedinSettings, status: string): Stage | null {
+  const k = stageOfStatus(status);
+  return k >= 0 && k < relancesOf(s).length ? (stageName(k + 1) as Stage) : null;
+}
 
 export async function prepareRelance(leadId: string, posts: LiProfile['posts']): Promise<void> {
   const s = await getLinkedinSettings();
   const { data: lead } = await db().from('leads').select(LEAD).eq('id', leadId).maybeSingle();
-  const stage = lead && NEXT_STAGE[lead.li_status];
+  const stage = s && lead ? nextStage(s, lead.li_status) : null;
   if (!s || !lead || !stage || lead.li_pending) return;
   const q: Question = lead.li_question ?? 'cout_client';
   const profile: LiProfile = { ...(lead.li_profile ?? {}), posts: posts ?? [] };
@@ -62,7 +67,7 @@ export async function prepareRelance(leadId: string, posts: LiProfile['posts']):
     pending = { stage, kind: 'post', question: q, ...post, generated_at: now };
     status = needsValidation(s) ? 'to_validate' : 'ready';
   } else {
-    pending = { stage, kind: stage, question: q, message: relanceMessage(stage as 'r1' | 'r2' | 'r3', lead, q), generated_at: now };
+    pending = { stage, kind: stage, question: q, message: relanceMessage(stage, lead, q), generated_at: now };
     status = 'ready';
   }
   await db().from('leads').update({ li_pending: pending, li_status: status, li_profile: profile, li_error: null }).eq('id', leadId);
@@ -75,12 +80,10 @@ export async function markSent(leadId: string, stage: Stage, kind: string) {
   const { data: lead } = await db().from('leads').select(LEAD).eq('id', leadId).maybeSingle();
   if (!s || !lead) return;
   const now = new Date();
-  const first = stage === 'first' ? now : new Date(lead.li_dm_sent_at ?? now);
-  const due = stage === 'first' ? addBusinessDays(first, s.r1_days)
-    : stage === 'r1' ? addBusinessDays(first, s.r2_days)
-    : stage === 'r2' ? addBusinessDays(first, s.r3_days)
-    : addBusinessDays(now, s.end_days);
-  const status = `${stage}_sent`;
+  // Échéance : la relance suivante (délai après ce message), ou la fin de séquence après la dernière
+  const k = stageIndex(stage), list = relancesOf(s);
+  const due = k < list.length ? addBusinessDays(now, Math.max(1, list[k].delay_days)) : addBusinessDays(now, s.end_days);
+  const status = statusOfStage(k);
   await db().from('leads').update({
     li_status: status, li_pending: null, li_due_at: due.toISOString(), li_attempts: 0, li_error: null,
     li_last_sent_at: now.toISOString(), li_last_kind: kind,
@@ -128,7 +131,7 @@ export async function decide(leadId: string, action: 'validate' | 'edit' | 'reje
     // Rejet : variante C (modèle) pour un premier message, relance prévue pour une relance post
     next = p.stage === 'first'
       ? { ...p, variante: 'C', message: messageC(lead, q), element_cite: '', source: '', confiance: 'haute', raison: 'rejeté par Lomig' }
-      : { ...p, kind: p.stage, message: relanceMessage(p.stage as 'r1' | 'r2' | 'r3', lead, q), element_cite: '', source: '' };
+      : { ...p, kind: p.stage, message: relanceMessage(p.stage, lead, q), element_cite: '', source: '' };
   }
   const review = { action, at: new Date().toISOString(), original: action === 'validate' ? undefined : p.message };
 

@@ -1,4 +1,5 @@
 'use client';
+import { relancesOf, stageOfStatus } from '@/lib/linkedinSequence';
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -35,7 +36,11 @@ export function lastStep(l: LinkedinLead): { label: string; at: string | null } 
 }
 
 export function nextStep(l: LinkedinLead, s: LinkedinSettings): { label: string; at: string | null } {
-  const R: Record<string, string> = { first_sent: 'R1 (ou relance post)', r1_sent: 'R2 (ou relance post)', r2_sent: 'R3 (ou relance post)' };
+  // Messages envoyés : relance suivante (R1 … RN) ou fin de séquence après la dernière
+  const k = stageOfStatus(l.li_status), n = relancesOf(s).length;
+  if (k >= 0) return k < n
+    ? { label: `R${k + 1} (ou relance post) ${when(l.li_due_at)}`, at: l.li_due_at }
+    : { label: `Fin de séquence ${when(l.li_due_at)}`, at: l.li_due_at };
   switch (l.li_status) {
     case 'to_invite':
       if (l.invite_forecast && l.invite_exact) {
@@ -52,9 +57,6 @@ export function nextStep(l: LinkedinLead, s: LinkedinSettings): { label: string;
     case 'connected':   return { label: `Visite du profil puis rédaction ; premier message prévu ${when(l.li_due_at)}`, at: l.li_due_at };
     case 'to_validate': return { label: `Message prêt : à valider par vous (envoi prévu ${when(l.li_due_at)} une fois validé)`, at: l.li_due_at };
     case 'ready':       return { label: `Envoi du premier message ${when(l.li_due_at)}`, at: l.li_due_at };
-    case 'first_sent': case 'r1_sent': case 'r2_sent':
-      return { label: `${R[l.li_status]} ${when(l.li_due_at)}`, at: l.li_due_at };
-    case 'r3_sent':     return { label: `Fin de séquence ${when(l.li_due_at)}`, at: l.li_due_at };
     case 'to_resume':   return { label: l.li_handled_at ? 'Traité' : 'À vous de répondre', at: null };
     case 'failed':      return { label: l.li_error ?? 'Erreur', at: null };
     default:            return { label: '', at: null };
@@ -114,7 +116,7 @@ export default function LeadsTimeline({ leads, settings }: { leads: LinkedinLead
         <span className="text-xs text-gray-500">Triés par prochaine échéance. Cliquez sur une ligne pour voir son historique.</span>
         <p className="w-full text-xs text-gray-500">
           Délais : acceptations vérifiées toutes les 15 min (lun.–ven., 9 h – 18 h 30) → visite du profil et rédaction du message →
-          premier message {settings.first_msg_min_hours} à {settings.first_msg_max_hours} h après l&apos;acceptation → R1, R2, R3 à J+{settings.r1_days}, J+{settings.r2_days}, J+{settings.r3_days} ouvrés.
+          premier message {settings.first_msg_min_hours} à {settings.first_msg_max_hours} h après l&apos;acceptation → {relancesOf(settings).length} relance(s) : {relancesOf(settings).map((r, i) => `R${i + 1} J+${r.delay_days}`).join(', ')} (jours ouvrés après le message précédent).
           {settings.manual_validation && <span className="text-amber-700"> Validation manuelle active : chaque premier message attend votre validation (onglet « À valider ») avant de partir.</span>}
         </p>
         {selected.size > 0 && (

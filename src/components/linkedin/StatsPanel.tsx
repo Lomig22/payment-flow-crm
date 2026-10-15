@@ -14,7 +14,8 @@ const PERIODS = [
 ];
 const VARIANTS = ['A', 'B', 'C'];
 const QUESTIONS: Question[] = ['cout_client', 'regularite'];
-const STAGES = ['first', 'r1', 'r2', 'r3', 'post'];
+// Étapes de réponse : premier message, R1 … R16, relance post (seules celles qui ont des réponses s'affichent au-delà de R3)
+const ALL_STAGES = ['first', ...Array.from({ length: 16 }, (_, i) => `r${i + 1}`), 'post'];
 
 function Stat({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -55,7 +56,7 @@ export default function StatsPanel({ leads }: { leads: LinkedinLead[] }) {
       variants: Object.fromEntries(VARIANTS.map((v) => [v, by((l) => l.li_variant === v)])),
       questions: Object.fromEntries(QUESTIONS.map((q) => [q, by((l) => l.li_question === q)])),
       matrix: Object.fromEntries(VARIANTS.map((v) => [v, Object.fromEntries(QUESTIONS.map((q) => [q, by((l) => l.li_variant === v && l.li_question === q)]))])),
-      stages: Object.fromEntries(STAGES.map((st) => [st, repliedLeads.filter((l) => l.li_replied_stage === st).length])),
+      stages: Object.fromEntries(ALL_STAGES.map((st) => [st, repliedLeads.filter((l) => l.li_replied_stage === st).length])),
       untreated: leads.filter((l) => l.li_status === 'to_resume' && !l.li_handled_at).length,
     };
   }, [leads, period, sector]);
@@ -111,7 +112,7 @@ export default function StatsPanel({ leads }: { leads: LinkedinLead[] }) {
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Message qui a déclenché la réponse</p>
           <ul className="space-y-1">
-            {STAGES.map((st) => (
+            {ALL_STAGES.filter((st) => ['first', 'r1', 'r2', 'r3', 'post'].includes(st) || s.stages[st]).map((st) => (
               <li key={st} className="flex items-center gap-2">
                 <span className="w-32 text-gray-600">{STAGE_LABELS[st]}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">

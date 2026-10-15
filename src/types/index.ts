@@ -42,7 +42,7 @@ export interface LeadHistory {
 }
 
 export type LinkedinStatus = 'to_invite' | 'invited' | 'expired' | 'connected' | 'to_validate' | 'ready'
-  | 'first_sent' | 'r1_sent' | 'r2_sent' | 'r3_sent' | 'no_reply' | 'to_resume' | 'dnc' | 'failed';
+  | 'first_sent' | `r${number}_sent` | 'no_reply' | 'to_resume' | 'dnc' | 'failed';   // R1 … R16
 
 export interface Lead {
   id:                  string;

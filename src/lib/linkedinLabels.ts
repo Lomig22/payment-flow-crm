@@ -8,9 +8,8 @@ export const LI_STATUS_LABELS: Record<string, string> = {
   to_validate: 'Message à valider',
   ready:       'Message prêt',
   first_sent:  'Premier message envoyé',
-  r1_sent:     'R1 envoyée',
-  r2_sent:     'R2 envoyée',
-  r3_sent:     'R3 envoyée',
+  // R1 … R16 envoyée(s)
+  ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`r${i + 1}_sent`, `R${i + 1} envoyée`])),
   no_reply:    'Sans réponse',
   to_resume:   'À reprendre',
   dnc:         'Ne plus contacter',
@@ -26,5 +25,8 @@ export const SECTORS: Record<string, string> = {
 
 export type Question = 'cout_client' | 'regularite';
 export const QUESTION_LABELS: Record<Question, string> = { cout_client: 'Q1 coût client', regularite: 'Q2 régularité' };
-export type Stage = 'first' | 'r1' | 'r2' | 'r3';
-export const STAGE_LABELS: Record<string, string> = { first: 'Premier message', r1: 'R1', r2: 'R2', r3: 'R3', post: 'Relance post' };
+export type Stage = 'first' | `r${number}`;
+export const STAGE_LABELS: Record<string, string> = {
+  first: 'Premier message', post: 'Relance post',
+  ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`r${i + 1}`, `R${i + 1}`])),
+};

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { capitalizeName, type Question } from '@/lib/linkedin';
-import { tpl, checkMessage, MAX_CHARS } from '@/lib/linkedinTemplates';
+import { tpl, fillText, relanceText, checkMessage, MAX_CHARS } from '@/lib/linkedinTemplates';
 export { checkMessage };
 
 // Agent de personnalisation LinkedIn (cahier des charges du 12/10/2026).
@@ -54,14 +54,16 @@ export function messagePost(lead: Lead, q: Question, sujet: string, element: str
   return tpl('post', { prenom: capitalizeName(lead.first_name), sujet, element, question_courte: tpl(`qc_${QKEY(q)}`, {}) });
 }
 
-// Relances R1 / R2 / R3 : toujours la question du premier message
-export function relanceMessage(stage: 'r1' | 'r2' | 'r3', lead: Lead, q: Question): string {
+// Relances R1 … R16 : textes de l'onglet Messages (variables : prénom, entreprise, question…)
+export function relanceMessage(stage: string, lead: Lead, q: Question): string {
+  const k = Number(/^r(\d+)$/.exec(stage)?.[1] ?? 0);
   const company = (lead.company ?? '').trim();
   const vars = {
     prenom: capitalizeName(lead.first_name), entreprise: company,
     pour_entreprise: company ? `pour ${company}` : 'pour votre activité', chez_entreprise: company ? `Chez ${company}` : 'Chez vous',
+    question: QUESTIONS[q], question_courte: tpl(`qc_${QKEY(q)}`, {}),
   };
-  return stage === 'r3' ? tpl('r3', vars) : tpl(`${stage}_${QKEY(q)}`, vars);
+  return fillText(relanceText(k, QKEY(q)), vars);
 }
 
 // ── Règles de rédaction : linkedinTemplates.ts (partagées avec l'onglet Messages) ──

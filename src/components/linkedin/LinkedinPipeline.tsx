@@ -12,12 +12,13 @@ const COLUMNS: { key: string; title: string; statuses: string[]; cls: string }[]
   { key: 'invited',  title: 'Invitation envoyée',  statuses: ['invited'],                        cls: 'border-blue-400' },
   { key: 'accepted', title: 'Acceptée',            statuses: ['connected', 'to_validate', 'ready'], cls: 'border-sky-400' },
   { key: 'first',    title: '1er message envoyé',  statuses: ['first_sent'],                     cls: 'border-green-400' },
-  { key: 'relances', title: 'Relances',            statuses: ['r1_sent', 'r2_sent', 'r3_sent'],  cls: 'border-teal-400' },
+  { key: 'relances', title: 'Relances',            statuses: Array.from({ length: 16 }, (_, i) => `r${i + 1}_sent`), cls: 'border-teal-400' },
   { key: 'resume',   title: 'À reprendre',         statuses: ['to_resume'],                      cls: 'border-emerald-500' },
   { key: 'ended',    title: 'Terminé',             statuses: ['no_reply', 'expired', 'dnc', 'failed'], cls: 'border-gray-200' },
 ];
 const SUB: Record<string, string> = {
-  to_validate: 'à valider', ready: 'message prêt', connected: 'rédaction', r1_sent: 'R1', r2_sent: 'R2', r3_sent: 'R3',
+  to_validate: 'à valider', ready: 'message prêt', connected: 'rédaction',
+  ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`r${i + 1}_sent`, `R${i + 1}`])),
   no_reply: 'sans réponse', expired: 'invitation expirée', dnc: 'ne plus contacter', failed: 'erreur',
 };
 

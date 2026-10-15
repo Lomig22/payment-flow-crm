@@ -2,7 +2,7 @@ import type { LinkedinStatus } from '@/types';
 
 // Petites briques communes à la page /linkedin
 
-export const STATUS_BADGE: Record<LinkedinStatus, string> = {
+export const STATUS_BADGE: Record<string, string> = {
   to_invite:   'bg-gray-100 text-gray-700',
   invited:     'bg-blue-100 text-blue-700',
   expired:     'bg-gray-200 text-gray-500',
@@ -10,9 +10,7 @@ export const STATUS_BADGE: Record<LinkedinStatus, string> = {
   to_validate: 'bg-amber-100 text-amber-800',
   ready:       'bg-amber-50 text-amber-700',
   first_sent:  'bg-green-100 text-green-700',
-  r1_sent:     'bg-teal-100 text-teal-700',
-  r2_sent:     'bg-teal-100 text-teal-700',
-  r3_sent:     'bg-teal-100 text-teal-700',
+  ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`r${i + 1}_sent`, 'bg-teal-100 text-teal-700'])),   // R1 … R16
   no_reply:    'bg-gray-200 text-gray-600',
   to_resume:   'bg-emerald-200 text-emerald-900',
   dnc:         'bg-red-50 text-red-600',

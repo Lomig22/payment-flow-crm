@@ -49,10 +49,8 @@ export default function SettingsCard({ settings }: { settings: LinkedinSettings 
         {num('first_msg_min_hours', 'Premier message, au plus tôt', 'h après acceptation')}
         {num('first_msg_max_hours', 'Premier message, au plus tard', 'h après acceptation')}
         <span />
-        {num('r1_days', 'R1', 'jours ouvrés après le 1er message')}
-        {num('r2_days', 'R2', 'jours ouvrés')}
-        {num('r3_days', 'R3', 'jours ouvrés')}
-        {num('end_days', 'Fin de séquence', 'jours ouvrés après R3')}
+        {num('end_days', 'Fin de séquence', 'jours ouvrés après la dernière relance')}
+        <p className="text-xs text-gray-500 col-span-full">Nombre de relances, délais et textes : onglet LinkedIn &gt; Messages.</p>
       </div>
 
 

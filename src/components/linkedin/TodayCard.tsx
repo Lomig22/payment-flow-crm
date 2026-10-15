@@ -1,4 +1,5 @@
 'use client';
+import { relancesOf, stageOfStatus } from '@/lib/linkedinSequence';
 import type { LinkedinLead, LinkedinSettings } from '@/lib/api';
 import { STAGE_LABELS } from '@/lib/linkedinLabels';
 import { fullName } from './shared';
@@ -45,7 +46,7 @@ export default function TodayCard({ leads, settings }: { leads: LinkedinLead[]; 
     ...leads.filter((l) => l.li_status === 'to_invite' && isToday(l.invite_forecast)).map((l) => ({ key: `pi${l.id}`, text: `Invitation à ${fullName(l)}` })),
     ...leads.filter((l) => l.li_status === 'connected').map((l) => ({ key: `pc${l.id}`, text: `Visite du profil de ${fullName(l)} et rédaction du message` })),
     ...leads.filter((l) => l.li_status === 'ready' && dueToday(l.li_due_at)).map((l) => ({ key: `pr${l.id}`, text: `Message à ${fullName(l)}` })),
-    ...leads.filter((l) => ['first_sent', 'r1_sent', 'r2_sent'].includes(l.li_status ?? '') && dueToday(l.li_due_at)).map((l) => ({ key: `pf${l.id}`, text: `Relance de ${fullName(l)}` })),
+    ...leads.filter((l) => { const k = stageOfStatus(l.li_status); return k >= 0 && k < relancesOf(settings).length && dueToday(l.li_due_at); }).map((l) => ({ key: `pf${l.id}`, text: `Relance de ${fullName(l)}` })),
   ] : [];
   const toValidate = leads.filter((l) => l.li_status === 'to_validate').length;
 

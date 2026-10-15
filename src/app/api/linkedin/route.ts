@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureInviteSlots } from '@/lib/linkedinRampServer';
 import { parisClock } from '@/lib/linkedinRamp';
 import { TEMPLATE_DEFAULTS } from '@/lib/linkedinTemplates';
+import { MAX_RELANCES, stageIndex, statusOfStage } from '@/lib/linkedinSequence';
 import { getAuthUser, unauthorized, forbidden, badRequest } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import {
@@ -180,6 +181,10 @@ const EDITABLE: Record<string, (v: any) => boolean> = {
   reinvite_block_days: int(0, 365),
   note_split_pct:      int(0, 100),
   note_templates:      (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((t) => typeof t === 'string' && t.length <= 200),
+  relances:            (v) => Array.isArray(v) && v.length >= 1 && v.length <= MAX_RELANCES && v.every((r: any) => r && typeof r === 'object'
+    && Number.isInteger(r.delay_days) && r.delay_days >= 1 && r.delay_days <= 60
+    && typeof r.cout_client === 'string' && typeof r.regularite === 'string' && r.cout_client.length <= 600 && r.regularite.length <= 600
+    && (r.cout_client.trim() || r.regularite.trim())),
   msg_templates:       (v) => v && typeof v === 'object' && !Array.isArray(v)
     && Object.entries(v).every(([k, t]) => k in TEMPLATE_DEFAULTS && typeof t === 'string' && t.length <= 600),
   previsit_enabled:    (v) => typeof v === 'boolean',
@@ -282,7 +287,7 @@ export async function POST(request: NextRequest) {
     const { data } = await db.from('leads').select('id, li_pending, li_invited_at, li_connected_at, li_dm_sent_at, li_last_kind').in('id', ids).eq('li_status', 'failed');
     for (const l of data ?? []) {
       const li_status = l.li_pending ? 'ready'
-        : l.li_dm_sent_at ? ({ first: 'first_sent', r1: 'r1_sent', r2: 'r2_sent', r3: 'r3_sent' } as Record<string, string>)[l.li_last_kind] ?? 'first_sent'
+        : l.li_dm_sent_at ? (stageIndex(l.li_last_kind) >= 0 ? statusOfStage(stageIndex(l.li_last_kind)) : 'first_sent')
         : l.li_connected_at ? 'connected' : l.li_invited_at ? 'invited' : 'to_invite';
       await db.from('leads').update({ li_status, li_attempts: 0, li_error: null }).eq('id', l.id);
       await liEvent(l.id, 'failed', li_status, 'remis dans la séquence');

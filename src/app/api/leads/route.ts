@@ -1,3 +1,4 @@
+import { fetchAll } from '@/lib/fetchAll';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
@@ -62,7 +63,8 @@ export async function GET(request: NextRequest) {
     if (source) cq = cq.eq('source', source);
     if (niche)  cq = (cq as any).eq('niche', niche);
     if (region) cq = (cq as any).eq('region', region);
-    const { data: rows } = await (cq as any).limit(5000);
+    const base = (cq as any).order('id');   // tri ajouté une fois : chaque page ne change que la plage
+    const rows = await fetchAll(() => base);
     const counts: Record<string, number> = {};
     let open_count = 0;
     let total_count = 0;
@@ -114,9 +116,16 @@ export async function GET(request: NextRequest) {
     q = q.or(orParts.join(','));
   }
 
-  q = q.order(sort, { ascending: asc }).range(offset, offset + limit - 1);
+  // Au-delà de 1 000 lignes demandées (plafond de Supabase par réponse) : plusieurs pages
+  q = q.order(sort, { ascending: asc }).order('id');
+  const pageAt = (from: number) => (q as any).range(from, Math.min(from + 1000, offset + limit) - 1);
 
-  const { data, count, error } = await q;
+  let { data, count, error } = await pageAt(offset);
+  for (let from = offset + 1000; !error && data && data.length === from - offset && from < offset + limit; from += 1000) {
+    const next = await pageAt(from);
+    if (next.error) { error = next.error; break; }
+    data = data.concat(next.data ?? []);
+  }
   if (error) return NextResponse.json({ message: 'Erreur serveur' }, { status: 500 });
 
   const total = count ?? 0;

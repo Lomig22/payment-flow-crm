@@ -7,6 +7,7 @@ import {
 import { generateFor } from '@/lib/linkedinFlow';
 import { ensureDayPlan, ensureInviteSlots } from '@/lib/linkedinRampServer';
 import { parisClock, weeklyCap, fmtMin } from '@/lib/linkedinRamp';
+import { relancesOf, stageOfStatus } from '@/lib/linkedinSequence';
 
 // GET → la prochaine action du worker (une seule par appel), par ordre de priorité :
 //   scan     : relire la page « Relations » (acceptations), toutes les 2 h s'il y a des invitations
@@ -91,12 +92,16 @@ export async function GET(request: NextRequest) {
   const r = await ensureDayPlan(s, now);
   Object.assign(s, r);
 
-  // Fin de séquence : R3 envoyée et toujours sans réponse après end_days jours ouvrés
+  // Fin de séquence : dernière relance (RN) envoyée et toujours sans réponse après end_days jours ouvrés.
+  // Les relances au-delà de N (N réduit depuis) terminent aussi la séquence.
+  const lastStage = relancesOf(s).length;
+  const endStatuses = MESSAGED.filter((st) => stageOfStatus(st) >= lastStage);
+  const relanceStatuses = MESSAGED.filter((st) => stageOfStatus(st) < lastStage);
   {
-    const { data: ended } = await db.from('leads').select('id').eq('li_status', 'r3_sent').lte('li_due_at', iso);
+    const { data: ended } = await db.from('leads').select('id, li_status').in('li_status', endStatuses).lte('li_due_at', iso).is('li_pending', null);
     for (const l of ended ?? []) {
       await db.from('leads').update({ li_status: 'no_reply', li_due_at: null }).eq('id', l.id);
-      await liEvent(l.id, 'r3_sent', 'no_reply', 'séquence terminée sans réponse');
+      await liEvent(l.id, l.li_status, 'no_reply', 'séquence terminée sans réponse');
     }
   }
 
@@ -155,7 +160,7 @@ export async function GET(request: NextRequest) {
   // 6. Relance arrivée à échéance : d'abord regarder ses nouvelles publications
   if (messagesLeft > 0) {
     const { data } = await db.from('leads').select('id, linkedin_url')
-      .in('li_status', ['first_sent', 'r1_sent', 'r2_sent']).lte('li_due_at', iso).is('li_pending', null)
+      .in('li_status', relanceStatuses).lte('li_due_at', iso).is('li_pending', null)
       .order('li_due_at', { ascending: true }).limit(1);
     const lead = data?.[0];
     const url = lead && linkedinActivityUrl(lead.linkedin_url);

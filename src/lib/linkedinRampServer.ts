@@ -1,3 +1,4 @@
+import { fetchAll } from '@/lib/fetchAll';
 import { supabase } from '@/lib/supabase';
 import { accountEvent, countToday, countInvitesWeek, type LinkedinSettings } from '@/lib/linkedin';
 import { evaluateTier, planDay, parisClock, scheduleSlots, weeklyCap, type Invite } from '@/lib/linkedinRamp';
@@ -8,8 +9,8 @@ import { evaluateTier, planDay, parisClock, scheduleSlots, weeklyCap, type Invit
 const DAY = 86_400_000;
 
 export async function recentInvites(days = 30): Promise<Invite[]> {
-  const { data } = await (supabase as any).from('leads').select('li_invited_at, li_connected_at')
-    .not('li_invited_at', 'is', null).gte('li_invited_at', new Date(Date.now() - days * DAY).toISOString()).limit(5000);
+  const data = await fetchAll(() => (supabase as any).from('leads').select('li_invited_at, li_connected_at')
+    .not('li_invited_at', 'is', null).gte('li_invited_at', new Date(Date.now() - days * DAY).toISOString()).order('id'));
   return (data ?? []).map((l: any) => ({ invited_at: l.li_invited_at, connected_at: l.li_connected_at }));
 }
 

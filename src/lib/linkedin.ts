@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
-import { setTemplates } from '@/lib/linkedinTemplates';
+import { setTemplates, setRelances } from '@/lib/linkedinTemplates';
+import { MESSAGED_STATUSES, relancesOf, type Relance } from '@/lib/linkedinSequence';
 import { supabase } from '@/lib/supabase';
 import { startOfTodayParis } from '@/lib/paris-time';
 import { sendLeadEmail } from '@/lib/mailer';
@@ -64,6 +65,7 @@ export interface LinkedinSettings extends RampSettings {
   note_split_pct:      number;
   note_templates:      Record<string, string>;
   msg_templates?:      Record<string, string>;   // gabarits des messages (onglet Messages)
+  relances?:           Relance[];                // R1 … R16 : délai et textes (onglet Messages)
   previsit_enabled:    boolean;
   worker_id:           string | null;
   worker_ip:           string | null;
@@ -72,7 +74,7 @@ export interface LinkedinSettings extends RampSettings {
 }
 
 // Statuts où un message est déjà parti : on surveille la messagerie
-export const MESSAGED = ['first_sent', 'r1_sent', 'r2_sent', 'r3_sent'];
+export const MESSAGED = MESSAGED_STATUSES;   // premier message, R1 … R16
 // Statuts « en cours » : le lead ne doit pas être réimporté ni remis dans la séquence
 export const ACTIVE = ['to_invite', 'invited', 'connected', 'to_validate', 'ready', ...MESSAGED];
 
@@ -91,6 +93,7 @@ export const PROFILE_FRESH_MS = 30 * 86_400_000;
 export async function getLinkedinSettings(): Promise<LinkedinSettings | null> {
   const { data } = await (supabase as any).from('linkedin_settings').select('*').eq('id', 1).maybeSingle();
   setTemplates(data?.msg_templates);   // gabarits de messages modifiés par Lomig (onglet Messages)
+  if (data) setRelances(relancesOf(data));
   return data ?? null;
 }
 

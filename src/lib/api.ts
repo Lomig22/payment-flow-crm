@@ -362,6 +362,7 @@ export interface LinkedinSettings {
   error_streak_max: number; pending_cap: number; pending_suspend: number; reinvite_block_days: number;
   note_split_pct: number; note_templates: Record<string, string>; previsit_enabled: boolean;
   msg_templates?: Record<string, string>;
+  relances?: { delay_days: number; cout_client: string; regularite: string }[];
 }
 export interface LinkedinRate { rate: number | null; sent: number; accepted: number }
 export interface LinkedinRates { accept_7: LinkedinRate; accept_30: LinkedinRate; accept_mature: LinkedinRate; reply: { sent: number; replied: number } }
@@ -398,7 +399,7 @@ export interface LinkedinCandidate {
   li_sector: string | null; linkedin_url: string | null; created_at: string;
 }
 export interface LinkedinPending {
-  stage: 'first' | 'r1' | 'r2' | 'r3'; kind: 'first' | 'r1' | 'r2' | 'r3' | 'post'; message: string;
+  stage: string; kind: string; message: string;   // first, r1 … r16, post
   variante?: string; question?: string; element_cite?: string; source?: string; confiance?: string; raison?: string;
   generated_at: string;
 }

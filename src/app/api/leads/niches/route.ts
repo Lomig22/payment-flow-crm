@@ -1,3 +1,4 @@
+import { fetchAll } from '@/lib/fetchAll';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
@@ -15,7 +16,8 @@ export async function GET(request: NextRequest) {
   if (source) q = q.eq('source', source);
   if (user.role !== 'admin') q = q.eq('setter_id', user.id);
 
-  const { data } = await (q as any).limit(5000);
+  const base = (q as any).order('id');
+  const data = await fetchAll(() => base);
   const niches = Array.from(
     new Set((data ?? []).map((r: any) => (r.niche || '').trim()).filter(Boolean))
   ).sort((a, b) => (a as string).localeCompare(b as string, 'fr'));

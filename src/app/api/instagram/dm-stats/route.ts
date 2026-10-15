@@ -1,3 +1,4 @@
+import { fetchAll } from '@/lib/fetchAll';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
@@ -20,9 +21,10 @@ export async function GET(request: NextRequest) {
   const since = new Date(Math.min(dayStart.getTime(), hourStart.getTime())).toISOString();
 
   const [logs, accounts] = await Promise.all([
-    db.from('instagram_dm_log')
+    fetchAll(() => db.from('instagram_dm_log')
       .select('account_id, action, from_status, to_status, variant, created_at')
-      .gte('created_at', since).order('created_at', { ascending: false }).limit(10000),
+      .gte('created_at', since).order('created_at', { ascending: false }).order('id'))
+      .then((data) => ({ data, error: null as any }), (e) => ({ data: null, error: e })),
     db.from('social_accounts').select('id, paused_until, pause_reason').eq('platform', 'instagram'),
   ]);
   if (logs.error) return NextResponse.json({ message: logs.error.message }, { status: 500 });

@@ -58,11 +58,6 @@ export const TEMPLATE_META: { key: TemplateKey; group: string; label: string; wh
   { key: 'qc_cout_client', group: 'Questions', label: 'Q1 version courte', when: 'Dans la relance « post »', vars: [] },
   { key: 'qc_regularite', group: 'Questions', label: 'Q2 version courte', when: 'Dans la relance « post »', vars: [] },
   { key: 'post', group: 'Relances', label: 'Relance « post »', when: 'À la place d\'une relance, si le lead vient de publier', vars: ['prenom', 'sujet', 'element', 'question_courte'] },
-  { key: 'r1_cout_client', group: 'Relances', label: 'R1 · Q1', when: 'R1 après le premier message (Q1)', vars: ['prenom', 'entreprise'] },
-  { key: 'r1_regularite', group: 'Relances', label: 'R1 · Q2', when: 'R1 après le premier message (Q2)', vars: ['prenom', 'entreprise'] },
-  { key: 'r2_cout_client', group: 'Relances', label: 'R2 · Q1', when: 'R2 (Q1)', vars: ['prenom', 'entreprise', 'pour_entreprise'] },
-  { key: 'r2_regularite', group: 'Relances', label: 'R2 · Q2', when: 'R2 (Q2)', vars: ['prenom', 'entreprise', 'chez_entreprise'] },
-  { key: 'r3', group: 'Relances', label: 'R3 · dernière relance', when: 'R3, puis fin de séquence', vars: ['prenom', 'entreprise'] },
 ];
 
 export const VAR_HELP: Record<string, string> = {
@@ -81,6 +76,23 @@ export function setTemplates(overrides?: Partial<Record<string, string>> | null)
   current = { ...TEMPLATE_DEFAULTS, ...o };
 }
 
+export function fillText(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{(\w+)\}/g, (m, v) => (v in vars ? vars[v] : m)).replace(/[ \t]{2,}/g, ' ').trim();
+}
+
 export function tpl(key: TemplateKey, vars: Record<string, string>): string {
   return current[key].replace(/\{(\w+)\}/g, (m, v) => (v in vars ? vars[v] : m)).replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+// ── Relances (R1 … R16) : textes en vigueur, chargés avec les réglages ──
+// Par défaut (réglages pas encore chargés) : R1 / R2 / R3 d'origine
+let currentRelances: { cout_client: string; regularite: string }[] = [
+  { cout_client: TEMPLATE_DEFAULTS.r1_cout_client, regularite: TEMPLATE_DEFAULTS.r1_regularite },
+  { cout_client: TEMPLATE_DEFAULTS.r2_cout_client, regularite: TEMPLATE_DEFAULTS.r2_regularite },
+  { cout_client: TEMPLATE_DEFAULTS.r3, regularite: TEMPLATE_DEFAULTS.r3 },
+];
+export function setRelances(list: { cout_client: string; regularite: string }[]): void { currentRelances = list; }
+export function relanceText(k: number, q: 'cout_client' | 'regularite'): string {
+  const r = currentRelances[k - 1];
+  return (r?.[q]?.trim() || r?.cout_client?.trim() || r?.regularite?.trim() || '');
 }
