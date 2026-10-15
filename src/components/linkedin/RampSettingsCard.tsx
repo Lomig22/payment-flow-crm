@@ -71,7 +71,7 @@ export default function RampSettingsCard({ settings }: { settings: LinkedinSetti
       </div>
 
       <div>
-        <span className="label">Paliers (invitations par jour)</span>
+        <span className="label">Paliers (invitations par jour, et jours d&apos;invitation : aucun coché = tous les jours)</span>
         <div className="space-y-1.5">
           {tiers.map((t, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
@@ -79,6 +79,17 @@ export default function RampSettingsCard({ settings }: { settings: LinkedinSetti
               <input type="number" className="input py-1 w-20" value={t.min} onChange={(e) => setTier(i, 'min', Number(e.target.value))} />
               <span className="text-gray-400">à</span>
               <input type="number" className="input py-1 w-20" value={t.max} onChange={(e) => setTier(i, 'max', Number(e.target.value))} />
+              {/* Jours d'invitation : aucun coché = tous les jours */}
+              <span className="flex gap-0.5 ml-1">
+                {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, k) => {
+                  const on = t.days?.includes(k + 1);
+                  return (
+                    <button key={k} type="button" title="Jours d'invitation (aucun = tous les jours)"
+                      className={`w-6 h-6 rounded text-[11px] ${on ? 'bg-[#0a66c2] text-white' : 'bg-gray-100 text-gray-500'}`}
+                      onClick={() => setF({ ...f, tiers: tiers.map((x, j) => (j === i ? { ...x, days: on ? (x.days ?? []).filter((y) => y !== k + 1) : [...(x.days ?? []), k + 1].sort() } : x)) })}>{d}</button>
+                  );
+                })}
+              </span>
               {tiers.length > 1 && i === tiers.length - 1 && (
                 <button className="text-gray-400 hover:text-red-600" onClick={() => setF({ ...f, tiers: tiers.slice(0, -1) })}><Trash2 className="w-3.5 h-3.5" /></button>
               )}

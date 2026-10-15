@@ -2,7 +2,8 @@
 // Logique pure (aucun accès base ni LinkedIn), testée par scripts/tests/linkedin-ramp.test.ts :
 // paliers, taux d'acceptation sur fenêtre glissante, plafond 7 jours, cooldown, plan du jour.
 
-export interface Tier { min: number; max: number }
+// days : jours d'invitation (1 = lundi … 7 = dimanche) ; absent = tous les jours
+export interface Tier { min: number; max: number; days?: number[] }
 export type AccountState = 'active' | 'cooldown' | 'blocked';
 
 export interface RampSettings {

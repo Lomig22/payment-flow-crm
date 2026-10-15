@@ -184,6 +184,7 @@ export async function GET(request: NextRequest) {
   const room = slots.length;
   const hm = (iso: string) => { const m = parisClock(new Date(iso)).minutes; return fmtMin(m); };
   let block: string | null = capLeft <= 0 ? `plafond de ${weeklyCap(s)} invitations sur 7 jours glissants atteint`
+    : s.day_plan && s.day_plan.target === 0 ? 'pas d\'invitations aujourd\'hui (jours d\'invitation du palier)'
     : s.day_plan && sentToday >= s.day_plan.target ? `cible du jour atteinte (${sentToday}/${s.day_plan.target})`
     : (s.pending_count ?? 0) >= s.pending_suspend ? `${s.pending_count} invitations en attente (≥ ${s.pending_suspend}) : nouveaux envois suspendus`
     : !due ? (slots.length ? `prochaine invitation à ${hm(slots[0].at)}` : 'aucune invitation planifiée (file vide ou sessions du jour terminées)')

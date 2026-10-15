@@ -145,7 +145,7 @@ const EDITABLE: Record<string, (v: any) => boolean> = {
   min_gap_minutes:     int(1, 120),
   max_gap_minutes:     int(1, 240),
   ramp:                (v) => Array.isArray(v) && v.length >= 1 && v.length <= 8 && v.every(int(0, 40)),
-  weekly_invite_cap:   int(0, 200),
+  weekly_invite_cap:   int(0, 1000),
   dms_per_day:         int(0, 60),
   invite_expiry_days:  int(3, 60),
   first_msg_min_hours: int(0, 72),
@@ -157,7 +157,8 @@ const EDITABLE: Record<string, (v: any) => boolean> = {
   inbox_every_minutes: int(10, 240),
   validation_target:   int(0, 500),
   // Montée en charge (sprint46)
-  tiers:               (v) => Array.isArray(v) && v.length >= 1 && v.length <= 8 && v.every((t: any) => Number.isInteger(t?.min) && Number.isInteger(t?.max) && t.min >= 1 && t.max >= t.min && t.max <= 60),
+  tiers:               (v) => Array.isArray(v) && v.length >= 1 && v.length <= 8 && v.every((t: any) => Number.isInteger(t?.min) && Number.isInteger(t?.max) && t.min >= 1 && t.max >= t.min && t.max <= 500
+    && (t.days === undefined || (Array.isArray(t.days) && t.days.every((d: any) => Number.isInteger(d) && d >= 1 && d <= 7)))),
   promote_min_days:    int(1, 60),
   promote_rate:        int(1, 100),
   promote_rate_last:   int(1, 100),

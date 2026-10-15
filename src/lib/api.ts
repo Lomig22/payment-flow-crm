@@ -353,7 +353,7 @@ export interface LinkedinSettings {
   next_action_at: string | null; last_scan_at: string | null; last_inbox_at: string | null; last_seen_at: string | null;
   alert: string | null; alert_at: string | null; stop_reason: string | null; stopped_at: string | null;
   // Montée en charge (sprint46)
-  tiers: { min: number; max: number }[]; tier: number; tier_since: string | null;
+  tiers: { min: number; max: number; days?: number[] }[]; tier: number; tier_since: string | null;
   promote_min_days: number; promote_rate: number; promote_rate_last: number; demote_rate: number; rate_min_sample: number;
   last_tier_bonus_pct: number; volume_jitter_pct: number;
   day_start_min: number; day_end_min: number; lunch_start_min: number; lunch_end_min: number;
@@ -367,7 +367,7 @@ export interface LinkedinSettings {
 export interface LinkedinRate { rate: number | null; sent: number; accepted: number }
 export interface LinkedinRates { accept_7: LinkedinRate; accept_30: LinkedinRate; accept_mature: LinkedinRate; reply: { sent: number; replied: number } }
 export interface LinkedinRamp {
-  tier: number; tiers: { min: number; max: number }[]; tier_since: string | null; tier_reason: string | null;
+  tier: number; tiers: { min: number; max: number; days?: number[] }[]; tier_since: string | null; tier_reason: string | null;
   plan: { date: string; target: number; sessions: { start: number; end: number; count: number }[] } | null;
   account_state: 'active' | 'cooldown' | 'blocked'; cooldown_until: string | null;
   weekly_cap: number; invites_week: number; invites_today: number;
