@@ -131,13 +131,21 @@ export function inviteRoom(s: RampSettings, plan: DayPlan | null, sentToday: num
 export const fmtMin = (m: number) => `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
 
 // ── Plan du jour : cible répartie en 2 ou 3 sessions, hors pause déjeuner ──
-export function planDay(s: RampSettings, date: string, rng: Rng = Math.random, target = dailyTarget(s, rng)): DayPlan {
+// `fromMin` : minute de la journée où le plan est établi. Un plan fait en cours de journée (palier
+// changé, réglages modifiés, VPS redémarré) ne place pas de session dans le passé : sinon toute la
+// cible tombait dans des sessions déjà finies et aucune invitation ne partait (15/10/2026).
+export function planDay(s: RampSettings, date: string, rng: Rng = Math.random, target = dailyTarget(s, rng), fromMin = 0): DayPlan {
   const k = s.sessions_min + Math.floor(rng() * (s.sessions_max - s.sessions_min + 1));
-  // Plages : matin, début d'après-midi, fin d'après-midi
-  const ranges: [number, number][] = k <= 2
-    ? [[s.day_start_min, s.lunch_start_min], [s.lunch_end_min, s.day_end_min]]
-    : [[s.day_start_min, s.lunch_start_min], [s.lunch_end_min, s.lunch_end_min + Math.floor((s.day_end_min - s.lunch_end_min) / 2)],
-       [s.lunch_end_min + Math.floor((s.day_end_min - s.lunch_end_min) / 2), s.day_end_min]];
+  // Plages : matin, début d'après-midi, fin d'après-midi (sans pause déjeuner : la journée en deux ou trois)
+  const lunch = s.lunch_end_min > s.lunch_start_min;
+  const [ls, le] = lunch ? [s.lunch_start_min, s.lunch_end_min] : [Math.floor((s.day_start_min + s.day_end_min) / 2), Math.floor((s.day_start_min + s.day_end_min) / 2)];
+  const all: [number, number][] = k <= 2
+    ? [[s.day_start_min, ls], [le, s.day_end_min]]
+    : [[s.day_start_min, ls], [le, le + Math.floor((s.day_end_min - le) / 2)], [le + Math.floor((s.day_end_min - le) / 2), s.day_end_min]];
+  // Rien dans le passé ; s'il ne reste qu'un bout de journée, une seule session jusqu'à la fin
+  let ranges = all.map(([a, b]) => [Math.max(a, fromMin), b] as [number, number]).filter(([a, b]) => b - a >= 15);
+  if (!ranges.length && s.day_end_min - fromMin >= 15) ranges = [[fromMin, s.day_end_min]];
+  if (!ranges.length) return { date, target, sessions: [] };
   // Répartition du volume : chaque session reçoit au moins 1, le reste au hasard
   const counts: number[] = ranges.map(() => (target >= ranges.length ? 1 : 0));
   for (let i = counts.reduce((a, b) => a + b, 0); i < target; i++) counts[Math.floor(rng() * ranges.length)]++;
@@ -145,7 +153,8 @@ export function planDay(s: RampSettings, date: string, rng: Rng = Math.random, t
     // Durée : de quoi placer les invitations au rythme moyen, plus une marge, sans dépasser la plage
     const need = Math.max(30, Math.ceil(counts[i] * ((s.invite_gap_min + s.invite_gap_max) / 2) * 1.3));
     const len = Math.min(b - a, need);
-    const start = a + Math.floor(rng() * Math.max(1, b - a - len));
+    // Plage entamée (plan fait en cours de journée) : la session démarre tout de suite
+    const start = fromMin > 0 && a === fromMin ? a : a + Math.floor(rng() * Math.max(1, b - a - len));
     return { start, end: start + len, count: counts[i] };
   }).filter((x) => x.count > 0);
   return { date, target, sessions };

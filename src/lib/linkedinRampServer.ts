@@ -29,7 +29,7 @@ export async function ensureDayPlan(s: LinkedinSettings, now = new Date()): Prom
       lines: [`Montée en charge LinkedIn : passage du palier ${s.tier} au palier ${tier} (${s.tiers[tier - 1].min}–${s.tiers[tier - 1].max} invitations par jour).`, `Raison : ${ev.reason}.`],
     });
   }
-  const day_plan = planDay({ ...s, tier }, today);
+  const day_plan = planDay({ ...s, tier }, today, Math.random, undefined, parisClock(now).minutes);
   await db.from('linkedin_settings').update({ tier, tier_since: tierSince, day_plan, tier_reason: ev.reason }).eq('id', 1);
   return { ...s, tier, tier_since: tierSince, day_plan };
 }
