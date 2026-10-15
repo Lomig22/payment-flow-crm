@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
     ? await db.from('content_queue').select('id, status, media_url, frame_paths, scheduled_at, published_at, permalink, error').in('id', ids)
     : { data: [] };
   const byId = new Map((queue ?? []).map((q: any) => [q.id, q]));
-  const preview = supabase.storage.from(MEDIA_BUCKET).getPublicUrl('agency/apercu/modele.mp4').data.publicUrl;
+  // Version dans l'URL : le navigateur ne garde pas l'ancien aperçu en cache
+  const { data: files } = await supabase.storage.from(MEDIA_BUCKET).list('agency/apercu', { search: 'modele.mp4', limit: 1 });
+  const v = files?.[0]?.updated_at ? Date.parse(files[0].updated_at) : 0;
+  const preview = `${supabase.storage.from(MEDIA_BUCKET).getPublicUrl('agency/apercu/modele.mp4').data.publicUrl}?v=${v}`;
   return NextResponse.json({
     preview_url: preview,
     reels: (reels ?? []).map((r: any) => {

@@ -92,7 +92,7 @@ export default function FabriquePage() {
         {showModel && (
           <div className="mt-3 flex gap-4 items-start">
             <video src={data.preview_url} controls playsInline preload="metadata" className="w-[220px] aspect-[9/16] rounded-xl bg-black" />
-            <p className="text-sm text-gray-600 max-w-md">Le nouveau modèle (rythme v2) avec le script et la voix Anatole du prototype que tu avais aimé. Les reels écrits par Claude auront des phrases encore plus courtes, donc des coupes plus rapides.</p>
+            <p className="text-sm text-gray-600 max-w-md">Le modèle actuel (rythme v2, logo et bleu Payment Flow) avec le script et la voix Anatole du prototype que tu avais aimé. Les reels écrits par Claude auront des phrases encore plus courtes, donc des coupes plus rapides.</p>
           </div>
         )}
       </div>
