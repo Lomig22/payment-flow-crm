@@ -9,29 +9,29 @@
       @font-face { font-family: "Unbounded"; src: url("fonts/Unbounded-800.woff2") format("woff2"); font-weight: 800; }
       @font-face { font-family: "DM Sans"; src: url("fonts/DMSans.woff2") format("woff2"); font-weight: 100 1000; }
       /* Fenêtres d'interface (scènes recherche et demandes) */
-      .bar { display: flex; align-items: center; gap: 12px; padding: 22px 28px; border-bottom: 2px solid #2c2870; font-size: 28px; color: #b4b1e0; margin: -34px -36px 4px; }
-      .bar .d { width: 14px; height: 14px; border-radius: 50%; background: #4b4790; }
-      .bar .t { margin-left: 10px; font-weight: 700; color: #f1f0ff; }
-      .bar .c { margin-left: auto; color: #a5b4fc; font-family: "JetBrains Mono", monospace; }
-      .item { display: flex; align-items: center; gap: 20px; padding: 20px 22px; background: #1d1a4a; border-radius: 20px; }
-      .item.top { border: 3px solid #4f46e5; }
-      .item .rk, .item .av { width: 56px; height: 56px; border-radius: 16px; background: #4f46e5; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 26px; flex-shrink: 0; }
+      .bar { display: flex; align-items: center; gap: 12px; padding: 22px 28px; border-bottom: 2px solid #233a78; font-size: 28px; color: #b3c0e6; margin: -34px -36px 4px; }
+      .bar .d { width: 14px; height: 14px; border-radius: 50%; background: #3d4f8f; }
+      .bar .t { margin-left: 10px; font-weight: 700; color: #f0f4ff; }
+      .bar .c { margin-left: auto; color: #a9c4ff; font-family: "JetBrains Mono", monospace; }
+      .item { display: flex; align-items: center; gap: 20px; padding: 20px 22px; background: #16224a; border-radius: 20px; }
+      .item.top { border: 3px solid #2f62e0; }
+      .item .rk, .item .av { width: 56px; height: 56px; border-radius: 16px; background: #2f62e0; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 26px; flex-shrink: 0; }
       .item .n { font-size: 36px; font-weight: 700; }
-      .item .s { font-size: 28px; color: #b4b1e0; margin-top: 4px; }
-      .item .badge { margin-left: auto; padding: 8px 16px; border-radius: 999px; background: #34d399; color: #0a0820; font-size: 22px; font-weight: 800; }
-      .search { display: flex; align-items: center; gap: 16px; padding: 20px 28px; border: 3px solid #4b4790; border-radius: 999px; font-size: 42px; font-weight: 700; min-height: 84px; }
-      .search .lens { color: #a5b4fc; }
+      .item .s { font-size: 28px; color: #b3c0e6; margin-top: 4px; }
+      .item .badge { margin-left: auto; padding: 8px 16px; border-radius: 999px; background: #34d399; color: #060a1e; font-size: 22px; font-weight: 800; }
+      .search { display: flex; align-items: center; gap: 16px; padding: 20px 28px; border: 3px solid #3d4f8f; border-radius: 999px; font-size: 42px; font-weight: 700; min-height: 84px; }
+      .search .lens { color: #a9c4ff; }
       .gold { color: #fbbf24; }
-      .vs-label { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b4b1e0; }
+      .vs-label { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b3c0e6; }
       .card.dim { opacity: 0.75; }
-      .card.hot { border-color: #4f46e5; }
-      .card.hot .vs-label { color: #a5b4fc; }
-      .offer { border-color: #4f46e5; }
+      .card.hot { border-color: #2f62e0; }
+      .card.hot .vs-label { color: #a9c4ff; }
+      .offer { border-color: #2f62e0; }
       .offer .row { font-size: 38px; align-items: flex-start; }
       .offer .row b { font-weight: 700; }
       .name { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 60px; letter-spacing: -0.02em; }
-      .note { font-size: 24px; color: #8f8bc4; }
-      .bar-u { width: 220px; height: 10px; border-radius: 10px; background: #6366f1; transform-origin: center; }
+      .note { font-size: 24px; color: #8c9ac4; }
+      .bar-u { width: 220px; height: 10px; border-radius: 10px; background: #5186fd; transform-origin: center; }
     </style>
   </head>
   <body>
@@ -149,7 +149,7 @@
             tl.fromTo(`#s${i}-r0`, { opacity: 0, y: 40, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "back.out(2)" }, t + b.results);
             tl.fromTo(`#s${i}-r1`, { opacity: 0, y: 30 }, { opacity: 0.55, y: 0, duration: 0.22, ease: "power3.out" }, t + b.results + 0.12);
             tl.fromTo(`#s${i}-r2`, { opacity: 0, y: 30 }, { opacity: 0.4, y: 0, duration: 0.22, ease: "power2.out" }, t + b.results + 0.22);
-            tl.fromTo(`#s${i}-r0`, { boxShadow: "0 0 0 0 rgba(165,180,252,0)" }, { boxShadow: "0 0 0 8px rgba(165,180,252,0.9)", duration: 0.25, ease: "power2.out" }, t + b.glow);
+            tl.fromTo(`#s${i}-r0`, { boxShadow: "0 0 0 0 rgba(169,196,255,0)" }, { boxShadow: "0 0 0 8px rgba(169,196,255,0.9)", duration: 0.25, ease: "power2.out" }, t + b.glow);
             K.float(`#s${i}-c`, t + b.glow + 0.3, d - b.glow - 0.4);
           },
         },
@@ -213,14 +213,14 @@
         },
         cta: {
           html: (s, i) => s.mode === "offer"
-            ? `<div class="mark" id="s${i}-m">P</div><div class="name" id="s${i}-na">PAYMENT FLOW</div>
+            ? `<img class="mark" id="s${i}-m" src="logo.png" alt="Payment Flow" /><div class="name" id="s${i}-na">PAYMENT FLOW</div>
                <div class="pill" id="s${i}-p">Commente <em>${esc(s.keyword || "DEVIS")}</em></div>
                <div class="arrow" id="s${i}-ar">↓</div>
-               <div class="card offer" id="s${i}-c"><div class="vs-label" style="color:#a5b4fc">Tu reçois gratuitement</div>
+               <div class="card offer" id="s${i}-c"><div class="vs-label" style="color:#a9c4ff">Tu reçois gratuitement</div>
                  <div class="row" id="s${i}-o1"><span class="ck">✓</span><span>Un audit offert de ta visibilité, <b>avec Lomig</b></span></div>
                  <div class="row" id="s${i}-o2"><span class="ck">✓</span><span>Ton plan d'action pour <b>+15 demandes de devis</b> par mois</span></div>
                  <div class="small">100 % gratuit · sans engagement</div></div>`
-            : `<div class="mark" id="s${i}-m">P</div>
+            : `<img class="mark" id="s${i}-m" src="logo.png" alt="Payment Flow" />
                ${W(`s${i}-t`, "Abonne-toi à *@paymentflow*", TITLE)}
                <div class="sub" id="s${i}-s">${rich(s.line || "Chaque jour, une idée pour recevoir plus de demandes de devis")}</div>
                <div class="pill" id="s${i}-p">Commente <em>${esc(s.keyword || "DEVIS")}</em> : plan d'action offert</div>`,
