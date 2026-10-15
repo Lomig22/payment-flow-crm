@@ -28,6 +28,18 @@ async function guard(request: NextRequest) {
 
 const LEAD_FIELDS = 'li_seen_at, li_inv_variant, li_open_profile, li_visited_at, id, first_name, last_name, company, job_title, li_sector, niche, linkedin_url, li_status, li_enqueued_at, li_invited_at, li_connected_at, li_dm_sent_at, li_last_sent_at, li_last_kind, li_due_at, li_variant, li_question, li_replied_at, li_replied_stage, li_reply_text, li_thread_url, li_handled_at, li_error, li_preview, li_expired_at, do_not_contact';
 
+// Lecture complète par pages de 1 000 (plafond de Supabase), `max` pages au plus
+async function allPages(page: (from: number, to: number) => any, max = 20): Promise<{ data: any[] }> {
+  const out: any[] = [];
+  for (let i = 0; i < max; i++) {
+    const { data, error } = await page(i * 1000, i * 1000 + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  return { data: out };
+}
+
 export async function GET(request: NextRequest) {
   const g = await guard(request); if (g.error) return g.error;
   const db = supabase as any;
@@ -36,10 +48,13 @@ export async function GET(request: NextRequest) {
     countToday('invite'),
     countInvitesWeek(),
     countToday('message'),
-    db.from('leads').select(LEAD_FIELDS).not('li_status', 'is', null).order('li_enqueued_at', { ascending: false, nullsFirst: false }).limit(3000),
-    db.from('leads').select('id, first_name, last_name, company, job_title, li_sector, linkedin_url, created_at')
+    // Tous les leads de la séquence : Supabase renvoie 1 000 lignes au plus par requête, d'où les pages
+    // (sans elles, un gros import masquait les anciens leads : invitations et messages « disparus »)
+    allPages((from, to) => db.from('leads').select(LEAD_FIELDS).not('li_status', 'is', null)
+      .order('li_enqueued_at', { ascending: false, nullsFirst: false }).order('id').range(from, to)),
+    allPages((from, to) => db.from('leads').select('id, first_name, last_name, company, job_title, li_sector, linkedin_url, created_at')
       .is('li_status', null).eq('do_not_contact', false).not('linkedin_url', 'is', null).neq('linkedin_url', '')
-      .order('created_at', { ascending: false }).limit(2000),
+      .order('created_at', { ascending: false }).order('id').range(from, to), 3),
     db.from('leads').select('id, first_name, last_name, company, job_title, linkedin_url, li_status, li_preview, li_pending, li_profile_at')
       .not('li_pending', 'is', null).or('li_status.eq.to_validate,li_preview.eq.true').limit(200),
     db.from('linkedin_log').select('id, lead_id, action, result, detail, stage, created_at, leads(first_name, last_name)')
