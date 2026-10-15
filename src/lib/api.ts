@@ -361,6 +361,7 @@ export interface LinkedinSettings {
   account_state: 'active' | 'cooldown' | 'blocked'; cooldown_until: string | null; cooldown_days: number; cooldown_tier_drop: number;
   error_streak_max: number; pending_cap: number; pending_suspend: number; reinvite_block_days: number;
   note_split_pct: number; note_templates: Record<string, string>; previsit_enabled: boolean;
+  msg_templates?: Record<string, string>;
 }
 export interface LinkedinRate { rate: number | null; sent: number; accepted: number }
 export interface LinkedinRates { accept_7: LinkedinRate; accept_30: LinkedinRate; accept_mature: LinkedinRate; reply: { sent: number; replied: number } }
@@ -385,6 +386,7 @@ export interface LinkedinLead {
   li_sector: string | null; niche?: string | null; linkedin_url: string | null; li_status: LinkedinStatus | null;
   li_enqueued_at: string | null; li_invited_at: string | null; li_connected_at: string | null; li_dm_sent_at: string | null;
   li_last_sent_at: string | null; li_last_kind: string | null; li_due_at: string | null;
+  li_seen_at?: string | null;   // premier « Vu » relevé dans la messagerie
   li_variant: string | null; li_question: string | null; li_replied_at: string | null; li_replied_stage: string | null;
   li_reply_text: string | null; li_thread_url: string | null; li_handled_at: string | null; li_error: string | null;
   li_preview: boolean; li_expired_at: string | null; do_not_contact: boolean;
@@ -477,6 +479,7 @@ export interface EmailStepCfg { step: number; delay_days: number; subject: strin
 export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; send_days: number[]; send_from: number; send_to: number; instructions: string }
 export interface EmailStats {
   settings: EmailSettingsCfg; by_status: Record<string, number>;
+  rates: Record<'7d' | '30d', { contacted: number; opened: number; replied: number; open_rate: number | null; reply_rate: number | null }>;
   today: { sent: number; replied: number; bounced: number };
   week: { sent: number; replied: number; bounced: number; interested: number };
   last_event_at: string | null; agent_configured: boolean;

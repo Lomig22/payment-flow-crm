@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { capitalizeName, type Question } from '@/lib/linkedin';
+import { tpl, checkMessage, MAX_CHARS } from '@/lib/linkedinTemplates';
+export { checkMessage };
 
 // Agent de personnalisation LinkedIn (cahier des charges du 12/10/2026).
 // L'IA ne rédige pas le message : elle choisit des éléments (sujet et point d'un post, fait du
@@ -8,7 +10,6 @@ import { capitalizeName, type Question } from '@/lib/linkedin';
 // (longueur, phrases, mots interdits…). Au moindre doute : variante suivante, jusqu'à C (modèle).
 
 const MODEL = 'claude-opus-5-5';
-const MAX_CHARS = 300;
 const POST_MAX_DAYS = 60;
 
 export interface ProfilePost { text: string; age: string | null; age_days: number | null; repost: boolean; url: string | null }
@@ -27,72 +28,43 @@ export interface AgentOutput {
 }
 interface Lead { first_name?: string | null; company?: string | null; job_title?: string | null }
 
-// ── Gabarits ──
+// ── Gabarits (textes modifiables dans LinkedIn > Messages, voir linkedinTemplates.ts) ──
 
+const QKEY = (q: Question) => (q === 'cout_client' ? 'cout_client' : 'regularite') as 'cout_client' | 'regularite';
 export const QUESTIONS: Record<Question, string> = {
-  cout_client: 'aujourd\'hui, vous savez combien vous coûte un nouveau client ?',
-  regularite:  'vos nouveaux clients arrivent plutôt régulièrement, ou ça dépend beaucoup des périodes ?',
-};
-const SHORT_QUESTIONS: Record<Question, string> = {
-  cout_client: 'vous connaissez votre coût par nouveau client',
-  regularite:  'vos nouveaux clients, c\'est plutôt régulier ou en dents de scie',
-};
-const OPEN = (p: string) => `Bonjour ${p}, merci d'avoir accepté.`;
+  get cout_client() { return tpl('q_cout_client', {}); },
+  get regularite() { return tpl('q_regularite', {}); },
+} as Record<Question, string>;
+const open = (lead: Lead) => tpl('ouverture', { prenom: capitalizeName(lead.first_name) });
 
 export function messageA(lead: Lead, q: Question, sujet: string, element: string) {
-  return `${OPEN(capitalizeName(lead.first_name))} J'ai lu votre post sur ${sujet}, votre point sur ${element} est très juste. Je suis curieux : ${QUESTIONS[q]}`;
+  return tpl('a', { ouverture: open(lead), sujet, element, question: QUESTIONS[q], prenom: capitalizeName(lead.first_name) });
 }
 export function messageB(lead: Lead, q: Question, fait: string) {
-  return `${OPEN(capitalizeName(lead.first_name))} ${upperFirst(fait)}, ce n'est pas rien. Je suis curieux : ${QUESTIONS[q]}`;
+  return tpl('b', { ouverture: open(lead), fait: upperFirst(fait), question: QUESTIONS[q], prenom: capitalizeName(lead.first_name) });
 }
 export function messageC(lead: Lead, q: Question) {
-  const p = capitalizeName(lead.first_name);
   const company = (lead.company ?? '').trim();
-  const withCompany = `${OPEN(p)} J'ai pris le temps de regarder ce que vous faites chez ${company}, c'est un beau projet. Je suis curieux : ${QUESTIONS[q]}`;
+  const vars = { ouverture: open(lead), entreprise: company, question: QUESTIONS[q], prenom: capitalizeName(lead.first_name) };
+  const withCompany = tpl('c_entreprise', vars);
   if (company && withCompany.length <= MAX_CHARS) return withCompany;
-  return `${OPEN(p)} J'ai pris le temps de regarder ce que vous faites, c'est un beau projet. Je suis curieux : ${QUESTIONS[q]}`;
+  return tpl('c', vars);
 }
 export function messagePost(lead: Lead, q: Question, sujet: string, element: string) {
-  return `${capitalizeName(lead.first_name)}, je viens de voir votre post sur ${sujet}, ${element} m'a fait sourire. Du coup, je repose ma question : ${SHORT_QUESTIONS[q]} ?`;
+  return tpl('post', { prenom: capitalizeName(lead.first_name), sujet, element, question_courte: tpl(`qc_${QKEY(q)}`, {}) });
 }
 
 // Relances R1 / R2 / R3 : toujours la question du premier message
 export function relanceMessage(stage: 'r1' | 'r2' | 'r3', lead: Lead, q: Question): string {
-  const p = capitalizeName(lead.first_name);
   const company = (lead.company ?? '').trim();
-  if (stage === 'r1') {
-    return q === 'cout_client'
-      ? `${p}, je remonte mon message au cas où il serait passé sous la pile. La réponse tient en un mot : vous connaissez votre coût par nouveau client, oui ou non ?`
-      : `${p}, je remonte mon message au cas où il serait passé sous la pile. En un mot : vos nouveaux clients, c'est plutôt régulier ou en dents de scie ?`;
-  }
-  if (stage === 'r2') {
-    return q === 'cout_client'
-      ? `Je vous pose la question parce que c'est le chiffre qui permet de savoir combien investir pour grandir. Par exemple : savoir qu'avec 10 € vous obtenez une demande, et qu'il en faut 4 pour signer un client. Vous l'avez déjà calculé ${company ? `pour ${company}` : 'pour votre activité'} ?`
-      : `Je vous pose la question parce que la plupart des dirigeants avec qui j'échange ont des mois pleins et des mois creux, sans savoir à l'avance lesquels. ${company ? `Chez ${company}` : 'Chez vous'}, c'est plutôt prévisible ?`;
-  }
-  return `${p}, je ne vais pas vous encombrer davantage. Dernière question : prévoir vos nouveaux clients, c'est un sujet pour vous en ce moment, ou pas du tout ?`;
+  const vars = {
+    prenom: capitalizeName(lead.first_name), entreprise: company,
+    pour_entreprise: company ? `pour ${company}` : 'pour votre activité', chez_entreprise: company ? `Chez ${company}` : 'Chez vous',
+  };
+  return stage === 'r3' ? tpl('r3', vars) : tpl(`${stage}_${QKEY(q)}`, vars);
 }
 
-// ── Règles de rédaction ──
-
-const BANNED = [
-  /payment\s*flow/i, /marketing/i, /publicit/i, /\bpubs?\b/i, /\bsites?\b/i, /google/i, /\bmeta\b/i,
-  /https?:|www\.|\.(fr|com)\b/i, /incroyable/i, /g[ée]nial/i, /inspirant/i, /exceptionnel/i, /extraordinaire/i,
-  /je me permets/i, /avez-vous vu mon message/i, /d'o[uù] viennent/i, /quel canal/i,
-];
-const EMOJI = new RegExp('\\p{Extended_Pictographic}', 'u');
-
-// Liste des règles non respectées par un message (vide = conforme)
-export function checkMessage(msg: string, { first }: { first: boolean }): string[] {
-  const issues: string[] = [];
-  if (msg.length > MAX_CHARS) issues.push(`${msg.length} caractères (300 max)`);
-  if (first && (msg.match(/[.?](\s|$)/g) ?? []).length > 3) issues.push('plus de 3 phrases');
-  if (msg.includes('!')) issues.push('point d\'exclamation');
-  if (EMOJI.test(msg)) issues.push('emoji');
-  if (/[«»"“”]/.test(msg)) issues.push('guillemets');
-  for (const re of BANNED) if (re.test(msg)) issues.push(`mot interdit (${re.source})`);
-  return issues;
-}
+// ── Règles de rédaction : linkedinTemplates.ts (partagées avec l'onglet Messages) ──
 
 // Un fragment (sujet, point, fait) doit tenir dans une phrase, sans ponctuation finale
 function cleanFragment(s: string | null | undefined): string | null {

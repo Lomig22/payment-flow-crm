@@ -64,14 +64,21 @@ async function pageAction(type, message) {
     if (!list) return { result: 'error', detail: 'Liste des conversations introuvable' };
     await sleep(rand(1500, 2500));
     const cards = Array.from(document.querySelectorAll('.msg-conversation-card')).filter(visible).slice(0, 25);
-    const hits = [];
+    const hits = [], seen = [];
     for (const card of cards) {
       const nameEl = card.querySelector('.msg-conversation-listitem__participant-names, .msg-conversation-card__participant-names, h3');
       const name = (nameEl ? nameEl.innerText : '').replace(/\s+/g, ' ').trim();
       const snippetEl = card.querySelector('.msg-conversation-card__message-snippet, .msg-conversation-card__message-snippet-body, p');
       const snippet = (snippetEl ? snippetEl.innerText : '').replace(/\s+/g, ' ').trim();
       if (!name || !names.includes(nameKey(name))) continue;
-      if (/^(vous|you)\s*:/i.test(snippet)) continue;   // dernier message envoyé par Lomig
+      if (/^(vous|you)\s*:/i.test(snippet)) {
+        // Dernier message envoyé par Lomig : lu par le lead ? (accusé « Vu » de LinkedIn, s'il est activé
+        // des deux côtés) : avatar ou libellé « Vu par … », « Seen by … »
+        const receipt = Array.from(card.querySelectorAll('img, [aria-label], [title], span'))
+          .some((e) => /^(vu|lu|seen|read)\b|vu par|lu par|seen by|read by/i.test((e.getAttribute('alt') || e.getAttribute('aria-label') || e.getAttribute('title') || '').trim()));
+        if (receipt) seen.push(name);
+        continue;
+      }
       hits.push({ card, name, snippet });
     }
     const replies = [];
@@ -88,7 +95,7 @@ async function pageAction(type, message) {
         thread_url: /\/messaging\/thread\//.test(location.href) ? location.href.split('?')[0] : null,
       });
     }
-    return { result: 'ok', replies };
+    return { result: 'ok', replies, seen };
   }
 
   // ── Invitations envoyées en attente (page « Gérer les invitations › Envoyées ») ──

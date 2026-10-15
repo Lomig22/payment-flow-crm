@@ -9,9 +9,14 @@ Le CRM Payment Flow est la source de vérité. Il décide **qui** contacter et *
 
 ## Connexion
 
-- Adresse : `https://payment-flow-crm-delta.vercel.app/api/emailing/agent`
-- En-tête sur chaque appel : `Authorization: Bearer $PF_CRM_EMAILING_KEY`. La clé est dans ta configuration (variable d'environnement), ne l'écris jamais dans un message ni dans un journal.
-- Réponses en JSON. `401` = clé absente ou fausse.
+Utilise l'outil `python3 /root/.hermes/scripts/pf_crm.py` : il lit la clé dans `/root/.hermes/secrets/pf_crm_emailing.key` (ne l'affiche jamais, ne la recopie nulle part).
+
+- `pf_crm.py next 50` : mails à envoyer
+- `pf_crm.py event '{"events": [...]}'` : rapporter des événements
+- `pf_crm.py release <lead_id> …` : rendre des leads non envoyés
+- `pf_crm.py stats` : indicateurs (envois du jour, taux d'ouverture et de réponse sur 7 et 30 jours), à donner à Lomig quand il demande où en est l'emailing
+
+(API sous-jacente : `https://payment-flow-crm-delta.vercel.app/api/emailing/agent/{next,events,release,stats}`, en-tête `Authorization: Bearer <clé>`.)
 
 ## Cycle d'envoi (à répéter toute la journée)
 
@@ -35,6 +40,7 @@ Le CRM Payment Flow est la source de vérité. Il décide **qui** contacter et *
    - `step` : 1 = premier mail, 2 et 3 = relances. Pour une relance, `previous` contient les mails déjà envoyés à ce lead. Réponds **dans le même fil** (`thread_id`) et **depuis la même boîte** (`mailbox`).
    - `template` : modèle de Lomig pour ce mail. Remplace les variables `{{first_name}}`, `{{company}}`, `{{city}}`, `{{sector}}`… avec `lead`. Si `template` est `null`, rédige toi-même en suivant `instructions`.
    - Chaque lead remis est réservé 6 h pour toi. Si `tasks` est vide, lis `reason` et attends (15 min) avant de redemander.
+   - `tracking` : **à mettre dans chaque mail**. `pixel_html` juste avant `</body>` de la version HTML (c'est lui qui mesure le taux d'ouverture dans le CRM), et `unsubscribe_url` comme lien de désinscription en pied de mail ainsi que dans l'en-tête `List-Unsubscribe: <unsubscribe_url>` avec `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Le CRM enregistre lui-même ouvertures et désinscriptions : tu n'as pas à les rapporter.
 
 2. **Envoyer** chaque mail depuis une boîte préchauffée. Respecte tes plafonds par boîte et l'espacement entre les envois : la délivrabilité passe avant l'objectif du jour.
 
@@ -55,7 +61,7 @@ Le CRM Payment Flow est la source de vérité. Il décide **qui** contacter et *
 | type | quand | effet dans le CRM |
 |---|---|---|
 | `sent` | mail envoyé | relance suivante programmée |
-| `opened`, `clicked` | ouverture ou clic (si suivi) | statistiques seulement |
+| `opened`, `clicked` | déjà mesurés par le pixel du CRM ; ne rapporte que les clics si tu les suis | statistiques seulement |
 | `replied` | **toute** réponse humaine | séquence arrêtée, lead à traiter par Lomig |
 | `interested` | la réponse montre de l'intérêt (rendez-vous, prix, « oui ») | séquence arrêtée, lead chaud |
 | `not_interested` | refus poli | séquence arrêtée |
@@ -67,6 +73,10 @@ Le CRM Payment Flow est la source de vérité. Il décide **qui** contacter et *
 - Mets `message_id` quand tu l'as : les doublons sont ignorés, tu peux renvoyer un événement sans risque.
 - Pour une réponse, mets le texte reçu dans `body`. Une réponse automatique d'absence n'est **pas** une réponse : ignore-la. Un « intéressé » est aussi une réponse : envoie seulement `interested`.
 - 500 événements au plus par appel.
+
+## Détecter les réponses (taux de réponse)
+
+Le taux de réponse est l'indicateur n° 1. Plusieurs fois par jour, relève la boîte de réception de chaque boîte d'envoi (IMAP) : pour chaque message reçu d'une adresse de prospect, rapporte `replied` (ou `interested`, `not_interested`, `unsubscribed` selon le contenu, `bounced` pour un retour « adresse inexistante » du serveur), avec le texte dans `body` et l'`email` du prospect.
 
 ## Règles absolues
 

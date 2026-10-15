@@ -21,6 +21,7 @@ export default function EmailingPage() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['emailing-stats'], queryFn: () => emailingApi.stats().then((r) => r.data), refetchInterval: 60_000 });
   const [cfg, setCfg] = useState<EmailSettingsCfg | null>(null);
+  const [range, setRange] = useState<'7d' | '30d'>('7d');
   useEffect(() => { if (data && !cfg) setCfg(data.settings); }, [data, cfg]);
   const save = useMutation({
     mutationFn: (s: Partial<EmailSettingsCfg>) => emailingApi.settings(s).then((r) => r.data),
@@ -46,6 +47,28 @@ export default function EmailingPage() {
       <div className="card p-5">
         <div className="flex items-baseline justify-between"><p className="font-semibold text-gray-900">Aujourd&apos;hui</p><p className="text-sm text-gray-500">{data.today.sent.toLocaleString('fr-FR')} / {cfg.daily_goal.toLocaleString('fr-FR')} mails</p></div>
         <div className="h-3 rounded-full bg-gray-100 mt-2 overflow-hidden"><div className="h-full bg-indigo-500" style={{ width: `${goalPct}%` }} /></div>
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <p className="font-semibold text-gray-900">Taux clés</p>
+          <div className="flex gap-1 ml-auto">
+            {(['7d', '30d'] as const).map((r) => <button key={r} onClick={() => setRange(r)} className={`px-3 py-1 rounded-full text-sm ${range === r ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{r === '7d' ? '7 jours' : '30 jours'}</button>)}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { label: 'Taux d\'ouverture', v: data.rates[range].open_rate, sub: `${data.rates[range].opened} / ${data.rates[range].contacted} leads contactés` },
+            { label: 'Taux de réponse', v: data.rates[range].reply_rate, sub: `${data.rates[range].replied} / ${data.rates[range].contacted} leads contactés` },
+          ].map((t) => (
+            <div key={t.label} className="rounded-lg p-4 bg-indigo-50 border border-indigo-100">
+              <p className="text-xs text-gray-500">{t.label}</p>
+              <p className="text-3xl font-bold text-gray-900 tabular-nums">{t.v == null ? '—' : `${Math.round(t.v * 1000) / 10} %`}</p>
+              <p className="text-xs text-gray-500">{t.sub}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-400 mt-2">Ouvertures mesurées par le pixel du CRM : certaines messageries (Apple Mail) chargent les images d&apos;office et gonflent ce taux ; d&apos;autres les bloquent. Le taux de réponse est le chiffre fiable.</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

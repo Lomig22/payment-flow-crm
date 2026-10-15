@@ -1,6 +1,7 @@
 import { parse } from 'csv-parse/sync';
 import { supabase } from '@/lib/supabase';
 import { parisMidnight } from '@/lib/autoSchedule';
+import { trackingFor } from '@/lib/emailTracking';
 
 // Emailing (sprint50, 14/10/2026). Le CRM est la source de vérité : il choisit qui contacter et
 // quand (séquence de 3 mails, arrêt à la réponse, désinscription, rebond, « ne pas contacter »
@@ -103,6 +104,7 @@ export async function sentToday(): Promise<number> {
 export interface EmailTask {
   lead_id: string; step: number; email: string; mailbox: string | null; thread_id: string | null;
   lead: Record<string, unknown>; template: { subject: string; body: string } | null; previous: { subject: string | null; body: string | null }[];
+  tracking: { pixel_url: string; pixel_html: string; unsubscribe_url: string };   // à mettre dans chaque mail
 }
 
 // Prochains mails à envoyer : relances dues d'abord (une conversation entamée prime), puis premiers
@@ -141,6 +143,7 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
       lead: { first_name: l.first_name, last_name: l.last_name, company: l.company, job_title: l.job_title, sector: l.sector, city: l.city, website: l.website, ...l.custom },
       template: tpl && (tpl.subject || tpl.body) ? { subject: tpl.subject, body: tpl.body } : null,
       previous: prev ?? [],
+      tracking: trackingFor(l.id, step),
     });
   }
   return { ...base, tasks };
@@ -164,7 +167,7 @@ export async function recordEvents(events: EmailEventIn[]): Promise<{ ok: number
     const e = events[index];
     try {
       if (!TYPES.includes(e.type)) throw new Error(`type inconnu : ${e.type}`);
-      const q = db().from('email_leads').select('id, status, step, mailbox, thread_id');
+      const q = db().from('email_leads').select('id, email, status, step, mailbox, thread_id');
       const { data: lead } = e.lead_id ? await q.eq('id', e.lead_id).maybeSingle() : await q.ilike('email', String(e.email ?? '').trim()).maybeSingle();
       if (!lead) throw new Error('lead introuvable (lead_id ou email)');
       const at = e.occurred_at && !Number.isNaN(Date.parse(e.occurred_at)) ? new Date(e.occurred_at).toISOString() : new Date().toISOString();
@@ -191,7 +194,7 @@ export async function recordEvents(events: EmailEventIn[]): Promise<{ ok: number
         patch.next_send_at = null;
         patch.claimed_at = null;
         if (e.type === 'replied' || e.type === 'interested') patch.replied_at = at;
-        if (e.type === 'unsubscribed') await db().from('leads').update({ do_not_contact: true }).ilike('email', String(e.email ?? '')).then(() => null, () => null);
+        if (e.type === 'unsubscribed') await db().from('leads').update({ do_not_contact: true }).ilike('email', String(lead.email)).then(() => null, () => null);
       }
       await db().from('email_leads').update(patch).eq('id', lead.id);
       out.ok++;
@@ -209,6 +212,24 @@ export async function releaseTasks(leadIds: string[]): Promise<void> {
 
 // ── Tableau de bord ──
 
+// Taux par cohorte : leads ayant reçu au moins un mail depuis `from` → part qui a ouvert, part qui
+// a répondu (réponse, intéressé, pas intéressé)
+async function rates(from: string) {
+  const ev = async (types: string[]) => {
+    const out = new Set<string>();
+    for (let page = 0; page < 20; page++) {
+      const { data } = await db().from('email_events').select('lead_id').in('type', types).gte('occurred_at', from).range(page * 1000, page * 1000 + 999);
+      for (const r of data ?? []) out.add(r.lead_id);
+      if ((data?.length ?? 0) < 1000) break;
+    }
+    return out;
+  };
+  const [sent, opened, replied] = await Promise.all([ev(['sent']), ev(['opened', 'clicked']), ev(['replied', 'interested', 'not_interested'])]);
+  const inSent = (set: Set<string>) => Array.from(set).filter((id) => sent.has(id)).length;
+  const o = inSent(opened), r = inSent(replied);
+  return { contacted: sent.size, opened: o, replied: r, open_rate: sent.size ? o / sent.size : null, reply_rate: sent.size ? r / sent.size : null };
+}
+
 export async function emailStats() {
   const since = parisMidnightIso(), week = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const count = async (type: string, from: string) =>
@@ -221,8 +242,9 @@ export async function emailStats() {
   ]);
   const { data: last } = await db().from('email_events').select('occurred_at').order('created_at', { ascending: false }).limit(1);
   const s = await getEmailSettings();
+  const [r7, r30] = await Promise.all([rates(week), rates(new Date(Date.now() - 30 * 86_400_000).toISOString())]);
   return {
-    settings: s, by_status: byStatus,
+    settings: s, by_status: byStatus, rates: { '7d': r7, '30d': r30 },
     today: { sent: sentToday, replied: repliedToday, bounced: bouncedToday },
     week: { sent: sentWeek, replied: repliedWeek, bounced: bouncedWeek, interested: interestedWeek },
     last_event_at: last?.[0]?.occurred_at ?? null,

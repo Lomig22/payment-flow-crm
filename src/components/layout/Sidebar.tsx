@@ -165,6 +165,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             <NavLink href="/linkedin/validation" icon={CheckSquare} label="À valider" onClick={onClose} />
             <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Organisation</p>
             <NavLink href="/linkedin" icon={Gauge} label="Pilotage" onClick={onClose} exact />
+            <NavLink href="/linkedin/messages" icon={MessageSquare} label="Messages" onClick={onClose} />
             <NavLink href="/linkedin/reglages" icon={Settings2} label="Import & réglages" onClick={onClose} />
           </PoleSection>
         )}

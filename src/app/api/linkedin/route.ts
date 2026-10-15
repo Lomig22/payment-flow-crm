@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureInviteSlots } from '@/lib/linkedinRampServer';
 import { parisClock } from '@/lib/linkedinRamp';
+import { TEMPLATE_DEFAULTS } from '@/lib/linkedinTemplates';
 import { getAuthUser, unauthorized, forbidden, badRequest } from '@/lib/auth-server';
 import { supabase } from '@/lib/supabase';
 import {
@@ -25,7 +26,7 @@ async function guard(request: NextRequest) {
   return { user };
 }
 
-const LEAD_FIELDS = 'li_inv_variant, li_open_profile, li_visited_at, id, first_name, last_name, company, job_title, li_sector, niche, linkedin_url, li_status, li_enqueued_at, li_invited_at, li_connected_at, li_dm_sent_at, li_last_sent_at, li_last_kind, li_due_at, li_variant, li_question, li_replied_at, li_replied_stage, li_reply_text, li_thread_url, li_handled_at, li_error, li_preview, li_expired_at, do_not_contact';
+const LEAD_FIELDS = 'li_seen_at, li_inv_variant, li_open_profile, li_visited_at, id, first_name, last_name, company, job_title, li_sector, niche, linkedin_url, li_status, li_enqueued_at, li_invited_at, li_connected_at, li_dm_sent_at, li_last_sent_at, li_last_kind, li_due_at, li_variant, li_question, li_replied_at, li_replied_stage, li_reply_text, li_thread_url, li_handled_at, li_error, li_preview, li_expired_at, do_not_contact';
 
 export async function GET(request: NextRequest) {
   const g = await guard(request); if (g.error) return g.error;
@@ -164,6 +165,8 @@ const EDITABLE: Record<string, (v: any) => boolean> = {
   reinvite_block_days: int(0, 365),
   note_split_pct:      int(0, 100),
   note_templates:      (v) => v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((t) => typeof t === 'string' && t.length <= 200),
+  msg_templates:       (v) => v && typeof v === 'object' && !Array.isArray(v)
+    && Object.entries(v).every(([k, t]) => k in TEMPLATE_DEFAULTS && typeof t === 'string' && t.length <= 600),
   previsit_enabled:    (v) => typeof v === 'boolean',
 };
 

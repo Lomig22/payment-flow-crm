@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { setTemplates } from '@/lib/linkedinTemplates';
 import { supabase } from '@/lib/supabase';
 import { startOfTodayParis } from '@/lib/paris-time';
 import { sendLeadEmail } from '@/lib/mailer';
@@ -62,6 +63,7 @@ export interface LinkedinSettings extends RampSettings {
   reinvite_block_days: number;
   note_split_pct:      number;
   note_templates:      Record<string, string>;
+  msg_templates?:      Record<string, string>;   // gabarits des messages (onglet Messages)
   previsit_enabled:    boolean;
   worker_id:           string | null;
   worker_ip:           string | null;
@@ -88,6 +90,7 @@ export const PROFILE_FRESH_MS = 30 * 86_400_000;
 
 export async function getLinkedinSettings(): Promise<LinkedinSettings | null> {
   const { data } = await (supabase as any).from('linkedin_settings').select('*').eq('id', 1).maybeSingle();
+  setTemplates(data?.msg_templates);   // gabarits de messages modifiés par Lomig (onglet Messages)
   return data ?? null;
 }
 

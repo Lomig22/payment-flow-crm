@@ -128,7 +128,16 @@ export async function POST(request: NextRequest) {
       await markReplied(matches[0].id, { text: r.text ?? null, thread_url: r.thread_url ?? null });
       found++;
     }
-    await db.from('linkedin_log').insert({ action: 'inbox', result: 'ok', detail: `${replies.length} conversation(s) à lire, ${found} réponse(s) de leads` });
+    // Messages lus (« Vu ») : taux d'ouverture LinkedIn
+    let read = 0;
+    for (const name of (Array.isArray(body.seen) ? body.seen : []).slice(0, 50)) {
+      const n = normName(String(name ?? ''));
+      const matches = (watched ?? []).filter((l: any) => n && normName(`${l.first_name ?? ''} ${l.last_name ?? ''}`) === n && MESSAGED.includes(l.li_status));
+      if (matches.length !== 1) continue;
+      const { data: upd } = await db.from('leads').update({ li_seen_at: iso }).eq('id', matches[0].id).is('li_seen_at', null).select('id');
+      if (upd?.length) read++;
+    }
+    await db.from('linkedin_log').insert({ action: 'inbox', result: 'ok', detail: `${replies.length} conversation(s) à lire, ${found} réponse(s) de leads${read ? `, ${read} message(s) lu(s)` : ''}` });
     await setNext();
     return NextResponse.json({ ok: true, replies: found });
   }
