@@ -9,6 +9,8 @@ import { regionForLocation, DEPT_REGION } from '@/lib/regions';
 // URL de profil, ou si c'est un doublon : même URL LinkedIn, même SIREN ou même entreprise + ville,
 // dans le fichier ou déjà dans le CRM (leads « ne plus contacter » compris). Un seul lead par entreprise.
 
+// Suffixe de langue ajouté par Hermès après le profil (…/in/jean-dupont/fr, …/en/) : retiré, l'URL reste valide
+export const cleanLinkedinUrl = (url: string) => url.replace(/(\/in\/[^/?#\s]+)\/[a-z]{2}(?:[-_][a-z]{2})?\/?(?=$|[?#])/i, '$1/');
 export const PROFILE_URL = /^https?:\/\/([a-z]{2,3}\.)?(www\.)?linkedin\.com\/in\/[^/?#\s]+\/?([?#].*)?$/i;
 const flat = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const col = (h: string) => flat(h).replace(/ /g, '_');
@@ -52,7 +54,7 @@ export function analyzeImport(rows: Record<string, string>[], crm: Existing[]): 
 
   rows.forEach((r, i) => {
     const line = i + 2;
-    const prenom = (r.prenom ?? '').trim(), entreprise = (r.entreprise ?? '').trim(), url = (r.linkedin ?? '').trim();
+    const prenom = (r.prenom ?? '').trim(), entreprise = (r.entreprise ?? '').trim(), url = cleanLinkedinUrl((r.linkedin ?? '').trim());
     const ville = (r.ville ?? '').trim();
     const name = `${prenom} ${r.nom ?? ''}`.trim() + (entreprise ? ` (${entreprise})` : '');
     const reject = (reason: string) => rejected.push({ line, name: name || '—', reason });
