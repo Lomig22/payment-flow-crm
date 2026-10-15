@@ -1,4 +1,5 @@
 'use client';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { LinkedinLead, LinkedinSettings } from '@/lib/api';
 import { VARIANT_BADGE, fullName } from './shared';
@@ -20,11 +21,62 @@ const SUB: Record<string, string> = {
   no_reply: 'sans réponse', expired: 'invitation expirée', dnc: 'ne plus contacter', failed: 'erreur',
 };
 
+// ── Filtre d'activité : ce qui s'est passé sur une période (jours de Paris) ──
+type Activity = 'all' | 'invite' | 'accept' | 'message';
+type Period = 'any' | 'today' | 'yesterday' | '7d' | 'custom';
+const ACTIVITY: Record<Activity, string> = { all: 'Toute activité', invite: 'Invitations envoyées', accept: 'Acceptations', message: 'Messages envoyés' };
+const PERIOD: Record<Period, string> = { any: 'Toute la période', today: "Aujourd'hui", yesterday: 'Hier', '7d': '7 derniers jours', custom: 'Dates…' };
+const parisDay = (d: Date | string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(d));
+const shift = (days: number) => parisDay(new Date(Date.now() - days * 86_400_000));
+
+// Dates de l'activité choisie pour un lead (premier message et dernier envoi pour les messages)
+function activityDates(l: LinkedinLead, a: Activity): string[] {
+  const inv = l.li_invited_at ? [l.li_invited_at] : [];
+  const acc = l.li_connected_at ? [l.li_connected_at] : [];
+  const msg = [l.li_dm_sent_at, l.li_last_sent_at].filter(Boolean) as string[];
+  return a === 'invite' ? inv : a === 'accept' ? acc : a === 'message' ? msg : [...inv, ...acc, ...msg];
+}
+
 export default function LinkedinPipeline({ leads, settings }: { leads: LinkedinLead[]; settings: LinkedinSettings }) {
+  const [activity, setActivity] = useState<Activity>('all');
+  const [period, setPeriod] = useState<Period>('any');
+  const [from, setFrom] = useState(shift(7));
+  const [to, setTo] = useState(shift(0));
+
+  const range: [string, string] | null = period === 'today' ? [shift(0), shift(0)] : period === 'yesterday' ? [shift(1), shift(1)]
+    : period === '7d' ? [shift(6), shift(0)] : period === 'custom' ? [from, to] : null;
+  const shown = useMemo(() => {
+    if (!range && activity === 'all') return leads;
+    return leads.filter((l) => {
+      const dates = activityDates(l, activity);
+      if (!range) return dates.length > 0;
+      return dates.some((d) => { const day = parisDay(d); return day >= range[0] && day <= range[1]; });
+    });
+  }, [leads, activity, range?.[0], range?.[1]]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
+    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <select className="input w-auto py-1.5" value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>
+        {Object.entries(ACTIVITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
+      <div className="flex gap-1 flex-wrap">
+        {(Object.keys(PERIOD) as Period[]).map((p) => (
+          <button key={p} onClick={() => setPeriod(p)}
+            className={`px-3 py-1.5 rounded-full ${period === p ? 'bg-[#0a66c2] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{PERIOD[p]}</button>
+        ))}
+      </div>
+      {period === 'custom' && (
+        <span className="flex items-center gap-1.5 text-gray-600">
+          du <input type="date" className="input w-auto py-1" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+          au <input type="date" className="input w-auto py-1" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+        </span>
+      )}
+      {(range || activity !== 'all') && <span className="text-gray-500"><b className="text-gray-900">{shown.length}</b> lead{shown.length > 1 ? 's' : ''}</span>}
+    </div>
     <div className="flex gap-3 overflow-x-auto pb-2">
       {COLUMNS.map((col) => {
-        const items = leads.filter((l) => col.statuses.includes(l.li_status ?? ''))
+        const items = shown.filter((l) => col.statuses.includes(l.li_status ?? ''))
           .map((l) => ({ l, next: nextStep(l, settings) }))
           .sort((a, b) => (a.next.at ? new Date(a.next.at).getTime() : Infinity) - (b.next.at ? new Date(b.next.at).getTime() : Infinity));
         return (
@@ -50,6 +102,7 @@ export default function LinkedinPipeline({ leads, settings }: { leads: LinkedinL
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
