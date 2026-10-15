@@ -223,7 +223,9 @@ export async function POST(request: NextRequest) {
         li_status: 'invited', li_invited_at: iso, li_attempts: 0, li_error: null,
         li_inv_variant: body.inv_variant === 'note' ? 'note' : 'no_note', li_inv_note: body.note || null,
       }).eq('id', lead.id);
-      await liEvent(lead.id, lead.li_status, 'invited', result === 'ok' ? 'invitation envoyée (sans note)' : 'invitation déjà en attente');
+      await liEvent(lead.id, lead.li_status, 'invited', result !== 'ok' ? 'invitation déjà en attente'
+        : body.inv_variant === 'note' ? `invitation envoyée avec note : ${String(body.note ?? '').slice(0, 200)}`
+        : body.note_skipped ? 'invitation envoyée sans note (pas d\'option de note sur ce profil)' : 'invitation envoyée (sans note)');
     } else if (result === 'already_connected') {
       await db.from('leads').update({ li_status: 'connected', li_connected_at: iso, li_due_at: firstMessageDue(s, now).toISOString(), li_attempts: 0, li_error: null }).eq('id', lead.id);
       await liEvent(lead.id, lead.li_status, 'connected', 'déjà en relation');

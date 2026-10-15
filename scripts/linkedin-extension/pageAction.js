@@ -245,10 +245,11 @@ async function pageAction(type, message) {
     const dText = norm(dialog.innerText);
     if (/limite hebdomadaire|weekly invitation limit/.test(dText)) return { result: 'limit', detail: 'Limite hebdomadaire d’invitations LinkedIn atteinte' };
     if (dialog.querySelector('input[type="email"]')) return { result: 'error', detail: 'LinkedIn demande l’e-mail du contact' };
-    // Variante « avec note » : message = texte de la note (200 caractères max)
-    if (message) {
-      const addNote = clickables(dialog).find((el) => /^ajouter une note$|^add a note$/.test(label(el)));
-      if (!addNote) return { result: 'error', detail: 'note_unavailable' };
+    // Variante « avec note » : message = texte de la note (200 caractères max). Profil sans option
+    // « Ajouter une note » : l'invitation part sans note (le test continue sur les autres profils)
+    const addNote = message ? clickables(dialog).find((el) => /^ajouter une note$|^add a note$/.test(label(el))) : null;
+    const noteSkipped = !!message && !addNote;
+    if (addNote) {
       addNote.click();
       const area = await waitFor(() => { const d = findDialog(); const t = d && d.querySelector('textarea'); return t && t.getClientRects().length ? t : null; }, 6000);
       // Pas de zone de texte (offre Premium proposée à la place) : notes épuisées sur ce compte
@@ -272,7 +273,8 @@ async function pageAction(type, message) {
     await sleep(rand(1500, 2500));
     // Fenêtre refermée après « Envoyer » = invitation partie
     const confirmed = await waitFor(() => !findDialog() || isPending() || /invitation envoy[ée]e|invitation sent/.test(norm(document.body.innerText)), 8000);
-    return confirmed ? { result: 'ok' } : { result: 'error', detail: 'Envoi de l’invitation non confirmé (fenêtre restée ouverte)' };
+    if (!confirmed) return { result: 'error', detail: 'Envoi de l’invitation non confirmé (fenêtre restée ouverte)' };
+    return noteSkipped ? { result: 'ok', inv_variant: 'no_note', note: null, note_skipped: true } : { result: 'ok' };
   }
 
   if (type === 'dm' || type === 'followup' || type === 'check') {
