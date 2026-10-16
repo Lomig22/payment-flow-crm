@@ -496,5 +496,6 @@ export const emailingApi = {
   stats:    () => api.get<EmailStats>('/emailing/stats'),
   settings: (s: Partial<EmailSettingsCfg>) => api.put<EmailSettingsCfg>('/emailing/settings', s),
   leads:    (params: { status?: string; q?: string; page?: number }) => api.get<{ leads: EmailLeadRow[]; total: number; page: number; size: number }>('/emailing/leads', { params }),
+  preview:  (segment: 'site' | 'no_site') => api.get<{ lead: { email: string; company: string } | null; variables: Record<string, string> }>('/emailing/preview', { params: { segment } }),
   import:   (csv: string, file_name: string) => api.post<{ total: number; inserted: number; duplicates: number; invalid: number; dnc: number; errors: string[] }>('/emailing/leads', { csv, file_name }),
 };

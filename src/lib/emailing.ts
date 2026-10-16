@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchAll } from '@/lib/fetchAll';
 import { parisMidnight } from '@/lib/autoSchedule';
 import { trackingFor } from '@/lib/emailTracking';
+import { buildVars, renderVars } from '@/lib/emailVars';
 
 // Emailing (sprint50, 14/10/2026). Le CRM est la source de vérité : il choisit qui contacter et
 // quand (séquence de 3 mails, arrêt à la réponse, désinscription, rebond, « ne pas contacter »
@@ -112,6 +113,8 @@ export interface EmailTask {
   lead_id: string; step: number; segment: Segment; email: string; mailbox: string | null; thread_id: string | null;
   lead: Record<string, unknown>; template: { subject: string; body: string } | null; previous: { subject: string | null; body: string | null }[];
   tracking: { pixel_url: string; pixel_html: string; unsubscribe_url: string };   // à mettre dans chaque mail
+  variables: Record<string, string>;                                               // personnalisation (emailVars.ts)
+  rendered: { subject: string; body: string } | null;                              // modèle de Lomig, variables remplacées
 }
 
 // Prochains mails à envoyer : relances dues d'abord (une conversation entamée prime), puis premiers
@@ -150,6 +153,9 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
       lead_id: l.id, step, segment: l.segment, email: l.email, mailbox: l.mailbox, thread_id: l.thread_id,
       lead: { first_name: l.first_name, last_name: l.last_name, company: l.company, job_title: l.job_title, sector: l.sector, city: l.city, website: l.website, ...l.custom },
       template: tpl && (tpl.subject || tpl.body) ? { subject: tpl.subject, body: tpl.body } : null,
+      // Mail déjà personnalisé par le CRM (variables remplacées) : à envoyer tel quel
+      variables: buildVars(l),
+      rendered: tpl && (tpl.subject || tpl.body) ? { subject: renderVars(tpl.subject, buildVars(l)), body: renderVars(tpl.body, buildVars(l)) } : null,
       previous: prev ?? [],
       tracking: trackingFor(l.id, step),
     });

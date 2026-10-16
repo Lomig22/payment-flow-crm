@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, Send, Reply, AlertTriangle, Sparkles, Bot, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { emailingApi, type EmailSettingsCfg, type EmailSegment, type EmailStepCfg } from '@/lib/api';
+import { VARS_HELP, renderVars } from '@/lib/emailVars';
 
 const SEG_LABEL: Record<EmailSegment, string> = { site: 'Avec site internet', no_site: 'Sans site internet' };
 import Spinner from '@/components/ui/Spinner';
@@ -25,6 +26,8 @@ export default function EmailingPage() {
   const [cfg, setCfg] = useState<EmailSettingsCfg | null>(null);
   const [range, setRange] = useState<'7d' | '30d'>('7d');
   const [seg, setSeg] = useState<EmailSegment>('site');
+  // Aperçu : un vrai lead du segment, pris au hasard
+  const { data: sample, refetch: nextSample } = useQuery({ queryKey: ['email-preview', seg], queryFn: () => emailingApi.preview(seg).then((r) => r.data) });
   useEffect(() => { if (data && !cfg) setCfg(data.settings); }, [data, cfg]);
   const save = useMutation({
     mutationFn: (s: Partial<EmailSettingsCfg>) => emailingApi.settings(s).then((r) => r.data),
@@ -137,6 +140,21 @@ export default function EmailingPage() {
             ))}
           </div>
           <p className="text-xs text-gray-500">Mail 1 puis relances, envoyés tant que le lead n&apos;a pas répondu. Variables : {'{{first_name}}'}, {'{{company}}'}, {'{{city}}'}, {'{{sector}}'}, {'{{website}}'} et toute colonne de ton fichier. Le pixel d&apos;ouverture et le lien de désinscription sont ajoutés à chaque mail. Modèle vide : Hermès rédige selon les consignes.</p>
+          <div className="rounded-lg bg-indigo-50/60 border border-indigo-100 p-3 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs font-semibold text-gray-700">Variables (clic = copier), exemple : {sample?.lead?.company ?? '—'}</p>
+              <button className="ml-auto text-xs text-indigo-700" onClick={() => nextSample()}>Autre exemple</button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
+              {VARS_HELP.map((v) => (
+                <button key={v.key} type="button" title={v.label} onClick={() => { navigator.clipboard?.writeText(`{${v.key}}`); toast.success(`{${v.key}} copié`); }}
+                  className="text-left text-xs truncate hover:bg-white rounded px-1">
+                  <code className="text-indigo-700">{`{${v.key}}`}</code> <span className="text-gray-500">{sample?.variables?.[v.key] || '—'}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500">Valeur de secours si la donnée manque : <code>{'{ville|votre ville}'}</code>. Les autres colonnes de ton fichier marchent aussi : <code>{'{nom_de_colonne}'}</code>.</p>
+          </div>
           {steps.map((st, i) => (
             <div key={i} className="rounded-lg border border-gray-100 p-3 space-y-2">
               <div className="flex items-center gap-3 text-sm"><b>{i === 0 ? 'Mail 1' : `Relance ${i}`}</b>
@@ -145,6 +163,18 @@ export default function EmailingPage() {
               </div>
               <input className="input text-sm" placeholder={i === 0 ? 'Objet' : 'Objet (vide : réponse dans le même fil, « Re: »)'} value={st.subject} onChange={(e) => setStep(i, { subject: e.target.value })} />
               <textarea className="input text-sm" rows={i === 0 ? 7 : 4} placeholder="Corps du mail" value={st.body} onChange={(e) => setStep(i, { body: e.target.value })} />
+              {(st.subject || st.body) && sample?.variables && (() => {
+                const missing = new Set<string>();
+                const subj = renderVars(st.subject, sample.variables, missing), body = renderVars(st.body, sample.variables, missing);
+                return (
+                  <div className="rounded-md bg-gray-50 p-2.5 text-sm">
+                    <p className="text-[11px] text-gray-500 mb-1">Aperçu pour {sample.lead?.company}</p>
+                    {subj && <p className="font-semibold text-gray-900">{subj}</p>}
+                    <p className="text-gray-800 whitespace-pre-line">{body}</p>
+                    {!!missing.size && <p className="text-[11px] text-amber-700 mt-1">Vide pour ce lead : {Array.from(missing).map((k) => `{${k}}`).join(', ')} — ajoute une valeur de secours ({'{'}{Array.from(missing)[0]}|…{'}'})</p>}
+                  </div>
+                );
+              })()}
             </div>
           ))}
           {steps.length < 6 && <button className="btn-secondary text-sm" onClick={() => setSteps([...steps, { step: steps.length + 1, delay_days: 3, subject: '', body: '' }])}>Ajouter une relance</button>}
