@@ -1,5 +1,6 @@
 import { parse } from 'csv-parse/sync';
 import { supabase } from '@/lib/supabase';
+import { fetchAll } from '@/lib/fetchAll';
 import { parisMidnight } from '@/lib/autoSchedule';
 import { trackingFor } from '@/lib/emailTracking';
 
@@ -11,9 +12,15 @@ import { trackingFor } from '@/lib/emailTracking';
 const db = () => supabase as any;
 const CLAIM_MS = 6 * 3600_000;   // un lead remis à Hermès et jamais rapporté redevient disponible
 
+// Segment du lead : avec site internet (« site ») ou sans (« no_site »), calculé en base depuis website
+export type Segment = 'site' | 'no_site';
+export const SEGMENTS: Segment[] = ['site', 'no_site'];
+export const seqOf = (s: EmailSettings, seg: Segment | null | undefined): EmailStep[] => s.sequences?.[seg ?? 'no_site'] ?? s.steps;
+
 export interface EmailStep { step: number; delay_days: number; subject: string; body: string }
 export interface EmailSettings {
   active: boolean; daily_goal: number; steps: EmailStep[];
+  sequences: Record<Segment, EmailStep[]> | null;   // un parcours par segment (avec / sans site)
   send_days: number[]; send_from: number; send_to: number; instructions: string;
 }
 
@@ -35,7 +42,7 @@ const FIELDS: Record<string, string[]> = {
   sector:       ['secteur', 'activite', 'metier', 'sector', 'industry', 'niche'],
   city:         ['ville', 'city', 'localisation', 'location'],
   phone:        ['telephone', 'tel', 'phone', 'mobile'],
-  website:      ['site', 'site_web', 'website', 'url'],
+  website:      ['site', 'site_web', 'website', 'url', 'site_internet', 'url_site', 'site_url', 'web'],
   linkedin_url: ['linkedin', 'linkedin_url', 'profil_linkedin'],
 };
 
@@ -102,7 +109,7 @@ export async function sentToday(): Promise<number> {
 }
 
 export interface EmailTask {
-  lead_id: string; step: number; email: string; mailbox: string | null; thread_id: string | null;
+  lead_id: string; step: number; segment: Segment; email: string; mailbox: string | null; thread_id: string | null;
   lead: Record<string, unknown>; template: { subject: string; body: string } | null; previous: { subject: string | null; body: string | null }[];
   tracking: { pixel_url: string; pixel_html: string; unsubscribe_url: string };   // à mettre dans chaque mail
 }
@@ -120,10 +127,11 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
   if (!n) return { ...base, tasks: [], reason: 'Objectif du jour atteint' };
 
   const nowIso = new Date().toISOString(), freeIso = new Date(Date.now() - CLAIM_MS).toISOString();
-  const maxStep = s.steps.length;
-  const { data: followups } = await db().from('email_leads').select('*')
-    .eq('status', 'in_sequence').lt('step', maxStep).lte('next_send_at', nowIso)
-    .or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('next_send_at').limit(n);
+  const { data: dueRows } = await db().from('email_leads').select('*')
+    .eq('status', 'in_sequence').lte('next_send_at', nowIso)
+    .or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('next_send_at').limit(n * 2);
+  // Relance encore prévue dans la séquence de son segment (avec / sans site)
+  const followups = (dueRows ?? []).filter((l: any) => l.step < seqOf(s, l.segment).length).slice(0, n);
   const rest = n - (followups?.length ?? 0);
   const { data: firsts } = rest > 0
     ? await db().from('email_leads').select('*').eq('status', 'new').or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('created_at').limit(rest)
@@ -136,10 +144,10 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
       .or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).select('id');
     if (!got?.length) continue;
     const step = l.step + 1;
-    const tpl = s.steps.find((x) => x.step === step);
+    const tpl = seqOf(s, l.segment).find((x) => x.step === step);
     const { data: prev } = l.step ? await db().from('email_events').select('subject, body').eq('lead_id', l.id).eq('type', 'sent').order('occurred_at') : { data: [] };
     tasks.push({
-      lead_id: l.id, step, email: l.email, mailbox: l.mailbox, thread_id: l.thread_id,
+      lead_id: l.id, step, segment: l.segment, email: l.email, mailbox: l.mailbox, thread_id: l.thread_id,
       lead: { first_name: l.first_name, last_name: l.last_name, company: l.company, job_title: l.job_title, sector: l.sector, city: l.city, website: l.website, ...l.custom },
       template: tpl && (tpl.subject || tpl.body) ? { subject: tpl.subject, body: tpl.body } : null,
       previous: prev ?? [],
@@ -167,12 +175,12 @@ export async function recordEvents(events: EmailEventIn[]): Promise<{ ok: number
     const e = events[index];
     try {
       if (!TYPES.includes(e.type)) throw new Error(`type inconnu : ${e.type}`);
-      const q = db().from('email_leads').select('id, email, status, step, mailbox, thread_id');
+      const q = db().from('email_leads').select('id, email, status, step, segment, mailbox, thread_id');
       const { data: lead } = e.lead_id ? await q.eq('id', e.lead_id).maybeSingle() : await q.ilike('email', String(e.email ?? '').trim()).maybeSingle();
       if (!lead) throw new Error('lead introuvable (lead_id ou email)');
       const at = e.occurred_at && !Number.isNaN(Date.parse(e.occurred_at)) ? new Date(e.occurred_at).toISOString() : new Date().toISOString();
       const { error } = await db().from('email_events').insert({
-        lead_id: lead.id, type: e.type, step: e.step ?? null, subject: e.subject ?? null, body: e.body ?? null,
+        lead_id: lead.id, type: e.type, step: e.step ?? (e.type === 'sent' ? lead.step + 1 : lead.step || null), subject: e.subject ?? null, body: e.body ?? null,
         mailbox: e.mailbox ?? null, message_id: e.message_id ?? null, occurred_at: at, payload: e.payload ?? {},
       });
       if (error) {
@@ -182,7 +190,7 @@ export async function recordEvents(events: EmailEventIn[]): Promise<{ ok: number
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (e.type === 'sent') {
         const step = e.step ?? lead.step + 1;
-        const next = s.steps.find((x) => x.step === step + 1);
+        const next = seqOf(s, lead.segment).find((x) => x.step === step + 1);
         Object.assign(patch, {
           step, last_sent_at: at, claimed_at: null, mailbox: lead.mailbox ?? e.mailbox ?? null, thread_id: lead.thread_id ?? e.thread_id ?? e.message_id ?? null,
           next_send_at: next ? new Date(Date.parse(at) + next.delay_days * 86_400_000).toISOString() : null,
@@ -212,22 +220,40 @@ export async function releaseTasks(leadIds: string[]): Promise<void> {
 
 // ── Tableau de bord ──
 
-// Taux par cohorte : leads ayant reçu au moins un mail depuis `from` → part qui a ouvert, part qui
-// a répondu (réponse, intéressé, pas intéressé)
+// Taux par cohorte : leads ayant reçu au moins un mail depuis `from` → part qui a ouvert, part qui a
+// répondu (réponse, intéressé, pas intéressé). Aussi par segment (avec / sans site) et par mail (1, 2…).
+interface Rate { contacted: number; opened: number; replied: number; open_rate: number | null; reply_rate: number | null }
+const rate = (c: number, o: number, r: number): Rate => ({ contacted: c, opened: o, replied: r, open_rate: c ? o / c : null, reply_rate: c ? r / c : null });
+const REPLY = ['replied', 'interested', 'not_interested'];
+
 async function rates(from: string) {
-  const ev = async (types: string[]) => {
-    const out = new Set<string>();
-    for (let page = 0; page < 20; page++) {
-      const { data } = await db().from('email_events').select('lead_id').in('type', types).gte('occurred_at', from).range(page * 1000, page * 1000 + 999);
-      for (const r of data ?? []) out.add(r.lead_id);
-      if ((data?.length ?? 0) < 1000) break;
-    }
-    return out;
-  };
-  const [sent, opened, replied] = await Promise.all([ev(['sent']), ev(['opened', 'clicked']), ev(['replied', 'interested', 'not_interested'])]);
-  const inSent = (set: Set<string>) => Array.from(set).filter((id) => sent.has(id)).length;
-  const o = inSent(opened), r = inSent(replied);
-  return { contacted: sent.size, opened: o, replied: r, open_rate: sent.size ? o / sent.size : null, reply_rate: sent.size ? r / sent.size : null };
+  const events = await fetchAll<{ lead_id: string; type: string; step: number | null }>(() => db().from('email_events')
+    .select('lead_id, type, step').in('type', ['sent', 'opened', 'clicked', ...REPLY]).gte('occurred_at', from).order('id'));
+  const sent = new Set<string>(), opened = new Set<string>(), replied = new Set<string>();
+  const byStep = new Map<number, { sent: Set<string>; opened: Set<string>; replied: Set<string> }>();
+  const stepOf = (k: number) => { if (!byStep.has(k)) byStep.set(k, { sent: new Set(), opened: new Set(), replied: new Set() }); return byStep.get(k)!; };
+  for (const e of events) {
+    const k = e.step ?? 1;
+    if (e.type === 'sent') { sent.add(e.lead_id); stepOf(k).sent.add(e.lead_id); }
+    else if (REPLY.includes(e.type)) { replied.add(e.lead_id); stepOf(k).replied.add(e.lead_id); }
+    else { opened.add(e.lead_id); stepOf(k).opened.add(e.lead_id); }
+  }
+  // Segment des leads contactés
+  const ids = Array.from(sent), seg = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await db().from('email_leads').select('id, segment').in('id', ids.slice(i, i + 300));
+    for (const r of data ?? []) seg.set(r.id, r.segment);
+  }
+  const count = (set: Set<string>, keep: (id: string) => boolean) => Array.from(set).filter((id) => sent.has(id) && keep(id)).length;
+  const bySeg = Object.fromEntries(SEGMENTS.map((sg) => {
+    const inSeg = (id: string) => seg.get(id) === sg;
+    return [sg, rate(ids.filter(inSeg).length, count(opened, inSeg), count(replied, inSeg))];
+  })) as Record<Segment, Rate>;
+  const steps = Array.from(byStep.entries()).sort((x, y) => x[0] - y[0]).map(([k, v]) => {
+    const inStep = (id: string) => v.sent.has(id);
+    return { step: k, ...rate(v.sent.size, Array.from(v.opened).filter(inStep).length, Array.from(v.replied).filter(inStep).length) };
+  });
+  return { ...rate(sent.size, count(opened, () => true), count(replied, () => true)), by_segment: bySeg, by_step: steps };
 }
 
 export async function emailStats() {
@@ -245,6 +271,8 @@ export async function emailStats() {
   const [r7, r30] = await Promise.all([rates(week), rates(new Date(Date.now() - 30 * 86_400_000).toISOString())]);
   return {
     settings: s, by_status: byStatus, rates: { '7d': r7, '30d': r30 },
+    leads_by_segment: Object.fromEntries(await Promise.all(SEGMENTS.map(async (sg) =>
+      [sg, (await db().from('email_leads').select('id', { count: 'exact', head: true }).eq('segment', sg)).count ?? 0]))) as Record<Segment, number>,
     today: { sent: sentToday, replied: repliedToday, bounced: bouncedToday },
     week: { sent: sentWeek, replied: repliedWeek, bounced: bouncedWeek, interested: interestedWeek },
     last_event_at: last?.[0]?.occurred_at ?? null,

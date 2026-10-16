@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, Send, Reply, AlertTriangle, Sparkles, Bot, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { emailingApi, type EmailSettingsCfg } from '@/lib/api';
+import { emailingApi, type EmailSettingsCfg, type EmailSegment, type EmailStepCfg } from '@/lib/api';
+
+const SEG_LABEL: Record<EmailSegment, string> = { site: 'Avec site internet', no_site: 'Sans site internet' };
 import Spinner from '@/components/ui/Spinner';
 import StatCard from '@/components/ui/StatCard';
 
@@ -22,6 +24,7 @@ export default function EmailingPage() {
   const { data, isLoading } = useQuery({ queryKey: ['emailing-stats'], queryFn: () => emailingApi.stats().then((r) => r.data), refetchInterval: 60_000 });
   const [cfg, setCfg] = useState<EmailSettingsCfg | null>(null);
   const [range, setRange] = useState<'7d' | '30d'>('7d');
+  const [seg, setSeg] = useState<EmailSegment>('site');
   useEffect(() => { if (data && !cfg) setCfg(data.settings); }, [data, cfg]);
   const save = useMutation({
     mutationFn: (s: Partial<EmailSettingsCfg>) => emailingApi.settings(s).then((r) => r.data),
@@ -29,6 +32,13 @@ export default function EmailingPage() {
     onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
   });
   if (isLoading || !data || !cfg) return <div className="flex justify-center py-20"><Spinner /></div>;
+  // Parcours du segment affiché (avant la migration : la séquence unique sert aux deux)
+  const seqs = cfg.sequences ?? { site: cfg.steps, no_site: cfg.steps };
+  const steps = seqs[seg];
+  const setSteps = (list: EmailStepCfg[]) => setCfg({ ...cfg, sequences: { ...seqs, [seg]: list.map((x, i) => ({ ...x, step: i + 1 })) } });
+  const setStep = (i: number, patch: Partial<EmailStepCfg>) => setSteps(steps.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const R = data.rates[range];
+  const p = (v: number | null) => (v == null ? '—' : `${Math.round(v * 1000) / 10} %`);
   const goalPct = Math.min(100, Math.round((data.today.sent / Math.max(1, cfg.daily_goal)) * 100));
 
   return (
@@ -68,6 +78,20 @@ export default function EmailingPage() {
             </div>
           ))}
         </div>
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-gray-500 text-left"><tr><th className="py-1">Segment</th><th>Contactés</th><th>Ouverture</th><th>Réponse</th></tr></thead>
+            <tbody>{(['site', 'no_site'] as const).map((sg) => (
+              <tr key={sg} className="border-t"><td className="py-1.5">{SEG_LABEL[sg]}</td><td>{R.by_segment[sg].contacted}</td><td>{p(R.by_segment[sg].open_rate)}</td><td className="font-semibold">{p(R.by_segment[sg].reply_rate)}</td></tr>
+            ))}</tbody>
+          </table>
+          <table className="w-full text-sm">
+            <thead className="text-xs text-gray-500 text-left"><tr><th className="py-1">Mail</th><th>Envoyés</th><th>Ouverture</th><th>Réponse</th></tr></thead>
+            <tbody>{R.by_step.length ? R.by_step.map((st) => (
+              <tr key={st.step} className="border-t"><td className="py-1.5">{st.step === 1 ? 'Mail 1' : `Relance ${st.step - 1}`}</td><td>{st.contacted}</td><td>{p(st.open_rate)}</td><td className="font-semibold">{p(st.reply_rate)}</td></tr>
+            )) : <tr><td colSpan={4} className="py-2 text-gray-400">Aucun envoi sur la période</td></tr>}</tbody>
+          </table>
+        </div>
         <p className="text-[11px] text-gray-400 mt-2">Ouvertures mesurées par le pixel du CRM : certaines messageries (Apple Mail) chargent les images d&apos;office et gonflent ce taux ; d&apos;autres les bloquent. Le taux de réponse est le chiffre fiable.</p>
       </div>
 
@@ -104,16 +128,26 @@ export default function EmailingPage() {
           })}
         </div>
         <div className="space-y-3">
-          <p className="text-sm font-medium text-gray-700">Séquence (modèles facultatifs : vides, Hermès rédige selon les consignes ; variables {'{{first_name}}'}, {'{{company}}'}, {'{{city}}'}…)</p>
-          {cfg.steps.map((s, i) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-medium text-gray-700">Parcours</p>
+            {(['site', 'no_site'] as const).map((sg) => (
+              <button key={sg} onClick={() => setSeg(sg)} className={`px-3 py-1 rounded-full text-sm ${seg === sg ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                {SEG_LABEL[sg]} · {(data.leads_by_segment?.[sg] ?? 0).toLocaleString('fr-FR')} leads
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">Mail 1 puis relances, envoyés tant que le lead n&apos;a pas répondu. Variables : {'{{first_name}}'}, {'{{company}}'}, {'{{city}}'}, {'{{sector}}'}, {'{{website}}'} et toute colonne de ton fichier. Le pixel d&apos;ouverture et le lien de désinscription sont ajoutés à chaque mail. Modèle vide : Hermès rédige selon les consignes.</p>
+          {steps.map((st, i) => (
             <div key={i} className="rounded-lg border border-gray-100 p-3 space-y-2">
-              <div className="flex items-center gap-3 text-sm"><b>Mail {s.step}</b>
-                {i > 0 && <span className="text-gray-500 inline-flex items-center gap-1">envoyé <input type="number" className="input w-16 py-1" value={s.delay_days} onChange={(e) => setCfg({ ...cfg, steps: cfg.steps.map((x, j) => (j === i ? { ...x, delay_days: Number(e.target.value) } : x)) })} /> jours après le précédent</span>}
+              <div className="flex items-center gap-3 text-sm"><b>{i === 0 ? 'Mail 1' : `Relance ${i}`}</b>
+                {i > 0 && <span className="text-gray-500 inline-flex items-center gap-1">envoyée <input type="number" min={1} className="input w-16 py-1" value={st.delay_days} onChange={(e) => setStep(i, { delay_days: Number(e.target.value) })} /> jours après le mail précédent</span>}
+                {i > 0 && i === steps.length - 1 && <button className="ml-auto text-xs text-red-600" onClick={() => setSteps(steps.slice(0, -1))}>Supprimer</button>}
               </div>
-              <input className="input text-sm" placeholder="Objet" value={s.subject} onChange={(e) => setCfg({ ...cfg, steps: cfg.steps.map((x, j) => (j === i ? { ...x, subject: e.target.value } : x)) })} />
-              <textarea className="input text-sm" rows={3} placeholder="Corps du mail" value={s.body} onChange={(e) => setCfg({ ...cfg, steps: cfg.steps.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)) })} />
+              <input className="input text-sm" placeholder={i === 0 ? 'Objet' : 'Objet (vide : réponse dans le même fil, « Re: »)'} value={st.subject} onChange={(e) => setStep(i, { subject: e.target.value })} />
+              <textarea className="input text-sm" rows={i === 0 ? 7 : 4} placeholder="Corps du mail" value={st.body} onChange={(e) => setStep(i, { body: e.target.value })} />
             </div>
           ))}
+          {steps.length < 6 && <button className="btn-secondary text-sm" onClick={() => setSteps([...steps, { step: steps.length + 1, delay_days: 3, subject: '', body: '' }])}>Ajouter une relance</button>}
         </div>
         <label className="text-sm block">Consignes de rédaction pour Hermès
           <textarea className="input mt-1 text-sm" rows={4} value={cfg.instructions} placeholder="Ton, longueur, offre, ce qu'il ne faut jamais écrire…" onChange={(e) => setCfg({ ...cfg, instructions: e.target.value })} />

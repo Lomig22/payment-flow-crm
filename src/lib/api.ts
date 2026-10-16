@@ -477,10 +477,13 @@ export const fabriqueApi = {
 
 // ── Emailing (envois par l'agent Hermès) ──
 export interface EmailStepCfg { step: number; delay_days: number; subject: string; body: string }
-export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; send_days: number[]; send_from: number; send_to: number; instructions: string }
+export type EmailSegment = 'site' | 'no_site';
+export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; sequences: Record<EmailSegment, EmailStepCfg[]> | null; send_days: number[]; send_from: number; send_to: number; instructions: string }
+export interface EmailRate { contacted: number; opened: number; replied: number; open_rate: number | null; reply_rate: number | null }
 export interface EmailStats {
   settings: EmailSettingsCfg; by_status: Record<string, number>;
-  rates: Record<'7d' | '30d', { contacted: number; opened: number; replied: number; open_rate: number | null; reply_rate: number | null }>;
+  rates: Record<'7d' | '30d', EmailRate & { by_segment: Record<EmailSegment, EmailRate>; by_step: (EmailRate & { step: number })[] }>;
+  leads_by_segment: Record<EmailSegment, number>;
   today: { sent: number; replied: number; bounced: number };
   week: { sent: number; replied: number; bounced: number; interested: number };
   last_event_at: string | null; agent_configured: boolean;

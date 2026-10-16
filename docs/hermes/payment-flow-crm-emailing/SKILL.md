@@ -38,9 +38,10 @@ Utilise l'outil `python3 /root/.hermes/scripts/pf_crm.py` : il lit la clé dans 
    ```
 
    - `step` : 1 = premier mail, 2 et 3 = relances. Pour une relance, `previous` contient les mails déjà envoyés à ce lead. Réponds **dans le même fil** (`thread_id`) et **depuis la même boîte** (`mailbox`).
-   - `template` : modèle de Lomig pour ce mail. Remplace les variables `{{first_name}}`, `{{company}}`, `{{city}}`, `{{sector}}`… avec `lead`. Si `template` est `null`, rédige toi-même en suivant `instructions`.
+   - `segment` : `site` (le prospect a un site internet) ou `no_site` (il n'en a pas). Lomig a écrit un parcours différent pour chacun : le `template` reçu est déjà celui du bon segment, ne le mélange jamais avec l'autre.
+   - `template` : modèle de Lomig pour ce mail. Respecte-le mot pour mot (seules les variables changent). Une relance dont l'objet est vide part **en réponse dans le même fil** que le mail 1 (objet « Re: <objet du mail 1> », en-têtes In-Reply-To / References avec le `thread_id`). Remplace les variables `{{first_name}}`, `{{company}}`, `{{city}}`, `{{sector}}`… avec `lead`. Si `template` est `null`, rédige toi-même en suivant `instructions`.
    - Chaque lead remis est réservé 6 h pour toi. Si `tasks` est vide, lis `reason` et attends (15 min) avant de redemander.
-   - `tracking` : **à mettre dans chaque mail**. `pixel_html` juste avant `</body>` de la version HTML (c'est lui qui mesure le taux d'ouverture dans le CRM), et `unsubscribe_url` comme lien de désinscription en pied de mail ainsi que dans l'en-tête `List-Unsubscribe: <unsubscribe_url>` avec `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Le CRM enregistre lui-même ouvertures et désinscriptions : tu n'as pas à les rapporter.
+   - `tracking` : **à mettre dans chaque mail, relances comprises** (le jeton change à chaque mail : c'est ce qui donne le taux d'ouverture par mail). `pixel_html` juste avant `</body>` de la version HTML (c'est lui qui mesure le taux d'ouverture dans le CRM), et `unsubscribe_url` comme lien de désinscription en pied de mail ainsi que dans l'en-tête `List-Unsubscribe: <unsubscribe_url>` avec `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Le CRM enregistre lui-même ouvertures et désinscriptions : tu n'as pas à les rapporter.
 
 2. **Envoyer** chaque mail depuis une boîte préchauffée. Respecte tes plafonds par boîte et l'espacement entre les envois : la délivrabilité passe avant l'objectif du jour.
 

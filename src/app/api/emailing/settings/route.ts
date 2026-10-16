@@ -24,6 +24,19 @@ export async function PUT(request: NextRequest) {
       subject: String(s.subject ?? '').slice(0, 200), body: String(s.body ?? '').slice(0, 5000),
     }));
   }
+  // Parcours par segment : { site: [...], no_site: [...] }, 1 à 6 mails chacun
+  if (b.sequences && typeof b.sequences === 'object') {
+    const seqs: Record<string, unknown> = {};
+    for (const seg of ['site', 'no_site']) {
+      const list = b.sequences[seg];
+      if (!Array.isArray(list) || !list.length || list.length > 6) return badRequest(`Parcours ${seg === 'site' ? 'avec site' : 'sans site'} : 1 à 6 mails`);
+      seqs[seg] = list.map((x: any, i: number) => ({
+        step: i + 1, delay_days: i === 0 ? 0 : Math.max(1, Math.min(60, Number(x.delay_days) || 1)),
+        subject: String(x.subject ?? '').slice(0, 200), body: String(x.body ?? '').slice(0, 5000),
+      }));
+    }
+    patch.sequences = seqs;
+  }
   if (Array.isArray(b.send_days)) patch.send_days = b.send_days.map(Number).filter((d: number) => d >= 1 && d <= 7);
   if (b.send_from != null) patch.send_from = Math.max(0, Math.min(23, Number(b.send_from) || 0));
   if (b.send_to != null) patch.send_to = Math.max(1, Math.min(24, Number(b.send_to) || 24));
