@@ -102,9 +102,13 @@ export async function probe(file: string): Promise<{ width: number; height: numb
   if (!v) throw new Error('Vidéo illisible');
   // Rotation (vidéos de téléphone stockées « couchées ») : dimensions telles qu'affichées
   const rot = Math.abs(Number(stderr.match(/rotation of (-?\d+(?:\.\d+)?) degrees/)?.[1] ?? 0)) % 180;
+  // width / height = dimensions AFFICHÉES : ffmpeg redresse les images à la lecture, tous les montages
+  // (voix off, sous-titres, fin CTA) doivent donc travailler dans ce sens. Sans ça, une vidéo verticale
+  // stockée couchée était écrasée en 1920 × 1080 au montage de la voix off (16/10/2026).
+  const dw = rot === 90 ? +v[2] : +v[1], dh = rot === 90 ? +v[1] : +v[2];
   return {
-    width: +v[1], height: +v[2],
-    display_width: rot === 90 ? +v[2] : +v[1], display_height: rot === 90 ? +v[1] : +v[2],
+    width: dw, height: dh,
+    display_width: dw, display_height: dh,
     fps: fps ? Math.min(60, Math.round(+fps[1])) : 30,
     audio: /Stream #0:\d+.*Audio:/.test(stderr),
     duration: d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0,
