@@ -35,18 +35,24 @@ const fr = (n: number, d = 1) => n.toLocaleString('fr-FR', { minimumFractionDigi
 // Nom d'entreprise lisible : Google Maps ajoute souvent des mots-clés (« GR COUVERTURE LILLOISE :
 // Couverture - étanchéité… ») → partie avant « : », « | », « - », « / », « ( », « , » ; nom trop long coupé
 // avant le premier mot de métier ; majuscules adoucies
+const LEGAL = /^(sarl|sas|sasu|eurl|sa|snc|sci|scop|selarl|ei|eirl|micro-entreprise|auto-entrepreneur)$/i;
 const TRADE_WORD = /^(travaux|r[ée]novation|renov|finitions?|salle|ma[çc]onnerie|plomberie|[ée]lectricit[ée]|chauffage|couverture|peinture|menuiserie|carrelage|isolation|construction|b[âa]timent|terrassement|am[ée]nagement|[ée]tanch[ée]it[ée]|toiture|charpente|services?|multi)$/i;
 export function cleanCompany(raw: string): string {
-  let words = str(raw).split(/\s[:|–—/-]\s|\s\(|,\s?|\s\||\s\/|\.\s/)[0].trim().replace(/[.\s]+$/, '').split(' ');
+  // Formes juridiques écrites avec des points (« S.A.R.L. ») retirées avant le découpage
+  const base = str(raw).replace(/(^|\s)(S\.A\.R\.L|S\.A\.S\.U|S\.A\.S|E\.U\.R\.L|S\.N\.C|S\.C\.I|E\.I)\.?(?=\s|$)/gi, ' ').trim() || str(raw);
+  let words = base.split(/\s[:|–—/-]\s|\s\(|,\s?|\s\||\s\/|(?<=[a-zà-ÿ]{3})\.\s/)[0].trim().replace(/[.\s]+$/, '').split(' ');
   // Nom long : coupé avant le premier mot de métier (après au moins deux mots)
   if (words.join(' ').length > 26) {
     const i = words.findIndex((w, k) => k >= 2 && TRADE_WORD.test(w));
     if (i > 0) words = words.slice(0, i);
   }
+  // Forme juridique retirée (SARL, SAS, EURL…) : ce n'est pas le nom de l'entreprise
+  const named = words.filter((w) => !LEGAL.test(w.replace(/[.,]/g, '')));
+  if (named.length) words = named;
   let s = words.join(' ');
   if (s.length > 40) s = s.slice(0, 40).replace(/\s+\S*$/, '');
   // Mots tout en capitales adoucis (« RENOV » → « Renov »), sauf sigles courts et formes juridiques
-  return s.split(' ').map((w) => (w.length > 3 && w === w.toUpperCase() && /[A-ZÀ-Ý]{4,}/.test(w) && !/^(SARL|SASU|EURL)$/.test(w)
+  return s.split(' ').map((w) => (w.length > 3 && w === w.toUpperCase() && /[A-ZÀ-Ý]{4,}/.test(w)
     ? w.charAt(0) + w.slice(1).toLowerCase() : w)).join(' ');
 }
 
