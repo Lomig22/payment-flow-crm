@@ -243,8 +243,8 @@ export async function cooldownAccount(s: LinkedinSettings, reason: string) {
     day_plan: null, error_streak: 0, alert: `Cooldown : ${reason}`, alert_at: now,
   }).eq('id', 1);
   const until_fr = until.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' });
-  await accountEvent('cooldown', `${reason} — reprise le ${until_fr} au palier ${tier}`, { subject: 'COOLDOWN de 7 jours', lines: [
-    `LinkedIn a signalé : ${reason}. Toutes les actions sont suspendues.`,
+  await accountEvent('cooldown', `${reason} — reprise le ${until_fr} au palier ${tier}`, { subject: 'invitations en pause 7 jours', lines: [
+    `LinkedIn a signalé : ${reason}. Les invitations sont suspendues ; acceptations, messages, relances et réponses continuent.`,
     `Reprise automatique le ${until_fr}, au palier ${tier} (deux paliers plus bas).`,
   ] });
 }

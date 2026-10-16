@@ -273,7 +273,9 @@ async function pageAction(type, message) {
     await sleep(rand(1500, 2500));
     // Fenêtre refermée après « Envoyer » = invitation partie
     const confirmed = await waitFor(() => !findDialog() || isPending() || /invitation envoy[ée]e|invitation sent/.test(norm(document.body.innerText)), 8000);
-    if (!confirmed) return { result: 'error', detail: 'Envoi de l’invitation non confirmé (fenêtre restée ouverte)' };
+    // Texte de la fenêtre restée ouverte : dit pourquoi LinkedIn n'a pas envoyé (limite, e-mail demandé…)
+    const stuck = findDialog();
+    if (!confirmed) return { result: 'error', detail: `Envoi de l’invitation non confirmé (fenêtre restée ouverte)${stuck ? ` — « ${norm(stuck.innerText).slice(0, 220)} »` : ''}` };
     return noteSkipped ? { result: 'ok', inv_variant: 'no_note', note: null, note_skipped: true } : { result: 'ok' };
   }
 

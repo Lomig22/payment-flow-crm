@@ -58,8 +58,13 @@ export async function GET(request: NextRequest) {
 
   // État du compte : bloqué (déblocage manuel), cooldown (reprise automatique à l'échéance)
   if (s.account_state === 'blocked' || s.stop_reason) return idle(`Compte bloqué : ${s.stop_reason ?? 'à débloquer dans /linkedin'}`);
+  // Cooldown : il ne suspend que les invitations (limite, erreurs d'invitation en série). Acceptations,
+  // messages, relances et réponses continuent ; seul un vrai blocage du compte (captcha, identité) arrête tout.
+  let invitesPaused: string | null = null;
   if (s.account_state === 'cooldown') {
-    if (s.cooldown_until && new Date(s.cooldown_until) > now) return idle(`Cooldown jusqu'au ${new Date(s.cooldown_until).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`);
+    if (s.cooldown_until && new Date(s.cooldown_until) > now) invitesPaused = `Invitations en pause jusqu'au ${new Date(s.cooldown_until).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`;
+  }
+  if (s.account_state === 'cooldown' && !invitesPaused) {
     await db.from('linkedin_settings').update({ account_state: 'active', cooldown_until: null, alert: null, alert_at: null }).eq('id', 1);
     await accountEvent('resumed', `Fin du cooldown : reprise au palier ${s.tier}`, {
       subject: 'reprise après cooldown', lines: [`Le cooldown est terminé : la séquence LinkedIn reprend au palier ${s.tier}.`],
@@ -121,7 +126,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Invitations en attente depuis trop longtemps : retrait (dans la fenêtre seulement)
-  if (open) {
+  if (open && !invitesPaused) {
     const limit = new Date(now.getTime() - s.invite_expiry_days * 86_400_000).toISOString();
     const { data } = await db.from('leads').select('id, linkedin_url').eq('li_status', 'invited').lte('li_invited_at', limit)
       .order('li_invited_at', { ascending: true }).limit(1);
@@ -167,6 +172,7 @@ export async function GET(request: NextRequest) {
     if (url) return serve({ type: 'posts', lead_id: lead.id, url });
   }
 
+  if (invitesPaused) return idle(invitesPaused);
   if (!open) return idle('Hors fenêtre des invitations : rien d\'autre à faire pour l\'instant');
 
   // 7. Invitations en attente sur LinkedIn : relevé quotidien (page « Invitations envoyées »)
