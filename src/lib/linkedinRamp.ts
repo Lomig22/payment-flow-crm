@@ -171,6 +171,7 @@ export function inviteDelayMs(s: Pick<RampSettings, 'invite_gap_min' | 'invite_g
 }
 
 // ── Horaires exacts des invitations du jour ──
+const MIN_SLOT_GAP_MS = 90_000;
 // Les leads reçoivent chacun une heure d'envoi, à la suite des créneaux déjà fixés, espacées du
 // délai d'invitation et uniquement dans les sessions restantes. `nowMin` : minute de Paris de `now`.
 export function scheduleSlots(s: Pick<RampSettings, 'invite_gap_min' | 'invite_gap_max'>, plan: DayPlan, existing: Slot[], leadIds: string[],
@@ -181,7 +182,8 @@ export function scheduleSlots(s: Pick<RampSettings, 'invite_gap_min' | 'invite_g
   let cursor = Math.max(now.getTime() + 60_000, last);
   const out: Slot[] = [];
   for (const id of leadIds) {
-    let t = cursor + (out.length || existing.length ? inviteDelayMs(s, rng) : 0);
+    // Jamais plus serré que le rythme réel du worker (une action, puis un passage par minute : ~80 s)
+    let t = cursor + (out.length || existing.length ? Math.max(MIN_SLOT_GAP_MS, inviteDelayMs(s, rng)) : 0);
     const w = windows.find(([, b]) => b > t);
     if (!w) break;
     if (t < w[0]) t = w[0];
