@@ -12,6 +12,11 @@ const CRM = process.env.CRM_URL ?? "https://payment-flow-crm-delta.vercel.app";
 const KEY = process.env.CRON_SECRET;
 const WORK = process.env.FACTORY_WORK ?? join(HERE, "work");
 const HF = process.env.HYPERFRAMES ?? "hyperframes@0.8.157";
+// Voix locale (Piper, gratuite, sans clé) : modèle français masculin, débit un peu plus rapide
+const PIPER = process.env.PIPER_PYTHON ?? "/opt/piper/venv/bin/python";
+const PIPER_VOICES = process.env.PIPER_VOICES ?? "/opt/piper/voices";
+const PIPER_MODEL = process.env.PIPER_MODEL ?? "fr_FR-tom-medium";
+const PIPER_SPEED = process.env.PIPER_LENGTH_SCALE ?? "0.88";
 if (!KEY) { console.error("CRON_SECRET manquant"); process.exit(1); }
 
 const api = async (method, query, body) => {
@@ -25,9 +30,9 @@ const api = async (method, query, body) => {
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 const { job } = await api("GET", "?action=next");
-if (!job) { log("rien à rendre"); process.exit(0); }
+if (!job) { log("rien à rendre"); process.exit(3); }   // 3 : file vide (arrête la boucle du cron)
 const dir = join(WORK, job.id);
-log("rendu", job.id, job.funnel, `${Object.keys(job.vo).length} voix`);
+log("rendu", job.id, job.funnel, job.tts ? `${job.tts.lines.length} voix ${job.tts.engine}` : `${Object.keys(job.vo).length} voix`);
 try {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "vo"), { recursive: true });
@@ -40,6 +45,10 @@ try {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`voix ${i} : HTTP ${r.status}`);
     writeFileSync(join(dir, "vo", `${i}.mp3`), Buffer.from(await r.arrayBuffer()));
+  }
+  for (const { i, text } of job.tts?.lines ?? []) {
+    execFileSync(PIPER, ["-m", "piper", "-m", PIPER_MODEL, "--data-dir", PIPER_VOICES, "-f", join(dir, "vo", `${i}.wav`), "--length-scale", PIPER_SPEED, "--", text],
+      { stdio: ["ignore", "ignore", "inherit"], timeout: 120_000 });
   }
   log("assemblage", execFileSync("node", [join(HERE, "build.mjs"), dir]).toString().trim());
   const out = join(dir, "reel.mp4");

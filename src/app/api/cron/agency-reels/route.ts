@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasCronKey } from '@/lib/cronAuth';
-import { planDay, nextJob, uploadUrl, markDone, markFailed, AGENCY_ACCOUNT } from '@/lib/agencyReels';
+import { planDay, fillStock, nextJob, uploadUrl, markDone, markFailed, AGENCY_ACCOUNT } from '@/lib/agencyReels';
 import { autoScheduleDrafts } from '@/lib/autoSchedule';
 import { supabase } from '@/lib/supabase';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 
 // Fabrique de reels @paymentflow (sprint48), appelée par le VPS. Protégé par CRON_SECRET.
 //   GET  ?action=plan[&day=AAAA-MM-JJ]  écrit les reels du jour (Claude)
+//   GET  ?action=fill                   complète le stock (70 reels non publiés), un lot par appel
 //   GET  ?action=next                   prochain reel à rendre (textes + liens des voix)
 //   POST {action:'upload', id, size}    entrée dans la file + URL signée de dépôt
 //   POST {action:'done', id}            vidéo déposée
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
   const action = request.nextUrl.searchParams.get('action');
   try {
     if (action === 'plan') return NextResponse.json(await planDay(request.nextUrl.searchParams.get('day') ?? undefined));
+    // Stock de 7 jours d'avance : un lot par appel
+    if (action === 'fill') return NextResponse.json(await fillStock());
     if (action === 'next') {
       // Au passage : les reels déjà traités par la file reçoivent leur créneau
       const scheduled = await autoScheduleDrafts(AGENCY_ACCOUNT).catch(() => 0);

@@ -22,8 +22,12 @@ const TTS_MODEL = 'eleven_flash_v2_5';
 const VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.8, style: 0.3, speed: 1.12, use_speaker_boost: true };
 const CREDIT_RESERVE = Number(process.env.AGENCY_VOICE_RESERVE ?? 500);
 // Phrases de fin : toujours les mêmes, donc générées une seule fois (cache)
-export const OFFER_VO  = "Commente DEVIS : je t'offre ton audit et ton plan d'action pour quinze demandes de devis de plus par mois.";
-export const FOLLOW_VO = "Abonne-toi, et commente DEVIS pour recevoir ton plan d'action offert.";
+// « Écris DEVIS en commentaire » : « Commente » était entendu « Commande » avec la voix Piper
+export const OFFER_VO  = "Écris DEVIS en commentaire : je t'offre ton audit et ton plan d'action pour quinze demandes de devis de plus par mois.";
+export const FOLLOW_VO = "Abonne-toi, et écris DEVIS en commentaire pour recevoir ton plan d'action offert.";
+// Voix des reels : « local » = Piper sur le VPS (gratuit, sans clé, défaut) ; « cloud » = Google si la
+// clé existe, sinon ElevenLabs dans la limite des crédits
+const LOCAL_TTS = (process.env.AGENCY_TTS ?? 'local') === 'local';
 
 export type Funnel = 'tofu' | 'mofu' | 'bofu';
 const db = () => supabase as any;
@@ -219,6 +223,29 @@ ${(history ?? []).map((h: any) => `- ${h.topic}`).join('\n') || '(aucun)'}`;
   return { day, planned, remaining: todo.length - planned };
 }
 
+// Stock : garder STOCK_TARGET reels non publiés d'avance (7 jours × 10 créneaux). Un appel écrit au plus
+// un lot (4 reels) ; le VPS rappelle tant que `full` est faux.
+const STOCK_TARGET = Number(process.env.AGENCY_STOCK_TARGET ?? 70);
+export async function fillStock(): Promise<{ stock: number; target: number; planned: number; full: boolean; day?: string }> {
+  const { data: rows } = await db().from('agency_reels').select('day, queue_id').neq('status', 'failed').neq('review_status', 'rejected');
+  const ids = (rows ?? []).map((r: any) => r.queue_id).filter(Boolean);
+  const published = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await db().from('content_queue').select('id').in('id', ids.slice(i, i + 200)).in('status', ['published', 'failed']);
+    for (const q of data ?? []) published.add(q.id);
+  }
+  const stock = (rows ?? []).filter((r: any) => !r.queue_id || !published.has(r.queue_id)).length;
+  if (stock >= STOCK_TARGET) return { stock, target: STOCK_TARGET, planned: 0, full: true };
+  // Jour à compléter : le dernier jour écrit s'il n'a pas ses 10 reels, sinon le lendemain
+  const days: string[] = (rows ?? []).map((r: any) => r.day as string).sort();
+  const last = days.length ? days[days.length - 1] : parisDay();
+  const lastCount = days.filter((d) => d === last).length;
+  const next = new Date(Date.parse(`${last}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const day = lastCount < DAY_ORDER.length ? last : (next < parisDay() ? parisDay() : next);
+  const r = await planDay(day);
+  return { stock: stock + r.planned, target: STOCK_TARGET, planned: r.planned, full: stock + r.planned >= STOCK_TARGET, day };
+}
+
 // ── Voix off (cache + plafond de crédits) ──
 
 const RULES = Object.entries(PRONOUNCE as Record<string, string>).filter(([k]) => !k.startsWith('_'));
@@ -317,7 +344,7 @@ async function prepareVoices(reel: any): Promise<{ urls: Record<number, string>;
 // ── Travail du VPS ──
 
 // Prochain reel à rendre (bail de 30 min), avec ses textes et les liens de ses voix
-export async function nextJob(): Promise<null | { id: string; funnel: Funnel; data: any; vo: Record<number, string> }> {
+export async function nextJob(): Promise<null | { id: string; funnel: Funnel; data: any; vo: Record<number, string>; tts?: { engine: 'piper'; lines: { i: number; text: string }[] } }> {
   const stale = new Date(Date.now() - LEASE_MS).toISOString();
   const { data: rows } = await db().from('agency_reels').select('*')
     .or(`status.eq.planned,and(status.eq.rendering,render_started_at.lt.${stale})`)
@@ -332,6 +359,15 @@ export async function nextJob(): Promise<null | { id: string; funnel: Funnel; da
       .eq('id', row.id).eq('status', row.status).eq('attempts', row.attempts).select('id');
     if (!got?.length) continue;
     let vo: Record<number, string> = {};
+    // Phrase de fin : toujours la version en vigueur (les reels écrits avant un changement la gardaient)
+    const specScenes = row.spec.scenes.map((sc: any) => (sc.type === 'cta' ? { ...sc, vo: sc.mode === 'offer' ? OFFER_VO : FOLLOW_VO } : sc));
+    if (row.voiced && LOCAL_TTS) {
+      // Voix synthétisée par le VPS (Piper) : on lui transmet les phrases à dire
+      const lines = specScenes.map((sc: any, i: number) => (sc.vo ? { i, text: pronounce(sc.vo, GOOGLE_RULES) } : null)).filter(Boolean);
+      await db().from('agency_reels').update({ error: null }).eq('id', row.id);
+      const scenes = specScenes.map(({ vo: _vo, ...sc }: any) => sc);
+      return { id: row.id, funnel: row.funnel, data: { funnel: row.funnel, scenes, music: 'music.mp3' }, vo: {}, tts: { engine: 'piper', lines } };
+    }
     if (row.voiced) {
       const v = await prepareVoices(row).catch((e) => ({ urls: {} as Record<number, string>, credits: 0, error: e?.message as string }));
       vo = v.urls;

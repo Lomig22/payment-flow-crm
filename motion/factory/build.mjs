@@ -28,8 +28,9 @@ const read = (s) => clamp(0.5 + words(s) * 0.2, 0, 4);   // sans voix : lecture 
 
 // 1. Voix : silences du début et de la fin retirés
 const vo = S.map((_, i) => {
-  const src = join(dir, "vo", `${i}.mp3`);
-  if (!existsSync(src)) return null;
+  // Voix : MP3 (ElevenLabs / Google) ou WAV (Piper, synthétisée sur le VPS)
+  const src = [join(dir, "vo", `${i}.mp3`), join(dir, "vo", `${i}.wav`)].find((f) => existsSync(f));
+  if (!src) return null;
   const out = join(dir, "vo", `.${i}.wav`);
   run(["-i", src, "-af", "silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse", "-ar", "44100", "-ac", "2", out]);
   return { path: out, d: dur(out) };
