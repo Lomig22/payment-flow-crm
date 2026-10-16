@@ -22,6 +22,8 @@ export interface EmailStep { step: number; delay_days: number; subject: string; 
 export interface EmailSettings {
   active: boolean; daily_goal: number; steps: EmailStep[];
   sequences: Record<Segment, EmailStep[]> | null;   // un parcours par segment (avec / sans site)
+  sender_email: string; sender_name: string; signature: string;   // boîte d'envoi de Lomig, signature ajoutée à chaque mail
+  imap_checked_at: string | null; imap_error: string | null;
   send_days: number[]; send_from: number; send_to: number; instructions: string;
 }
 
@@ -114,7 +116,8 @@ export interface EmailTask {
   lead: Record<string, unknown>; template: { subject: string; body: string } | null; previous: { subject: string | null; body: string | null }[];
   tracking: { pixel_url: string; pixel_html: string; unsubscribe_url: string };   // à mettre dans chaque mail
   variables: Record<string, string>;                                               // personnalisation (emailVars.ts)
-  rendered: { subject: string; body: string } | null;                              // modèle de Lomig, variables remplacées
+  rendered: { subject: string; body: string } | null;                              // modèle de Lomig, variables remplacées, signature incluse
+  from: { email: string; name: string };                                           // boîte d'envoi
 }
 
 // Prochains mails à envoyer : relances dues d'abord (une conversation entamée prime), puis premiers
@@ -155,7 +158,10 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
       template: tpl && (tpl.subject || tpl.body) ? { subject: tpl.subject, body: tpl.body } : null,
       // Mail déjà personnalisé par le CRM (variables remplacées) : à envoyer tel quel
       variables: buildVars(l),
-      rendered: tpl && (tpl.subject || tpl.body) ? { subject: renderVars(tpl.subject, buildVars(l)), body: renderVars(tpl.body, buildVars(l)) } : null,
+      rendered: tpl && (tpl.subject || tpl.body)
+        ? { subject: renderVars(tpl.subject, buildVars(l)), body: [renderVars(tpl.body, buildVars(l)), (s.signature ?? '').trim()].filter(Boolean).join('\n\n') }
+        : null,
+      from: { email: s.sender_email, name: s.sender_name },
       previous: prev ?? [],
       tracking: trackingFor(l.id, step),
     });

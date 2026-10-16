@@ -179,6 +179,13 @@ export default function EmailingPage() {
           ))}
           {steps.length < 6 && <button className="btn-secondary text-sm" onClick={() => setSteps([...steps, { step: steps.length + 1, delay_days: 3, subject: '', body: '' }])}>Ajouter une relance</button>}
         </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="text-sm">Adresse d&apos;envoi<input className="input mt-1" value={cfg.sender_email ?? ''} onChange={(e) => setCfg({ ...cfg, sender_email: e.target.value })} /></label>
+          <label className="text-sm">Nom affiché<input className="input mt-1" value={cfg.sender_name ?? ''} onChange={(e) => setCfg({ ...cfg, sender_name: e.target.value })} /></label>
+        </div>
+        <label className="text-sm block">Signature (ajoutée à la fin de chaque mail : Gmail n&apos;ajoute pas la sienne aux mails envoyés par Hermès)
+          <textarea className="input mt-1 text-sm" rows={4} value={cfg.signature ?? ''} placeholder={'Lomig Guégueniat\nPayment Flow\n06 …'} onChange={(e) => setCfg({ ...cfg, signature: e.target.value })} />
+        </label>
         <label className="text-sm block">Consignes de rédaction pour Hermès
           <textarea className="input mt-1 text-sm" rows={4} value={cfg.instructions} placeholder="Ton, longueur, offre, ce qu'il ne faut jamais écrire…" onChange={(e) => setCfg({ ...cfg, instructions: e.target.value })} />
         </label>
@@ -188,6 +195,7 @@ export default function EmailingPage() {
       <div className="card p-5 text-sm space-y-2">
         <p className="font-semibold text-gray-900 flex items-center gap-2"><Bot className="w-4 h-4" />Connexion de Hermès</p>
         <p className={data.agent_configured ? 'text-emerald-700' : 'text-amber-700'}>{data.agent_configured ? 'Clé de l\'agent configurée.' : 'Clé de l\'agent pas encore configurée (EMAILING_AGENT_KEY).'}</p>
+        <p className={cfg.imap_error ? 'text-red-600' : 'text-gray-600'}>Lecture des réponses (boîte {cfg.sender_email}) : {cfg.imap_error ? `erreur — ${cfg.imap_error}` : cfg.imap_checked_at ? `dernier relevé ${new Date(cfg.imap_checked_at).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}` : 'pas encore active (mot de passe d\'application à ajouter)'}</p>
         <p className="text-gray-600">Dernier événement reçu : {data.last_event_at ? new Date(data.last_event_at).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }) : 'aucun'}</p>
       </div>
     </div>

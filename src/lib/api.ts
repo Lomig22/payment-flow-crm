@@ -478,7 +478,8 @@ export const fabriqueApi = {
 // ── Emailing (envois par l'agent Hermès) ──
 export interface EmailStepCfg { step: number; delay_days: number; subject: string; body: string }
 export type EmailSegment = 'site' | 'no_site';
-export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; sequences: Record<EmailSegment, EmailStepCfg[]> | null; send_days: number[]; send_from: number; send_to: number; instructions: string }
+export interface EmailSettingsCfg { active: boolean; daily_goal: number; steps: EmailStepCfg[]; sequences: Record<EmailSegment, EmailStepCfg[]> | null;
+  sender_email: string; sender_name: string; signature: string; imap_checked_at?: string | null; imap_error?: string | null; send_days: number[]; send_from: number; send_to: number; instructions: string }
 export interface EmailRate { contacted: number; opened: number; replied: number; open_rate: number | null; reply_rate: number | null }
 export interface EmailStats {
   settings: EmailSettingsCfg; by_status: Record<string, number>;

@@ -40,6 +40,13 @@ export async function PUT(request: NextRequest) {
   if (Array.isArray(b.send_days)) patch.send_days = b.send_days.map(Number).filter((d: number) => d >= 1 && d <= 7);
   if (b.send_from != null) patch.send_from = Math.max(0, Math.min(23, Number(b.send_from) || 0));
   if (b.send_to != null) patch.send_to = Math.max(1, Math.min(24, Number(b.send_to) || 24));
+  if (typeof b.sender_email === 'string') {
+    const e = b.sender_email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e)) return badRequest('Adresse d\'envoi invalide');
+    patch.sender_email = e;
+  }
+  if (typeof b.sender_name === 'string') patch.sender_name = b.sender_name.trim().slice(0, 80);
+  if (typeof b.signature === 'string') patch.signature = b.signature.slice(0, 2000);
   if (typeof b.instructions === 'string') patch.instructions = b.instructions.slice(0, 8000);
   const { data, error } = await (supabase as any).from('email_settings').update(patch).eq('id', 1).select('*').single();
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
