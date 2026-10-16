@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useAutosave } from '@/lib/useAutosave';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, Send, Reply, AlertTriangle, Sparkles, Bot, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,9 +32,16 @@ export default function EmailingPage() {
   useEffect(() => { if (data && !cfg) setCfg(data.settings); }, [data, cfg]);
   const save = useMutation({
     mutationFn: (s: Partial<EmailSettingsCfg>) => emailingApi.settings(s).then((r) => r.data),
-    onSuccess: (s) => { setCfg(s); toast.success('Enregistré'); qc.invalidateQueries({ queryKey: ['emailing-stats'] }); },
+    // Interrupteur des envois : seul « active » est repris (les modifications en cours sont gardées)
+    onSuccess: (s) => { setCfg((c) => (c ? { ...c, active: s.active } : s)); toast.success(s.active ? 'Envois actifs' : 'Envois en pause'); qc.invalidateQueries({ queryKey: ['emailing-stats'] }); },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
   });
+  // Modèles et réglages : enregistrés automatiquement (et en quittant l'onglet ou la page)
+  const saveCfg = useCallback((v: EmailSettingsCfg) => {
+    const { active: _active, imap_checked_at: _c, imap_error: _e, ...rest } = v as any;
+    return emailingApi.settings(rest);
+  }, []);
+  const auto = useAutosave(cfg, saveCfg, { ready: !!cfg });
   if (isLoading || !data || !cfg) return <div className="flex justify-center py-20"><Spinner /></div>;
   // Parcours du segment affiché (avant la migration : la séquence unique sert aux deux)
   const seqs = cfg.sequences ?? { site: cfg.steps, no_site: cfg.steps };
@@ -189,7 +197,10 @@ export default function EmailingPage() {
         <label className="text-sm block">Consignes de rédaction pour Hermès
           <textarea className="input mt-1 text-sm" rows={4} value={cfg.instructions} placeholder="Ton, longueur, offre, ce qu'il ne faut jamais écrire…" onChange={(e) => setCfg({ ...cfg, instructions: e.target.value })} />
         </label>
-        <button className="btn-primary text-sm" disabled={save.isPending} onClick={() => save.mutate(cfg)}>Enregistrer</button>
+        <div className="flex items-center gap-3">
+          <button className="btn-primary text-sm" disabled={auto.status === 'saving'} onClick={() => auto.flush().then(() => toast.success('Enregistré'))}>Enregistrer maintenant</button>
+          <span className={`text-xs ${auto.status === 'error' ? 'text-red-600' : 'text-gray-500'}`}>{auto.label}</span>
+        </div>
       </div>
 
       <div className="card p-5 text-sm space-y-2">

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAutosave } from '@/lib/useAutosave';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { RotateCcw, AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
@@ -35,13 +36,27 @@ function Editor({ settings }: { settings: LinkedinSettings }) {
   const [msgs, setMsgs] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [relances, setRelances] = useState<Relance[]>([]);
+  // Chargé une seule fois : un rechargement des réglages ne doit pas écraser une saisie en cours
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    if (loaded) return;
     setMsgs({ ...TEMPLATE_DEFAULTS, ...(settings.msg_templates ?? {}) });
     setNotes(settings.note_templates ?? {});
     setRelances(relancesOf(settings as any));
-  }, [settings]);
+    setLoaded(true);
+  }, [settings, loaded]);
   const setRelance = (i: number, patch: Partial<Relance>) => setRelances(relances.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const all = msgs as Record<TemplateKey, string>;
+  // Enregistrement automatique (1,5 s après la frappe, et en quittant l'onglet ou la page)
+  const emptyRelance = relances.findIndex((r) => !r.cout_client.trim() && !r.regularite.trim());
+  const form = loaded ? { msgs, notes, relances } : null;
+  const persist = useCallback(async (f: { msgs: Record<string, string>; notes: Record<string, string>; relances: Relance[] }) => {
+    const msg_templates = Object.fromEntries(Object.entries(f.msgs).filter(([k, v]) => v.trim() && v.trim() !== TEMPLATE_DEFAULTS[k as TemplateKey]).map(([k, v]) => [k, v.trim()]));
+    const note_templates = Object.fromEntries(Object.entries(f.notes).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]));
+    await linkedinApi.saveSettings({ msg_templates, note_templates, relances: f.relances.map((r) => ({ delay_days: Math.max(1, Math.round(r.delay_days)), cout_client: r.cout_client.trim(), regularite: r.regularite.trim() })) });
+    qc.invalidateQueries({ queryKey: ['linkedin'] });
+  }, [qc]);
+  const auto = useAutosave(form, persist, { ready: loaded, blockedReason: emptyRelance >= 0 ? `R${emptyRelance + 1} sans texte (écris-le ou supprime la relance)` : null });
   const save = useMutation({
     mutationFn: () => {
       // Seuls les textes différents de l'original sont enregistrés
@@ -145,7 +160,8 @@ function Editor({ settings }: { settings: LinkedinSettings }) {
       </div>
 
       <div className="sticky bottom-4 flex justify-end">
-        <button className="btn-primary shadow-lg" disabled={save.isPending} onClick={() => save.mutate()}>Enregistrer les messages</button>
+        <span className={`self-center mr-3 text-xs px-2 py-1 rounded bg-white shadow ${auto.status === 'error' || emptyRelance >= 0 ? 'text-red-600' : 'text-gray-500'}`}>{auto.label}</span>
+        <button className="btn-primary shadow-lg" disabled={save.isPending} onClick={() => save.mutate()}>Enregistrer maintenant</button>
       </div>
     </div>
   );
