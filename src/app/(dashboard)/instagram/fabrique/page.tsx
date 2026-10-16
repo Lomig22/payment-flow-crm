@@ -40,6 +40,8 @@ function ReelCard({ r }: { r: FabriqueReel }) {
   });
   const st = state(r);
   const canReview = !!r.video_url && r.review_status === 'pending';
+  // Validé (automatiquement) mais pas encore publié : on peut encore le retirer
+  const canWithdraw = !!r.video_url && r.review_status === 'approved' && !r.published_at;
   return (
     <div className="card p-4 flex gap-4">
       <div className="w-[180px] flex-shrink-0">
@@ -61,9 +63,12 @@ function ReelCard({ r }: { r: FabriqueReel }) {
         <p className="text-sm text-gray-600 whitespace-pre-line line-clamp-5">{r.caption}</p>
         {r.error && !r.video_url && <p className="text-xs text-amber-700">{r.error}</p>}
         {r.queue_error && <p className="text-xs text-red-600">{r.queue_error}</p>}
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} disabled={!canReview}
-          placeholder={canReview ? 'Ton retour (rythme, texte, voix, visuels…) : Claude l\'appliquera aux prochains reels' : ''}
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} disabled={!canReview && !canWithdraw}
+          placeholder={canReview || canWithdraw ? 'Ton retour (rythme, texte, voix, visuels…) : Claude l\'appliquera aux prochains reels' : ''}
           className="input text-sm mt-auto disabled:bg-gray-50" />
+        {canWithdraw && (
+          <button onClick={() => review.mutate('reject')} disabled={review.isPending} className="btn-secondary inline-flex items-center gap-1.5 text-sm text-red-600 self-start"><X className="w-4 h-4" />Retirer (ne pas publier)</button>
+        )}
         {canReview && (
           <div className="flex gap-2">
             <button onClick={() => review.mutate('approve')} disabled={review.isPending} className="btn-primary inline-flex items-center gap-1.5 text-sm"><Check className="w-4 h-4" />Valider et programmer</button>
@@ -84,7 +89,7 @@ export default function FabriquePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Factory className="w-6 h-6 text-pink-500" />Fabrique de reels · @paymentflow</h1>
-        <p className="text-sm text-gray-500 mt-1">Chaque reel écrit par Claude arrive ici après son rendu. Rien n&apos;est publié sans ta validation. {todo > 0 && <b className="text-amber-700">{todo} à valider.</b>}</p>
+        <p className="text-sm text-gray-500 mt-1">Chaque jour, Claude écrit 10 reels ; ils sont rendus, voix off comprise, puis programmés automatiquement (10 créneaux par jour). Tu peux retirer un reel avant sa publication, avec un commentaire que Claude appliquera aux suivants. {todo > 0 && <b className="text-amber-700">{todo} à valider.</b>}</p>
       </div>
 
       <div className="card p-4">

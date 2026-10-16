@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 import { markUploaded } from '@/lib/queueProcess';
+import { parisMidnight } from '@/lib/autoSchedule';
 import PRONOUNCE from '../../motion/lib/pronounce.json';
 
 // Fabrique de reels du compte agence @paymentflow (sprint48, 14/10/2026).
@@ -259,12 +260,16 @@ async function voiceBudgetToday(): Promise<number> {
   const left = (s.character_limit ?? 0) - (s.character_count ?? 0) - CREDIT_RESERVE;
   const days = s.next_character_count_reset_unix ? Math.max(1, Math.ceil((s.next_character_count_reset_unix * 1000 - Date.now()) / 86_400_000)) : 30;
   const today = parisDay();
+  // Dépenses comptées le jour du RENDU (et non du plan : un reel écrit la veille et rendu aujourd'hui
+  // échappait au plafond, 16/10/2026)
+  const midnight = parisMidnight(new Date()).toISOString();
   const [{ data: spentRows }, { data: last }] = await Promise.all([
-    db().from('agency_reels').select('voice_credits').eq('day', today).gt('voice_credits', 0),
-    db().from('agency_reels').select('day').lt('day', today).gt('voice_credits', 0).order('day', { ascending: false }).limit(1),
+    db().from('agency_reels').select('voice_credits').gte('render_started_at', midnight).gt('voice_credits', 0),
+    db().from('agency_reels').select('render_started_at').lt('render_started_at', midnight).gt('voice_credits', 0).order('render_started_at', { ascending: false }).limit(1),
   ]);
   const spent = (spentRows ?? []).reduce((n: number, r: any) => n + r.voice_credits, 0);
-  const since = last?.[0]?.day ? Math.round((Date.parse(today) - Date.parse(last[0].day)) / 86_400_000) : 2;
+  const lastDay = last?.[0]?.render_started_at ? parisDay(new Date(last[0].render_started_at)) : null;
+  const since = lastDay ? Math.round((Date.parse(today) - Date.parse(lastDay)) / 86_400_000) : 2;
   const perDay = left / days;
   return Math.min(left, Math.floor(perDay * Math.min(3, Math.max(1, since)))) - spent;
 }
@@ -370,6 +375,14 @@ export async function markDone(id: string): Promise<void> {
   const { data: reel } = await db().from('agency_reels').select('queue_id').eq('id', id).single();
   if (!reel?.queue_id) throw new Error('Aucune entrée de file pour ce reel');
   await markUploaded(reel.queue_id);
+  // Validation automatique (10 reels/jour sans intervention, demande de Lomig du 16/10/2026) : le reel
+  // est programmé dès son traitement ; Lomig peut le retirer depuis la page Fabrique avant publication.
+  // AGENCY_AUTO_APPROVE=false : retour à la validation manuelle.
+  const auto = process.env.AGENCY_AUTO_APPROVE !== 'false';
+  await db().from('agency_reels').update({
+    status: 'uploaded', error: null, updated_at: new Date().toISOString(),
+    ...(auto ? { review_status: 'approved', reviewed_at: new Date().toISOString() } : {}),
+  }).eq('id', id).eq('review_status', 'pending');
   await db().from('agency_reels').update({ status: 'uploaded', error: null, updated_at: new Date().toISOString() }).eq('id', id);
 }
 
