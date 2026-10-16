@@ -94,18 +94,33 @@ export function hashDistance(a: string, b: string): number {
 }
 
 // Caractéristiques utiles d'une vidéo (lues dans la sortie d'ffmpeg)
-export async function probe(file: string): Promise<{ width: number; height: number; fps: number; audio: boolean; duration: number }> {
+export async function probe(file: string): Promise<{ width: number; height: number; fps: number; audio: boolean; duration: number; display_width: number; display_height: number }> {
   const { stderr } = await run(['-hide_banner', '-i', file, '-f', 'null', '-t', '0', '-']).catch((e) => ({ stderr: String(e.message), stdout: '' }));
   const v   = stderr.match(/Stream #0:\d+.*Video:.*?(\d{2,5})x(\d{2,5})/);
   const fps = stderr.match(/(\d+(?:\.\d+)?) fps/);
   const d   = stderr.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (!v) throw new Error('Vidéo illisible');
+  // Rotation (vidéos de téléphone stockées « couchées ») : dimensions telles qu'affichées
+  const rot = Math.abs(Number(stderr.match(/rotation of (-?\d+(?:\.\d+)?) degrees/)?.[1] ?? 0)) % 180;
   return {
     width: +v[1], height: +v[2],
+    display_width: rot === 90 ? +v[2] : +v[1], display_height: rot === 90 ? +v[1] : +v[2],
     fps: fps ? Math.min(60, Math.round(+fps[1])) : 30,
     audio: /Stream #0:\d+.*Audio:/.test(stderr),
     duration: d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0,
   };
+}
+
+// Reel horizontal (vidéo TikTok ou caméra en paysage) → vertical 1080 × 1920 : la vidéo entière au
+// centre, sur un fond flouté et assombri tiré d'elle-même (rien n'est coupé ni étiré)
+export async function reframeVertical(input: string, output: string): Promise<void> {
+  await run([
+    '-y', '-i', input,
+    '-filter_complex',
+    '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:3,eq=brightness=-0.12[bg];' +
+    '[0:v]scale=1080:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v]',
+    '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-c:a', 'copy', '-movflags', '+faststart', output,
+  ]);
 }
 
 // Prolongation de la séquence de fin : sa dernière image reste affichée en plus (temps de

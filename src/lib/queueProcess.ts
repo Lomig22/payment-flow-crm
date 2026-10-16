@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { supabase } from '@/lib/supabase';
-import { cleanVideo, extractFrames, imageDHash } from '@/lib/videoClean';
+import { cleanVideo, extractFrames, imageDHash, reframeVertical } from '@/lib/videoClean';
 import { findDuplicate, describeDuplicate, isFactoryFile } from '@/lib/duplicates';
 import { withEndCard } from '@/lib/endCard';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
@@ -103,6 +103,18 @@ export async function processQueueItem(id: string) {
     const report = await cleanVideo(tmpIn, tmpOut);
     if (!report.lossless) {
       throw new Error('Contrôle d\'intégrité échoué : la vidéo nettoyée ne correspond pas à l\'originale, elle ne sera pas publiée');
+    }
+
+    // Reel horizontal → vertical 1080 × 1920 (fond flouté) : publié tel quel, Instagram l'affichait
+    // en paysage (16/10/2026, vidéo TikTok 1920 × 1080)
+    if (row.format === 'reel') {
+      const dims = await probe(tmpOut);
+      if (dims.display_width > dims.display_height) {
+        const tmpV = path.join(os.tmpdir(), `${row.id}-vertical.mp4`);
+        await reframeVertical(tmpOut, tmpV);
+        await fs.rename(tmpV, tmpOut);
+        (report as any).reframed = { from: `${dims.display_width}x${dims.display_height}`, to: '1080x1920' };
+      }
     }
 
     // Reels : séquence de fin CTA ajoutée (si déposée) ; la vidéo publiée est cette version
