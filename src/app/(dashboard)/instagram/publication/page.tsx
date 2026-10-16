@@ -147,7 +147,7 @@ export default function PublicationPage() {
         toast.error(`${blocked.length} reel(s) en attente de voix off française : ${who}`, { duration: 7000 });
       }
       if (no_caption) toast.error(`${no_caption} reel(s) sans légende : à écrire avant de programmer`);
-      if (!scheduled && !blocked.length && !no_caption) toast.error('Aucun créneau libre dans les prochains jours');
+      if (!scheduled && !blocked.length && !no_caption) toast.error('Rien à programmer : aucun brouillon prêt, ou tous les créneaux des 30 prochains jours sont pris');
       refresh();
     },
     onError:   (e: any) => { toast.error(e.response?.data?.message ?? 'Erreur'); refresh(); },
