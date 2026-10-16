@@ -13,7 +13,9 @@ const SILENCE_MS = 15 * 60_000;
 
 export async function GET(_request: NextRequest) {
   const db = supabase as any;
-  const { data: s } = await db.from('linkedin_settings').select('last_seen_at').eq('id', 1).single();
+  const { data: s } = await db.from('linkedin_settings').select('last_seen_at, enabled').eq('id', 1).single();
+  // LinkedIn désactivé (compte bloqué le 16/10/2026, worker arrêté) : son silence est normal, pas d'alerte
+  if (!s?.enabled) return NextResponse.json({ state: 'paused' });
   const { data: last } = await db.from('linkedin_events').select('type, created_at')
     .in('type', ['vps_down', 'vps_up']).order('created_at', { ascending: false }).limit(1);
   const seen = s?.last_seen_at ? new Date(s.last_seen_at) : null;
