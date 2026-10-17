@@ -137,11 +137,15 @@ export async function nextTasks(limit: number): Promise<{ tasks: EmailTask[]; re
     .eq('status', 'in_sequence').lte('next_send_at', nowIso)
     .or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('next_send_at').limit(n * 2);
   // Relance encore prévue dans la séquence de son segment (avec / sans site)
-  const followups = (dueRows ?? []).filter((l: any) => l.step < seqOf(s, l.segment).length).slice(0, n);
+  // Un mail qui utilise {recommandations} attend que celles du lead soient calculées (emailReco.ts)
+  const usesReco = (seg: Segment, step: number) => /recommandation/i.test(JSON.stringify(seqOf(s, seg).find((x) => x.step === step) ?? {}));
+  const ready = (l: any) => !(l.segment === 'site' && !l.site_reco_at && usesReco(l.segment, l.step + 1));
+  const followups = (dueRows ?? []).filter((l: any) => l.step < seqOf(s, l.segment).length && ready(l)).slice(0, n);
   const rest = n - (followups?.length ?? 0);
-  const { data: firsts } = rest > 0
-    ? await db().from('email_leads').select('*').eq('status', 'new').or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('created_at').limit(rest)
+  const { data: firstRows } = rest > 0
+    ? await db().from('email_leads').select('*').eq('status', 'new').or(`claimed_at.is.null,claimed_at.lt.${freeIso}`).order('created_at').limit(rest * 3)
     : { data: [] };
+  const firsts = (firstRows ?? []).filter(ready).slice(0, rest);
 
   const tasks: EmailTask[] = [];
   for (const l of [...(followups ?? []), ...(firsts ?? [])]) {

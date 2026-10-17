@@ -8,6 +8,7 @@ export interface VarLead {
   email?: string | null; first_name?: string | null; last_name?: string | null; company?: string | null;
   job_title?: string | null; sector?: string | null; city?: string | null; website?: string | null;
   phone?: string | null; custom?: Record<string, unknown> | null;
+  site_reco?: { reco: string; constat: string }[] | null;   // recommandations sur son site (siteAudit.ts)
 }
 
 // Région à partir du département (métropole)
@@ -91,6 +92,9 @@ export function buildVars(l: VarLead): Record<string, string> {
     avis_google: hasNote && hasAvis ? `${fr(note)}/5 sur ${avis} avis Google` : '',
     // Présence en ligne
     site: domain, site_url: site, fiche_google: str(c.url_fiche_google),
+    // Recommandations sur son site : la liste complète, ou une par une
+    recommandations: (l.site_reco ?? []).map((r) => `– ${r.reco}`).join('\n'),
+    recommandation_1: l.site_reco?.[0]?.reco ?? '', recommandation_2: l.site_reco?.[1]?.reco ?? '', recommandation_3: l.site_reco?.[2]?.reco ?? '',
   };
   // Toute autre colonne du fichier importé : {nom_de_colonne}
   for (const [k, v] of Object.entries(c)) if (!(k in vars) && str(v)) vars[k] = str(v);
@@ -114,6 +118,8 @@ export const VARS_HELP: { key: string; label: string }[] = [
   { key: 'site', label: 'Site sans https ni www (« trahay.com ») — leads avec site' },
   { key: 'site_url', label: 'Adresse complète du site' },
   { key: 'fiche_google', label: 'Lien de la fiche Google Maps — leads sans site' },
+  { key: 'recommandations', label: 'Mes 3 recommandations sur son site (une par ligne) — leads avec site' },
+  { key: 'recommandation_1', label: 'La recommandation n° 1 seule (aussi _2 et _3)' },
   { key: 'bonjour', label: '« Bonjour Prénom », ou « Bonjour » sans prénom' },
   { key: 'prenom', label: 'Prénom (vide pour l\'instant : aucun prénom dans tes leads)' },
 ];
