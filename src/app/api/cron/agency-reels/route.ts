@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasCronKey } from '@/lib/cronAuth';
-import { planDay, fillStock, nextJob, uploadUrl, markDone, markFailed, AGENCY_ACCOUNT } from '@/lib/agencyReels';
+import { planDay, fillStock, nextJob, nextCover, coverDone, uploadUrl, markDone, markFailed, AGENCY_ACCOUNT } from '@/lib/agencyReels';
 import { autoScheduleDrafts } from '@/lib/autoSchedule';
 import { supabase } from '@/lib/supabase';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
     if (action === 'plan') return NextResponse.json(await planDay(request.nextUrl.searchParams.get('day') ?? undefined));
     // Stock de 7 jours d'avance : un lot par appel
     if (action === 'fill') return NextResponse.json(await fillStock());
+    // Couvertures standardisées : prochain reel sans couverture
+    if (action === 'cover_next') return NextResponse.json({ cover: await nextCover() });
     if (action === 'next') {
       // Au passage : les reels déjà traités par la file reçoivent leur créneau
       const scheduled = await autoScheduleDrafts(AGENCY_ACCOUNT).catch(() => 0);
@@ -41,6 +43,11 @@ export async function POST(request: NextRequest) {
   if (action === 'preview') {
     const { data, error: e } = await supabase.storage.from(MEDIA_BUCKET).createSignedUploadUrl('agency/apercu/modele.mp4', { upsert: true });
     return e || !data ? fail(e) : NextResponse.json({ upload_url: data.signedUrl });
+  }
+  if (action === 'cover_done') {
+    if (!id) return NextResponse.json({ message: 'id manquant' }, { status: 400 });
+    await coverDone(id);
+    return NextResponse.json({ ok: true });
   }
   if (!id) return NextResponse.json({ message: 'id manquant' }, { status: 400 });
   try {

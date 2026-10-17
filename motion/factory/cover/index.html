@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      @font-face { font-family: "Unbounded"; src: url("fonts/Unbounded-800.woff2") format("woff2"); font-weight: 800; }
+      @font-face { font-family: "DM Sans"; src: url("fonts/DMSans.woff2") format("woff2"); font-weight: 100 1000; }
+      /* Couverture standard des reels @paymentflow : tout le texte tient dans la zone 3:4 du centre
+         (y 240 → 1680), celle que la grille du profil affiche */
+      #halo { top: 260px; }
+      .cover { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 44px; padding: 300px 80px 300px; text-align: center; }
+      .tag { font-family: "DM Sans", sans-serif; font-size: 34px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+        color: #060a1e; background: #a9c4ff; padding: 12px 28px; border-radius: 999px; }
+      .title { font-family: "Unbounded", sans-serif; font-weight: 800; color: #f0f4ff; line-height: 1.04; letter-spacing: -0.035em; max-width: 920px; }
+      .title em { font-style: normal; color: #a9c4ff; }
+      .brand { display: flex; align-items: center; gap: 18px; font-family: "DM Sans", sans-serif; font-size: 34px; font-weight: 700; color: #b3c0e6; }
+      .brand img { width: 72px; height: 72px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="1">
+      <div id="stars" data-layout-ignore></div>
+      <div id="halo" data-layout-allow-overflow></div>
+      <div class="cover">
+        <div class="tag" id="tag"></div>
+        <div class="title" id="title"></div>
+        <div class="brand"><img src="logo.png" alt="" /><span>@paymentflow</span></div>
+      </div>
+    </div>
+    <script src="base.js"></script>
+    <script src="data.js"></script>
+    <script>
+      // Couverture : accroche du reel (text, sinon text2), étiquette (kicker, sinon le type de reel)
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const C = window.__PF_COVER || {};
+      PF.stars();
+      const text = C.text || "Plus de demandes de devis";
+      const n = text.replace(/\*/g, "").length;
+      const title = document.getElementById("title");
+      title.style.fontSize = (n <= 24 ? 112 : n <= 40 ? 96 : n <= 60 ? 82 : 70) + "px";
+      title.innerHTML = PF.rich(text);
+      document.getElementById("tag").textContent = C.tag || "Payment Flow";
+      tl.set("#root", { opacity: 1 }, 0);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

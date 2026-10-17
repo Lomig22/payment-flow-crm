@@ -446,3 +446,31 @@ export async function reviewReel(id: string, action: 'approve' | 'reject', feedb
   const { autoScheduleDrafts } = await import('@/lib/autoSchedule');
   return { scheduled: await autoScheduleDrafts(reel.account_username, true) };
 }
+
+// ── Couvertures standardisées (accroche du reel sur fond de marque), générées par le VPS ──
+
+// Prochain reel de la fabrique, programmé ou en brouillon, sans couverture : son accroche et l'URL
+// signée pour déposer l'image
+export async function nextCover(): Promise<null | { queue_id: string; tag: string; text: string; upload_url: string }> {
+  const { data: rows } = await db().from('agency_reels').select('id, funnel, spec, queue_id').not('queue_id', 'is', null).neq('review_status', 'rejected')
+    .order('created_at', { ascending: true }).limit(500);
+  const ids = (rows ?? []).map((r: any) => r.queue_id);
+  if (!ids.length) return null;
+  const todo = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await db().from('content_queue').select('id').in('id', ids.slice(i, i + 200)).in('status', ['draft', 'scheduled']).is('cover_url', null);
+    for (const q of data ?? []) todo.add(q.id);
+  }
+  const r = (rows ?? []).find((x: any) => todo.has(x.queue_id));
+  if (!r) return null;
+  const hook = r.spec?.scenes?.find((x: any) => x.type === 'hook') ?? {};
+  const TAG: Record<Funnel, string> = { tofu: 'Astuce artisan', mofu: 'Méthode', bofu: 'Payment Flow' };
+  const { data: signed, error } = await supabase.storage.from(MEDIA_BUCKET).createSignedUploadUrl(`covers/${r.queue_id}.jpg`, { upsert: true });
+  if (error || !signed) throw new Error(error?.message ?? 'Stockage indisponible');
+  return { queue_id: r.queue_id, tag: hook.kicker || TAG[r.funnel as Funnel], text: hook.text || hook.text2 || r.spec?.scenes?.[0]?.title || '', upload_url: signed.signedUrl };
+}
+
+export async function coverDone(queueId: string): Promise<void> {
+  const url = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(`covers/${queueId}.jpg`).data.publicUrl;
+  await db().from('content_queue').update({ cover_url: url, updated_at: new Date().toISOString() }).eq('id', queueId);
+}

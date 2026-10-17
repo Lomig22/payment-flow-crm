@@ -19,6 +19,7 @@ export interface QueueRow {
   id: string; account_username: string; format: 'reel' | 'story'; caption: string | null;
   status: string; media_url: string | null; storage_path: string | null;
   ig_container_id: string | null; attempts: number;
+  cover_url?: string | null;   // couverture dédiée (reels de la fabrique), sinon la première image
 }
 
 async function update(id: string, fields: Record<string, unknown>) {
@@ -33,7 +34,7 @@ async function fail(row: QueueRow, message: string) {
 async function createContainer(row: QueueRow, tok: { ig_user_id: string; access_token: string }): Promise<string> {
   if (!row.media_url) throw new Error('Vidéo introuvable');
   const params: Record<string, string> = row.format === 'reel'
-    ? { media_type: 'REELS', video_url: row.media_url, caption: fixEscapedEmoji(row.caption ?? ''), share_to_feed: 'true' }
+    ? { media_type: 'REELS', video_url: row.media_url, caption: fixEscapedEmoji(row.caption ?? ''), share_to_feed: 'true', ...(row.cover_url ? { cover_url: row.cover_url } : {}) }
     : { media_type: 'STORIES', video_url: row.media_url };
   const c = await igPost<{ id: string }>(`${tok.ig_user_id}/media`, tok.access_token, params);
   await update(row.id, { ig_container_id: c.id, attempts: row.attempts + 1, error: null });
@@ -47,7 +48,7 @@ const PREPARE_AHEAD_MS = 25 * 60_000;
 async function prepareUpcoming(deadline: number): Promise<number> {
   const db = supabase as any;
   const { data: rows } = await db.from('content_queue')
-    .select('id, account_username, format, caption, status, media_url, storage_path, ig_container_id, attempts, clean_report')
+    .select('id, account_username, format, caption, status, media_url, storage_path, ig_container_id, attempts, clean_report, cover_url')
     .eq('status', 'scheduled').is('ig_container_id', null)
     .gt('scheduled_at', new Date().toISOString())
     .lte('scheduled_at', new Date(Date.now() + PREPARE_AHEAD_MS).toISOString())
@@ -165,7 +166,7 @@ export async function publishDue(budgetMs: number): Promise<{ id: string; status
   const db = supabase as any;
   const { data: rows } = await db
     .from('content_queue')
-    .select('id, account_username, format, caption, status, media_url, storage_path, ig_container_id, attempts, clean_report')
+    .select('id, account_username, format, caption, status, media_url, storage_path, ig_container_id, attempts, clean_report, cover_url')
     .or(`status.eq.publishing,and(status.eq.scheduled,scheduled_at.lte.${new Date().toISOString()})`)
     .order('scheduled_at', { ascending: true })
     .limit(10);

@@ -3,11 +3,13 @@
 window.PF = (function () {
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // Texte sûr ; *mot* → mot en couleur d'accent
-  const rich = (s) => esc(s).replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  // Espace insécable avant ? ! : ; (typographie française : la ponctuation ne part pas seule à la ligne)
+  const nb = (s) => String(s ?? "").replace(/\s+([?!:;»])/g, "\u00A0$1").replace(/«\s+/g, "«\u00A0");
+  const rich = (s) => esc(nb(s)).replace(/\*([^*]+)\*/g, "<em>$1</em>");
   // Texte découpé en mots (animation mot par mot) ; *mot* → mot en couleur d'accent
   const words = (s) => {
     let em = false;
-    return esc(s).split(/\s+/).filter(Boolean).map((w) => {
+    return esc(nb(s)).split(/ +/).filter(Boolean).map((w) => {
       const open = w.startsWith("*"), close = w.endsWith("*") && (w.length > 1 || em);
       if (open) em = true;
       const cls = em ? "w em" : "w";
