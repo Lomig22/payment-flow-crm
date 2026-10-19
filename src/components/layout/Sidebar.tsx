@@ -163,6 +163,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             <NavLink href="/linkedin/leads" icon={Users} label="Leads" onClick={onClose} />
             <NavLink href="/linkedin/pipeline" icon={Kanban} label="Pipeline" onClick={onClose} />
             <NavLink href="/linkedin/validation" icon={CheckSquare} label="À valider" onClick={onClose} />
+            <NavLink href="/linkedin/posts" icon={CalendarClock} label="Posts automatiques" onClick={onClose} />
             <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Organisation</p>
             <NavLink href="/linkedin" icon={Gauge} label="Pilotage" onClick={onClose} exact />
             <NavLink href="/linkedin/messages" icon={MessageSquare} label="Messages" onClick={onClose} />

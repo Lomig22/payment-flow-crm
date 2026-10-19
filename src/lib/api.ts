@@ -475,6 +475,16 @@ export const fabriqueApi = {
   review: (id: string, action: 'approve' | 'reject', feedback?: string) => api.post<{ scheduled: number }>(`/instagram/fabrique/${id}`, { action, feedback }),
 };
 
+// ── Posts LinkedIn automatiques (profil de Lomig) ──
+export interface LinkedinPost { id: string; scheduled_at: string; topic: string | null; body: string; photo_id: string | null; photo_url: string | null;
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'; post_urn: string | null; error: string | null; feedback: string | null; published_at: string | null }
+export interface LinkedinPhoto { id: string; storage_path: string; url: string; uses: number }
+export const linkedinPostsApi = {
+  list:   () => api.get<{ connection: { connected: boolean; name?: string; expires_at?: string }; photos: LinkedinPhoto[]; posts: LinkedinPost[] }>('/linkedin/posts'),
+  action: (body: Record<string, unknown>) => api.post('/linkedin/posts', body),
+  connectUrl: () => api.get<{ url: string }>('/linkedin/oauth/start'),
+};
+
 // ── Emailing (envois par l'agent Hermès) ──
 export interface EmailStepCfg { step: number; delay_days: number; subject: string; body: string }
 export type EmailSegment = 'site' | 'no_site';
