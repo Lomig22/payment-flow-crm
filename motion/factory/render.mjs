@@ -17,6 +17,8 @@ const PIPER = process.env.PIPER_PYTHON ?? "/opt/piper/venv/bin/python";
 const PIPER_VOICES = process.env.PIPER_VOICES ?? "/opt/piper/voices";
 const PIPER_MODEL = process.env.PIPER_MODEL ?? "fr_FR-tom-medium";
 const PIPER_SPEED = process.env.PIPER_LENGTH_SCALE ?? "0.95";   // ≈ ×1,05, jamais plus rapide (brief du 19/10/2026)
+// Gabarit : « template » (v2) ou « template-v3 » (bureau de chantier, nuit → jour)
+const TEMPLATE = process.env.FACTORY_TEMPLATE ?? "template";
 if (!KEY) { console.error("CRON_SECRET manquant"); process.exit(1); }
 
 const api = async (method, query, body) => {
@@ -36,8 +38,9 @@ log("rendu", job.id, job.funnel, job.tts ? `${job.tts.lines.length} voix ${job.t
 try {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "vo"), { recursive: true });
-  cpSync(join(HERE, "template", "index.html"), join(dir, "index.html"));
+  cpSync(join(HERE, TEMPLATE, "index.html"), join(dir, "index.html"));
   for (const f of ["base.css", "base.js", "beats.js", "logo.png"]) cpSync(join(HERE, "shared", f), join(dir, f));
+  if (TEMPLATE !== "template") cpSync(join(HERE, "shared", "v3", "arc.js"), join(dir, "arc.js"));
   cpSync(join(HERE, "shared", "fonts"), join(dir, "fonts"), { recursive: true });
   writeFileSync(join(dir, "hyperframes.json"), JSON.stringify({ media: { autoProxy: true } }));
   writeFileSync(join(dir, "data.json"), JSON.stringify(job.data));

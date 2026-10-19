@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="fr" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      @font-face { font-family: "Unbounded"; src: url("fonts/Unbounded-800.woff2") format("woff2"); font-weight: 800; }
+      @font-face { font-family: "DM Sans"; src: url("fonts/DMSans.woff2") format("woff2"); font-weight: 100 1000; }
+      @font-face { font-family: "Jost"; src: url("fonts/Jost-wght-500.woff2") format("woff2"); font-weight: 500; }
+      @font-face { font-family: "Jost"; src: url("fonts/Jost-wght-700.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "Caveat"; src: url("fonts/Caveat-wght-700.woff2") format("woff2"); font-weight: 700; }
+
+      /* ── Décor unique : le bureau de chantier, filmé par une caméra qui se déplace ── */
+      #cam { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 0; transform-origin: 0 0; }
+      #cam svg { display: block; width: 1080px; height: 1920px; }
+      #grade { position: absolute; inset: 0; z-index: 1; background: #02040f; opacity: 0.5; }
+      #split { position: absolute; inset: 0; z-index: 1; opacity: 0; display: flex; }
+      #split > div { flex: 1; }
+      #split .l { background: rgba(2, 4, 15, 0.62); border-right: 4px solid #5186fd; }
+      #split .r { background: rgba(251, 191, 36, 0.16); }
+      .neon { filter: drop-shadow(0 0 10px rgba(81, 134, 253, 0.9)) drop-shadow(0 0 26px rgba(81, 134, 253, 0.55)); }
+
+      /* Composants repris du gabarit v2 */
+      .bar { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #233a78; color: #b3c0e6; }
+      .bar .d { width: 14px; height: 14px; border-radius: 50%; background: #3d4f8f; }
+      .bar .t { margin-left: 10px; font-weight: 700; color: #f0f4ff; }
+      .bar .c { margin-left: auto; color: #a9c4ff; font-family: "JetBrains Mono", monospace; }
+      .item { display: flex; align-items: center; gap: 20px; background: #16224a; border-radius: 20px; }
+      .item.top { border: 3px solid #fbbf24; }
+      .item .rk, .item .av { width: 56px; height: 56px; border-radius: 16px; background: #2f62e0; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 26px; flex-shrink: 0; }
+      .item .n { font-weight: 700; }
+      .item .s { color: #b3c0e6; margin-top: 4px; }
+      .item .badge { margin-left: auto; padding: 8px 16px; border-radius: 999px; background: #34d399; color: #060a1e; font-size: 22px; font-weight: 800; }
+      .search { display: flex; align-items: center; gap: 16px; border: 3px solid #3d4f8f; border-radius: 999px; font-weight: 700; }
+      .vs-label { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #b3c0e6; }
+      .offer { border-color: #2f62e0; }
+      .offer .row { align-items: flex-start; }
+      .offer .row b { font-weight: 700; }
+      .name { font-family: "Unbounded", sans-serif; font-weight: 800; letter-spacing: -0.02em; text-shadow: 0 4px 24px rgba(2, 4, 15, 0.8); }
+      .w.em { margin: 0 0.12em; }
+
+      /* ── Étiquettes : sur fond sombre, dans la moitié haute (le décor reste visible autour) ── */
+      .scene-content { padding: 270px 60px 850px; gap: 18px; justify-content: center; }
+      .emo { font-size: 92px; line-height: 1; filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6)); }
+      .title, .hook, .hook2 { background: rgba(6, 10, 30, 0.8); padding: 16px 28px 20px; border-radius: 26px; box-shadow: 0 20px 60px rgba(2, 4, 15, 0.6); }
+      .hook2 { background: rgba(47, 98, 224, 0.88); color: #f0f4ff; }
+      .sub { background: rgba(6, 10, 30, 0.78); padding: 10px 22px; border-radius: 18px; color: #d6e0ff; }
+      .kicker { background: rgba(6, 10, 30, 0.8); }
+      .card { width: 920px; padding: 26px 30px; gap: 14px; background: rgba(9, 14, 38, 0.86); }
+      .row { font-size: 36px; }
+      .notif { width: 920px; padding: 16px 22px; }
+      .notif .ic { font-size: 34px; background: #2f62e0; }
+      .num { background: rgba(6, 10, 30, 0.8); padding: 10px 36px; border-radius: 30px; color: #a9c4ff; }
+      .note { background: rgba(6, 10, 30, 0.8); padding: 6px 16px; border-radius: 12px; color: #b3c0e6; }
+      .bar { font-size: 26px; padding: 16px 24px; margin: -26px -30px 2px; }
+      .item { padding: 14px 18px; }
+      .item .n { font-size: 32px; }
+      .item .s { font-size: 26px; }
+      .search { font-size: 38px; min-height: 76px; padding: 14px 24px; }
+      .bubble { font-size: 34px; padding: 18px 26px; }
+      .cal { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+      .cal .day { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 700; color: #b3c0e6; text-align: center; margin-bottom: 8px; }
+      .cal .col { display: flex; flex-direction: column; gap: 8px; min-height: 230px; background: rgba(22, 34, 74, 0.6); border-radius: 14px; padding: 8px; }
+      .cal .slot { background: #2f62e0; border-radius: 10px; padding: 10px 8px; font-size: 22px; font-weight: 700; line-height: 1.15; text-align: center; }
+      /* Avant / après, côte à côte */
+      .vs { display: flex; gap: 22px; width: 960px; }
+      .vs .card { width: auto; flex: 1; gap: 12px; padding: 22px 22px; }
+      .vs .row { font-size: 30px; gap: 12px; align-items: flex-start; }
+      .vs .ck, .vs .ko { width: 44px; height: 44px; font-size: 22px; }
+      .vs .head { font-family: "Unbounded", sans-serif; font-weight: 800; font-size: 30px; display: flex; align-items: center; gap: 10px; }
+      .vs .head span { font-size: 46px; }
+      .mini { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 6px; }
+      .mini i { display: block; height: 30px; border-radius: 6px; border: 2px dashed #3d4f8f; }
+      .mini.full i { border: 0; background: #5186fd; }
+      .mini.full i:nth-child(3n) { background: #fbbf24; }
+      .card.night { background: rgba(4, 7, 22, 0.9); border-color: #233a78; }
+      .card.day { background: rgba(15, 23, 54, 0.92); border-color: #fbbf24; box-shadow: 0 30px 100px rgba(251, 191, 36, 0.25); }
+      /* Fin */
+      .mark { width: 120px; height: 120px; }
+      .name { font-size: 54px; }
+      .offer .row { font-size: 34px; }
+      .offer b.n15 { color: #fbbf24; font-variant-numeric: tabular-nums; }
+      .hand { font-family: "Caveat", cursive; font-weight: 700; font-size: 112px; line-height: 1; color: #fbbf24; text-shadow: 0 6px 30px rgba(2, 4, 15, 0.8); clip-path: inset(0 100% 0 0); }
+
+      /* ── Sous-titres : mot par mot, Jost 54 px, juste sous le centre, hors des zones d'Instagram ── */
+      #caps { position: absolute; z-index: 6; left: 110px; width: 860px; top: 1112px; height: 230px; }
+      .cap { position: absolute; left: 0; right: 0; top: 0; text-align: center; opacity: 0; font-family: "Jost", sans-serif; font-weight: 700; font-size: 54px; line-height: 1.22; color: #ffffff;
+        text-shadow: 0 3px 0 rgba(2, 4, 15, 0.9), 0 0 24px rgba(2, 4, 15, 0.95), 0 0 6px rgba(2, 4, 15, 1); }
+      .cw { display: inline-block; }
+      .cw.key { color: #a9c4ff; }
+      .cw.nb { color: #fbbf24; }
+      #prog { top: 240px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-start="0" data-duration="20">
+      <div id="cam" data-layout-ignore>
+        <svg viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g-night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030616" /><stop offset="1" stop-color="#14205a" /></linearGradient>
+            <linearGradient id="g-dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5186fd" /><stop offset="0.55" stop-color="#f6a85c" /><stop offset="1" stop-color="#fde68a" /></linearGradient>
+            <radialGradient id="g-warm" cx="0.75" cy="0.3" r="0.8"><stop offset="0" stop-color="#fbbf24" stop-opacity="0.55" /><stop offset="1" stop-color="#fbbf24" stop-opacity="0" /></radialGradient>
+            <radialGradient id="g-lamp" cx="0.5" cy="0" r="0.9"><stop offset="0" stop-color="#a9c4ff" stop-opacity="0.55" /><stop offset="1" stop-color="#a9c4ff" stop-opacity="0" /></radialGradient>
+            <radialGradient id="g-phone" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#5186fd" stop-opacity="0.9" /><stop offset="1" stop-color="#5186fd" stop-opacity="0" /></radialGradient>
+            <clipPath id="c-win"><rect x="610" y="390" width="380" height="430" rx="8" /></clipPath>
+          </defs>
+          <!-- Mur et sol -->
+          <rect id="wall" x="0" y="0" width="1080" height="1340" fill="#0a1230" />
+          <rect x="0" y="1340" width="1080" height="580" fill="#060b1f" />
+          <line x1="0" y1="1340" x2="1080" y2="1340" stroke="#1c2b66" stroke-width="4" />
+          <rect id="warm" x="0" y="0" width="1080" height="1920" fill="url(#g-warm)" opacity="0" />
+          <!-- Fenêtre : ciel, lune, soleil, camionnette -->
+          <g clip-path="url(#c-win)">
+            <rect x="610" y="390" width="380" height="430" fill="url(#g-night)" />
+            <rect id="sky-dawn" x="610" y="390" width="380" height="430" fill="url(#g-dawn)" opacity="0" />
+            <circle id="moon" cx="900" cy="470" r="34" fill="#e3ecff" opacity="0.9" />
+            <circle id="sun" cx="760" cy="900" r="70" fill="#fde68a" />
+            <g id="stars-win" fill="#c9dbff"><circle cx="660" cy="430" r="3" /><circle cx="720" cy="500" r="2" /><circle cx="830" cy="420" r="2.5" /><circle cx="960" cy="560" r="2" /><circle cx="690" cy="610" r="2" /></g>
+            <!-- Camionnette garée dehors -->
+            <g id="van">
+              <rect x="630" y="700" width="230" height="86" rx="14" fill="#0b1430" stroke="#5186fd" stroke-width="4" />
+              <path d="M860 718 h56 l40 40 v28 h-96 z" fill="#0b1430" stroke="#5186fd" stroke-width="4" />
+              <rect x="872" y="728" width="40" height="28" rx="4" fill="#14205a" />
+              <circle cx="690" cy="792" r="22" fill="#02040f" stroke="#5186fd" stroke-width="4" />
+              <circle cx="900" cy="792" r="22" fill="#02040f" stroke="#5186fd" stroke-width="4" />
+              <text x="745" y="756" text-anchor="middle" font-family="Unbounded" font-size="22" fill="#a9c4ff">PF</text>
+              <ellipse id="van-light" cx="968" cy="770" rx="40" ry="16" fill="#fde68a" opacity="0" />
+            </g>
+            <rect x="610" y="808" width="380" height="20" fill="#02040f" />
+          </g>
+          <rect x="604" y="384" width="392" height="442" rx="10" fill="none" stroke="#2a3f86" stroke-width="12" />
+          <line x1="800" y1="384" x2="800" y2="826" stroke="#2a3f86" stroke-width="8" />
+          <line x1="604" y1="600" x2="996" y2="600" stroke="#2a3f86" stroke-width="8" />
+          <!-- Horloge -->
+          <g id="clock" transform="translate(800 220)">
+            <circle r="74" fill="#0f1736" stroke="#5186fd" stroke-width="6" class="neon" />
+            <g stroke="#a9c4ff" stroke-width="5" stroke-linecap="round"><line y1="-60" y2="-50" /><line x1="60" x2="50" /><line y1="60" y2="50" /><line x1="-60" x2="-50" /></g>
+            <line id="hand-h" y2="-34" stroke="#f0f4ff" stroke-width="8" stroke-linecap="round" transform="rotate(95)" />
+            <line id="hand-m" y2="-52" stroke="#f0f4ff" stroke-width="5" stroke-linecap="round" transform="rotate(10)" />
+            <line id="hand-s" y2="-58" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" />
+            <circle r="7" fill="#fbbf24" />
+          </g>
+          <!-- Planning mural -->
+          <g id="planner">
+            <rect x="70" y="330" width="470" height="500" rx="18" fill="#0f1736" stroke="#5186fd" stroke-width="6" class="neon" />
+            <text x="305" y="392" text-anchor="middle" font-family="Unbounded" font-size="34" fill="#f0f4ff" letter-spacing="2">PLANNING</text>
+            <g font-family="JetBrains Mono, monospace" font-size="20" font-weight="700" fill="#a9c4ff" text-anchor="middle">
+              <text x="122" y="436">LUN</text><text x="214" y="436">MAR</text><text x="306" y="436">MER</text><text x="398" y="436">JEU</text><text x="490" y="436">VEN</text>
+            </g>
+            <g id="pl-grid" fill="none" stroke="#2a3f86" stroke-width="3" stroke-dasharray="8 6"></g>
+            <g id="pl-fill"></g>
+            <g id="pl-empty" transform="translate(305 640) rotate(-12)">
+              <rect x="-150" y="-50" width="300" height="100" rx="14" fill="none" stroke="#f87171" stroke-width="7" />
+              <text y="22" text-anchor="middle" font-family="Unbounded" font-size="58" fill="#f87171">VIDE</text>
+            </g>
+          </g>
+          <!-- Fil d'or : du téléphone au planning -->
+          <path id="thread" d="M705 1060 C 690 900, 520 980, 470 830" fill="none" stroke="#fbbf24" stroke-width="7" stroke-linecap="round" opacity="0" style="filter: drop-shadow(0 0 12px rgba(251,191,36,0.9))" />
+          <!-- Lampe de bureau -->
+          <g id="lamp">
+            <polygon id="lamp-glow" points="150,1020 40,1270 330,1270 230,1020" fill="url(#g-lamp)" />
+            <path d="M190 1262 v-40 l-40 -160 l70 -40" fill="none" stroke="#5186fd" stroke-width="8" stroke-linecap="round" class="neon" />
+            <path d="M150 1000 l80 -50 l40 60 z" fill="#0f1736" stroke="#5186fd" stroke-width="6" class="neon" />
+          </g>
+          <!-- Bureau -->
+          <rect x="40" y="1262" width="1000" height="34" rx="8" fill="#14205a" stroke="#5186fd" stroke-width="5" class="neon" />
+          <rect x="80" y="1296" width="22" height="300" fill="#0b1430" /><rect x="980" y="1296" width="22" height="300" fill="#0b1430" />
+          <!-- Personnage : silhouette à l'encre, contour néon -->
+          <g id="char" class="neon">
+            <path d="M300 1600 v-200 h170 v200" fill="none" stroke="#5186fd" stroke-width="7" />
+            <path d="M330 1400 c-10 -130 10 -260 90 -300 c80 30 110 160 100 300 z" fill="#050816" stroke="#5186fd" stroke-width="7" />
+            <path d="M470 1160 c60 30 110 60 170 100" fill="none" stroke="#5186fd" stroke-width="22" stroke-linecap="round" />
+            <path d="M470 1160 c60 30 110 60 170 100" fill="none" stroke="#050816" stroke-width="10" stroke-linecap="round" />
+            <path d="M420 1400 l20 190 l90 0" fill="none" stroke="#5186fd" stroke-width="7" />
+            <g id="head"><circle cx="425" cy="1030" r="62" fill="#050816" stroke="#5186fd" stroke-width="7" /><path d="M368 1004 q55 -60 116 -6" fill="#5186fd" opacity="0.5" /></g>
+          </g>
+          <!-- Téléphone sur son support -->
+          <g id="phone">
+            <ellipse id="ph-glow" cx="705" cy="1150" rx="170" ry="170" fill="url(#g-phone)" opacity="0" />
+            <rect x="648" y="1046" width="114" height="210" rx="18" fill="#02040f" stroke="#5186fd" stroke-width="6" class="neon" />
+            <rect id="ph-screen" x="658" y="1060" width="94" height="180" rx="10" fill="#0b1022" />
+            <text id="ph-icon" x="705" y="1150" text-anchor="middle" font-size="42">📵</text>
+            <g id="ph-badge" transform="translate(752 1046)" opacity="0"><circle r="34" fill="#fbbf24" /><text id="ph-count" y="13" text-anchor="middle" font-family="Unbounded" font-size="32" fill="#060a1e">0</text></g>
+          </g>
+          <!-- Boucle au sol : prospection → chantier → planning vide -->
+          <g id="loop" opacity="0">
+            <ellipse id="loop-path" cx="540" cy="1660" rx="420" ry="120" fill="none" stroke="#5186fd" stroke-width="8" stroke-dasharray="26 18" class="neon" />
+            <polygon points="960,1650 940,1690 985,1680" fill="#5186fd" /><polygon points="120,1670 140,1630 95,1640" fill="#5186fd" />
+            <g font-family="Jost" font-weight="700" font-size="36" text-anchor="middle">
+              <g id="lp0"><rect x="40" y="1510" width="300" height="62" rx="31" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="190" y="1553" fill="#f0f4ff">🔍 Prospection</text></g>
+              <g id="lp1"><rect x="740" y="1510" width="300" height="62" rx="31" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="890" y="1553" fill="#f0f4ff">🔨 Chantier</text></g>
+              <g id="lp2"><rect x="360" y="1750" width="360" height="62" rx="31" fill="#060a1e" stroke="#f87171" stroke-width="3" /><text x="540" y="1793" fill="#f87171">📅 Planning vide</text></g>
+            </g>
+          </g>
+          <!-- La boucle devient une cage -->
+          <g id="cage" stroke="#a9c4ff" stroke-width="9" stroke-linecap="round" opacity="0.9"></g>
+        </svg>
+      </div>
+      <div id="grade" data-layout-ignore></div>
+      <div id="split" data-layout-ignore><div class="l"></div><div class="r"></div></div>
+      <div id="scenes" data-layout-allow-overflow></div>
+      <div id="caps" data-layout-allow-overflow></div>
+      <div id="halo-beat" data-layout-ignore></div>
+      <div id="flash" data-layout-ignore></div>
+      <div id="prog" data-layout-ignore><div id="prog-fill"></div></div>
+      <audio id="audio" data-start="0" data-duration="20" data-track-index="10" src="audio.wav" data-volume="1"></audio>
+    </div>
+
+    <script src="base.js"></script>
+    <script src="beats.js"></script>
+    <script src="arc.js"></script>
+    <script src="data.js"></script>
+    <script src="timing.js"></script>
+    <script>
+      // Reel v3 : un seul décor (bureau de chantier), arc nuit → aube → matin, caméra qui se déplace dans
+      // le décor, étiquettes sur fond sombre, sous-titres mot par mot calés sur la voix.
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const D = window.__PF_DATA, PT = window.__PF_T, T = PT.T, END = PT.END, VD = PT.VD || [], LEAD = PT.LEAD || 0.08;
+      const A = window.PF_ARC, { words, rich, esc } = PF;
+      const K = PF.kit(tl, END);
+      const S = D.scenes, DAWN = A.dawn(S), TD = T[DAWN];
+      const size = (s, steps) => { const n = String(s || "").length; for (const [max, px] of steps) if (n <= max) return px; return steps[steps.length - 1][1]; };
+      const W = (id, text, steps, cls) => `<div class="${cls || "title"}" id="${id}" style="font-size:${size(text, steps)}px">${words(text)}</div>`;
+      const TITLE = [[22, 64], [40, 56], [999, 48]];
+      const initials = (n) => String(n || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+      const NS = "http://www.w3.org/2000/svg";
+      const svgEl = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); document.getElementById(parent).appendChild(e); return e; };
+      const EMO = { hook: "🌙", checklist: "✅", versus: "⚖️", number: "📈", search: "🔍", leads: "📩", chat: "💬", notifs: "📲", calendar: "📅" };
+      const emo = (s, i) => (s.type === "point" ? (i < DAWN ? "😩" : "💡") : s.type === "hook" ? (i < DAWN ? "🌙" : "☀️") : EMO[s.type] || "");
+      const E = (s, i) => (emo(s, i) ? `<div class="emo" id="s${i}-e">${emo(s, i)}</div>` : "");
+
+      // ── Planning mural : grille vide, créneaux qui se remplissent au lever du jour ──
+      const COLX = [82, 174, 266, 358, 450], ROWY = [456, 540, 624, 708];
+      COLX.forEach((x) => ROWY.forEach((y) => svgEl("rect", { x, y, width: 80, height: 70, rx: 10 }, "pl-grid")));
+      const FILL = [[0, 0], [1, 1], [2, 0], [3, 2], [4, 1], [0, 2], [2, 3], [1, 0], [3, 0], [4, 3], [2, 1], [0, 3]];
+      FILL.forEach(([c, r], k) => svgEl("rect", { id: `pf${k}`, x: COLX[c], y: ROWY[r], width: 80, height: 70, rx: 10, fill: k % 3 === 2 ? "#fbbf24" : "#5186fd", opacity: 0 }, "pl-fill"));
+      // Barreaux de la cage (autour du personnage)
+      for (let k = 0; k < 9; k++) { const x = 170 + k * 92; svgEl("line", { id: `cb${k}`, x1: x, y1: 980, x2: x, y2: 1700, opacity: 0 }, "cage"); }
+      const cageTop = svgEl("line", { id: "cb-top", x1: 160, y1: 980, x2: 920, y2: 980, opacity: 0 }, "cage");
+
+      // ── Caméra : points d'intérêt du décor [x, y, zoom] ──
+      const FOCUS = {
+        wide: [540, 960, 1], head: [425, 1040, 2.0], loop: [540, 1560, 1.3], phone: [705, 1150, 2.1],
+        planner: [305, 600, 1.75], window: [800, 640, 1.6], desk: [560, 1150, 1.45],
+      };
+      const camAt = (name, zoom) => {
+        const [fx, fy, z0] = FOCUS[name], s = z0 * (zoom || 1), SY = name === "wide" ? 960 : 800;
+        const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+        return { x: clamp(540 - fx * s, 1080 - 1080 * s, 0), y: clamp(SY - fy * s, 1920 - 1920 * s, 0), scale: s };
+      };
+      let pre = 0;
+      const camOf = (s, i) => {
+        if (i === 0) return "wide";
+        if (s.type === "cta") return "window";
+        if (s.type === "versus") return "wide";
+        if (i < DAWN) return pre++ % 2 ? "head" : "loop";
+        return { notifs: "phone", leads: "phone", chat: "phone", search: "phone", calendar: "planner", checklist: "planner", number: "desk", point: "head" }[s.type] || "desk";
+      };
+
+      // ── Scènes : étiquettes (état final) + animations aux temps forts (beats.js) ──
+      const SCENES = {
+        hook: {
+          html: (s, i) => `${E(s, i)}${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
+            ${W(`s${i}-a`, s.text, [[28, 92], [48, 78], [70, 66], [999, 58]], "hook")}
+            ${s.text2 ? W(`s${i}-b`, s.text2, [[30, 72], [55, 60], [999, 52]], "hook2") : ""}`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.slide(`#s${i}-k`, t + 0.02, -1);
+            K.words(`#s${i}-a`, t + b.words, 0.06);
+            if (s.text2) tl.fromTo(`#s${i}-b`, { opacity: 0, scale: 1.4, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.26, ease: "power4.out" }, t + b.text2);
+          },
+        },
+        point: {
+          html: (s, i) => `${E(s, i)}${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
+            ${s.num ? `<div class="num" id="s${i}-n">${esc(s.num)}</div>` : ""}
+            ${W(`s${i}-t`, s.title, TITLE)}
+            ${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) tl.fromTo(`#s${i}-k`, { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" }, t + b.kicker);
+            if (s.num) tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 2.2, rotation: -10 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.28, ease: "power4.out" }, t + b.num);
+            K.words(`#s${i}-t`, t + b.words);
+            if (s.sub) tl.fromTo(`#s${i}-s`, { opacity: 0, y: 24, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: "sine.out" }, t + b.sub);
+          },
+        },
+        checklist: {
+          html: (s, i) => `${E(s, i)}${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
+            ${W(`s${i}-t`, s.title, [[24, 62], [44, 54], [999, 46]])}
+            <div class="card" id="s${i}-c">${(s.items || []).map((it, j) => `<div class="row" id="s${i}-r${j}"><span class="${s.icon === "ko" ? "ko" : "ck"}">${s.icon === "ko" ? "✕" : "✓"}</span><span>${rich(it)}</span></div>`).join("")}</div>`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.fade(`#s${i}-k`, t + b.kicker);
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              K.slide(`#s${i}-r${j}`, t + at, j % 2 ? 1 : -1);
+              tl.fromTo(`#s${i}-r${j} > span:first-child`, { scale: 0, rotation: -60 }, { scale: 1, rotation: 0, duration: 0.24, ease: "back.out(3)" }, t + at + 0.08);
+            });
+          },
+        },
+        versus: {
+          // Écran partagé : la nuit (planning vide) à gauche, le jour (planning plein) à droite
+          html: (s, i) => `${W(`s${i}-t`, s.title, [[24, 58], [44, 50], [999, 44]])}
+            <div class="vs">
+              <div class="card night" id="s${i}-l"><div class="head"><span>🌙</span>${esc(s.left?.label || "Avant")}</div>${(s.left?.items || []).map((it) => `<div class="row"><span class="ko">✕</span><span>${rich(it)}</span></div>`).join("")}<div class="mini">${"<i></i>".repeat(10)}</div></div>
+              <div class="card day" id="s${i}-r"><div class="head"><span>☀️</span>${esc(s.right?.label || "Après")}</div>${(s.right?.items || []).map((it) => `<div class="row"><span class="ck">✓</span><span>${rich(it)}</span></div>`).join("")}<div class="mini full">${"<i></i>".repeat(10)}</div></div>
+            </div>`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            tl.fromTo(`#s${i}-l`, { opacity: 0, x: -200 }, { opacity: 1, x: 0, duration: 0.3, ease: "power4.out" }, t + b.left);
+            tl.fromTo(`#s${i}-l .row`, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.2, ease: "power2.out", stagger: 0.12 }, t + b.left + 0.15);
+            tl.fromTo(`#s${i}-r`, { opacity: 0, x: 220, scale: 0.92 }, { opacity: 1, x: 0, scale: 1, duration: 0.32, ease: "back.out(1.7)" }, t + b.right);
+            tl.fromTo(`#s${i}-r .row`, { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.2, ease: "expo.out", stagger: 0.12 }, t + b.right + 0.15);
+            tl.fromTo(`#s${i}-r .mini i`, { scale: 0 }, { scale: 1, duration: 0.18, ease: "back.out(3)", stagger: 0.05 }, t + b.right + 0.4);
+            // Le décor se coupe en deux le temps de la scène
+            tl.fromTo("#split", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "sine.out" }, t + 0.05);
+            tl.to("#split", { opacity: 0, duration: 0.3, ease: "sine.in" }, t + d - 0.2);
+          },
+        },
+        number: {
+          html: (s, i) => `${E(s, i)}${s.kicker ? `<div class="kicker" id="s${i}-k">${esc(s.kicker)}</div>` : ""}
+            <div class="num mono" id="s${i}-n" style="font-size:${String(s.prefix || "").length + String(s.value).length + String(s.suffix || "").length > 6 ? 120 : 170}px">${esc(s.prefix || "")}0${esc(s.suffix || "")}</div>
+            ${W(`s${i}-t`, s.label, [[24, 56], [44, 50], [999, 44]])}
+            ${s.note ? `<div class="note" id="s${i}-o">${esc(s.note)}</div>` : ""}`,
+          anim: (s, i, t, d, b) => {
+            if (s.kicker) K.fade(`#s${i}-k`, t + b.kicker);
+            tl.fromTo(`#s${i}-n`, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2)" }, t + b.num);
+            K.count(`#s${i}-n`, 0, Number(s.value) || 0, t + b.count, 0.85, (v) => `${s.prefix || ""}${Math.round(v).toLocaleString("fr-FR")}${s.suffix || ""}`);
+            tl.fromTo(`#s${i}-n`, { scale: 1 }, { scale: 1.14, duration: 0.12, ease: "power2.out", yoyo: true, repeat: 1 }, t + b.shake);
+            K.words(`#s${i}-t`, t + b.words);
+            if (s.note) K.fade(`#s${i}-o`, t + b.note);
+          },
+        },
+        search: {
+          html: (s, i) => `${E(s, i)}${W(`s${i}-t`, s.title, [[24, 60], [44, 52], [999, 46]])}
+            <div class="card" id="s${i}-c">
+              <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">Recherche</span></div>
+              <div class="search"><span class="lens">🔍</span><span id="s${i}-q"></span></div>
+              <div class="item top" id="s${i}-r0"><div class="rk">1</div><div><div class="n">${esc(s.business || "Ton entreprise")}</div><div class="s">📍 Le premier qu'on appelle</div></div></div>
+              <div class="item" id="s${i}-r1"><div class="rk">2</div><div><div class="n">Concurrent A</div></div></div>
+              <div class="item" id="s${i}-r2"><div class="rk">3</div><div><div class="n">Concurrent B</div></div></div>
+            </div>`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            const q = String(s.query || ""), o = { n: 0 };
+            tl.to(o, { n: q.length, duration: 0.5, ease: "none", onUpdate: () => { document.getElementById("s" + i + "-q").textContent = q.slice(0, Math.round(o.n)); } }, t + b.type);
+            tl.fromTo(`#s${i}-r0`, { opacity: 0, y: 40, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.28, ease: "back.out(2)" }, t + b.results);
+            tl.fromTo(`#s${i}-r1`, { opacity: 0, y: 30 }, { opacity: 0.55, y: 0, duration: 0.22, ease: "power3.out" }, t + b.results + 0.12);
+            tl.fromTo(`#s${i}-r2`, { opacity: 0, y: 30 }, { opacity: 0.4, y: 0, duration: 0.22, ease: "power2.out" }, t + b.results + 0.22);
+            tl.fromTo(`#s${i}-r0`, { boxShadow: "0 0 0 0 rgba(251,191,36,0)" }, { boxShadow: "0 0 0 8px rgba(251,191,36,0.9)", duration: 0.25, ease: "power2.out" }, t + b.glow);
+          },
+        },
+        leads: {
+          html: (s, i) => `${E(s, i)}${W(`s${i}-t`, s.title, [[24, 60], [44, 52], [999, 46]])}
+            <div class="card" id="s${i}-c">
+              <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">📩 Demandes de devis</span><span class="c" id="s${i}-n">0</span></div>
+              ${(s.items || []).slice(0, 3).map((l, j) => `<div class="item" id="s${i}-l${j}"><div class="av">${esc(initials(l.name))}</div><div><div class="n">${esc(l.name)}</div><div class="s">${esc(l.project)}${l.budget ? ` · ${esc(l.budget)}` : ""}</div></div><div class="badge">Qualifié</div></div>`).join("")}
+            </div>`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              K.slide(`#s${i}-l${j}`, t + at, j % 2 ? 1 : -1);
+              tl.fromTo(`#s${i}-l${j} .badge`, { scale: 0 }, { scale: 1, duration: 0.22, ease: "back.out(3)" }, t + at + 0.15);
+            });
+            const n = Math.min(3, (s.items || []).length);
+            K.count(`#s${i}-n`, 0, Number(s.total) || n, t + b.items[0], b.notif - b.items[0], (v) => { const k = Math.round(v); return `${k} demande${k > 1 ? "s" : ""}`; });
+          },
+        },
+        chat: {
+          html: (s, i) => `${E(s, i)}${W(`s${i}-t`, s.title, [[24, 58], [44, 50], [999, 44]])}
+            <div class="card" id="s${i}-c" style="gap:12px">
+              <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">${esc(s.contact || "Client")}</span><span class="c">💬 SMS</span></div>
+              ${(s.messages || []).slice(0, 4).map((m, j) => `<div class="bubble ${m.from === "toi" ? "me" : "them"}" id="s${i}-m${j}">${esc(m.text)}</div>`).join("")}
+            </div>`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => {
+              const me = (s.messages[j] || {}).from === "toi";
+              tl.fromTo(`#s${i}-m${j}`, { opacity: 0, scale: 0.4, x: me ? 120 : -120, transformOrigin: me ? "right bottom" : "left bottom" }, { opacity: 1, scale: 1, x: 0, duration: 0.26, ease: "back.out(2.2)" }, t + at);
+            });
+          },
+        },
+        notifs: {
+          html: (s, i) => `${E(s, i)}${W(`s${i}-t`, s.title, [[24, 60], [44, 52], [999, 46]])}
+            ${(s.items || []).slice(0, 4).map((n, j) => `<div class="notif" id="s${i}-x${j}"><div class="ic">📩</div><div><div class="a">${esc(n.title)}</div><div class="b">${esc(n.sub || "")}</div></div></div>`).join("")}`,
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            b.items.forEach((at, j) => tl.fromTo(`#s${i}-x${j}`, { opacity: 0, y: -220, scale: 0.85, rotation: j % 2 ? 3 : -3 }, { opacity: 1, y: 0, scale: 1, rotation: 0, duration: 0.3, ease: "back.out(2.2)" }, t + at));
+            // Le téléphone du décor s'allume à chaque demande
+            b.items.forEach((at) => tl.fromTo("#ph-glow", { opacity: 0.4 }, { opacity: 1, duration: 0.12, ease: "power2.out", yoyo: true, repeat: 1, immediateRender: false }, t + at));
+          },
+        },
+        calendar: {
+          html: (s, i) => {
+            const cols = ["LUN", "MAR", "MER", "JEU", "VEN"].map((day, k) => `<div><div class="day">${day}</div><div class="col">${(s.slots || []).map((sl, j) => (sl.day === k ? `<div class="slot" id="s${i}-z${j}">${esc(sl.label)}</div>` : "")).join("")}</div></div>`).join("");
+            return `${E(s, i)}${W(`s${i}-t`, s.title, [[24, 60], [44, 52], [999, 46]])}${s.sub ? `<div class="sub" id="s${i}-s">${rich(s.sub)}</div>` : ""}
+              <div class="card" id="s${i}-c"><div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="t">📅 Ton planning</span></div><div class="cal">${cols}</div></div>`;
+          },
+          anim: (s, i, t, d, b) => {
+            K.words(`#s${i}-t`, t + b.words);
+            if (s.sub) K.fade(`#s${i}-s`, t + 0.3);
+            K.card(`#s${i}-c`, t + b.card);
+            b.items.forEach((at, j) => tl.fromTo(`#s${i}-z${j}`, { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.24, ease: "back.out(2.6)" }, t + at));
+          },
+        },
+        cta: {
+          html: (s, i) => s.mode === "offer"
+            ? `<img class="mark" id="s${i}-m" src="logo.png" alt="Payment Flow" /><div class="name" id="s${i}-na">PAYMENT FLOW</div>
+               <div class="pill" id="s${i}-p">💬 Écris <em>${esc(s.keyword || "DEVIS")}</em> en commentaire</div>
+               <div class="card offer" id="s${i}-c"><div class="vs-label" style="color:#a9c4ff">🎁 Tu reçois gratuitement</div>
+                 <div class="row" id="s${i}-o1"><span class="ck">✓</span><span>Un audit offert de ta visibilité, <b>avec Lomig</b></span></div>
+                 <div class="row" id="s${i}-o2"><span class="ck">✓</span><span>Ton plan d'action pour <b class="n15" id="s${i}-n15">+15</b> <b>demandes de devis</b> par semaine</span></div></div>
+               <div class="hand" id="s${i}-h">Remplis ton planning.</div>`
+            : `<img class="mark" id="s${i}-m" src="logo.png" alt="Payment Flow" />
+               ${W(`s${i}-t`, "Abonne-toi à *@paymentflow*", TITLE)}
+               <div class="sub" id="s${i}-s">${rich(s.line || "Chaque jour, une idée pour recevoir plus de demandes de devis")}</div>
+               <div class="pill" id="s${i}-p">💬 Écris <em>${esc(s.keyword || "DEVIS")}</em> : plan d'action offert</div>
+               <div class="hand" id="s${i}-h">Remplis ton planning.</div>`,
+          anim: (s, i, t, d, b) => {
+            tl.fromTo(`#s${i}-m`, { opacity: 0, scale: 0.2, rotation: -40 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.32, ease: "back.out(2.4)" }, t + b.mark);
+            if (s.mode === "offer") {
+              K.pop(`#s${i}-na`, t + b.name, "expo.out");
+              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.5)" }, t + b.pill);
+              tl.fromTo(`#s${i}-c`, { opacity: 0, y: 120 }, { opacity: 1, y: 0, duration: 0.32, ease: "power4.out" }, t + b.card);
+              K.slide(`#s${i}-o1`, t + b.o1, -1);
+              K.slide(`#s${i}-o2`, t + b.o2, 1);
+            } else {
+              K.words(`#s${i}-t`, t + b.words);
+              K.fade(`#s${i}-s`, t + b.sub);
+              tl.fromTo(`#s${i}-p`, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.4, ease: "elastic.out(1, 0.5)" }, t + b.pill);
+            }
+            // « Remplis ton planning. » écrit à la main, puis le bouton bat jusqu'à la fin
+            const hand = Math.max(t + b.pulse - 0.4, END - 2.4);
+            tl.fromTo(`#s${i}-h`, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 1.1, ease: "power1.inOut" }, hand);
+            const beats = Math.max(1, Math.floor((d - b.pulse - 0.4) / 0.5));
+            tl.to(`#s${i}-p`, { scale: 1.06, duration: 0.25, ease: "sine.inOut", yoyo: true, repeat: beats * 2 - 1 }, t + b.pulse);
+          },
+        },
+      };
+
+      // ── Construction ──
+      const box = document.getElementById("scenes");
+      S.forEach((s, i) => {
+        const el = document.createElement("div");
+        el.id = `s${i}`;
+        el.className = "scene" + (i === 0 ? " first" : "");
+        el.innerHTML = `<div class="scene-content" data-layout-allow-overflow>${SCENES[s.type].html(s, i)}</div>`;
+        box.appendChild(el);
+      });
+
+      // ── Sous-titres : chaque mot apparaît quand il est prononcé ──
+      const caps = document.getElementById("caps");
+      S.forEach((s, i) => {
+        if (!s.vo || !VD[i]) return;
+        const next = i + 1 < T.length ? T[i + 1] : END;
+        const lines = A.chunks(A.wordTimes(s.vo, T[i] + LEAD, VD[i]), 46);
+        lines.forEach((c, k) => {
+          const el = document.createElement("div");
+          el.className = "cap";
+          el.innerHTML = c.map((x) => `<span class="cw ${A.keyword(x.w)}">${esc(x.w)}</span>`).join(" ");
+          caps.appendChild(el);
+          const from = Math.max(T[i] + 0.02, c[0].at - 0.04);
+          const to = k + 1 < lines.length ? lines[k + 1][0].at - 0.04 : Math.min(next - 0.02, c[c.length - 1].at + 0.9);
+          tl.set(el, { opacity: 1 }, from);
+          tl.set(el, { opacity: 0 }, Math.max(from + 0.1, to));
+          el.querySelectorAll(".cw").forEach((w, j) => tl.fromTo(w, { opacity: 0, y: 16, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.14, ease: "back.out(2)" }, c[j].at));
+        });
+      });
+
+      // ── Décor : la nuit ──
+      K.progress();
+      tl.fromTo("#hand-s", { rotation: 0, svgOrigin: "0 0" }, { rotation: Math.round(END) * 6, svgOrigin: "0 0", duration: Math.round(END), ease: `steps(${Math.round(END)})` }, 0);
+      tl.fromTo("#hand-m", { rotation: 10, svgOrigin: "0 0" }, { rotation: 10 + END * 0.6, svgOrigin: "0 0", duration: END, ease: "none" }, 0);
+      tl.set("#head", { rotation: 14, svgOrigin: "425 1090" }, 0);
+      tl.fromTo("#lamp-glow", { opacity: 0.7 }, { opacity: 1, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: Math.max(1, Math.floor(TD / 1.2) - 1) }, 0);
+      // Boucle au sol (1re scène problème), puis la boucle devient une cage (2e scène problème)
+      const probs = S.map((s, i) => i).filter((i) => i > 0 && i < DAWN);
+      if (probs.length) {
+        const t0 = T[probs[0]] + 0.3, len = 1700;
+        tl.set("#loop", { opacity: 1 }, t0);
+        tl.fromTo("#loop-path", { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" }, t0);
+        tl.to("#loop-path", { strokeDashoffset: -880, duration: Math.max(0.5, TD - t0 - 1), ease: "none" }, t0 + 1);
+        ["#lp0", "#lp1", "#lp2"].forEach((id, k) => tl.fromTo(id, { opacity: 0, scale: 0.6, svgOrigin: ["190 1540", "890 1540", "540 1780"][k] }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t0 + 0.25 + k * 0.35));
+        const tc = probs.length > 1 ? T[probs[1]] + 0.3 : T[probs[0]] + Math.max(1.4, (TD - T[probs[0]]) * 0.6);
+        if (tc < TD - 0.4) {
+          for (let k = 0; k < 9; k++) tl.fromTo(`#cb${k}`, { opacity: 0, attr: { y1: 1700 } }, { opacity: 1, attr: { y1: 980 }, duration: 0.3, ease: "power3.out" }, tc + k * 0.05);
+          tl.fromTo("#cb-top", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, tc + 0.5);
+        }
+      }
+
+      // ── Le jour se lève : ciel, soleil, lumière, fil d'or et planning qui se remplit ──
+      tl.to("#sky-dawn", { opacity: 1, duration: 1.8, ease: "sine.inOut" }, TD);
+      tl.to("#moon", { opacity: 0, y: 60, duration: 1.2, ease: "power1.in" }, TD);
+      tl.to("#stars-win", { opacity: 0, duration: 1.0, ease: "power1.in" }, TD);
+      tl.fromTo("#sun", { attr: { cy: 900 } }, { attr: { cy: 520 }, duration: 2.6, ease: "power2.out" }, TD);
+      tl.to("#grade", { opacity: 0.2, duration: 1.8, ease: "sine.inOut" }, TD);
+      tl.to("#warm", { opacity: 1, duration: 2.0, ease: "sine.inOut" }, TD + 0.2);
+      tl.to("#lamp-glow", { opacity: 0, duration: 1.2, ease: "sine.out" }, TD + 0.3);
+      tl.to("#head", { rotation: 0, duration: 0.8, ease: "back.out(1.6)" }, TD + 0.3);
+      tl.to("#cage line", { opacity: 0, y: 260, duration: 0.5, ease: "power3.in", stagger: 0.03 }, TD + 0.05);
+      tl.to("#loop", { opacity: 0, duration: 0.6, ease: "sine.in" }, TD + 0.1);
+      tl.to("#ph-screen", { attr: { fill: "#1b2a5c" }, duration: 0.4, ease: "sine.out" }, TD + 0.2);
+      tl.to("#ph-icon", { opacity: 0, duration: 0.2, ease: "none" }, TD + 0.2);
+      tl.fromTo("#ph-glow", { opacity: 0 }, { opacity: 0.7, duration: 0.5, ease: "sine.out" }, TD + 0.3);
+      const thread = document.getElementById("thread"), tlen = Math.ceil(thread.getTotalLength());
+      tl.fromTo("#thread", { opacity: 1, strokeDasharray: tlen, strokeDashoffset: tlen }, { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" }, TD + 0.5);
+      tl.to("#pl-empty", { opacity: 0, scale: 0.6, svgOrigin: "305 640", duration: 0.3, ease: "back.in(2)" }, TD + 1.2);
+      FILL.forEach((_, k) => tl.fromTo(`#pf${k}`, { opacity: 0, scale: 0.4, svgOrigin: `${COLX[FILL[k][0]] + 40} ${ROWY[FILL[k][1]] + 35}` }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2.6)" }, TD + 1.4 + k * 0.12));
+      // La camionnette s'allume à la fin (on part au chantier)
+      const cta = S.findIndex((s) => s.type === "cta");
+      if (cta > 0) tl.fromTo("#van-light", { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power2.out" }, T[cta] + 0.25);
+
+      // ── Le chiffre prononcé (« quinze ») : le compteur du téléphone monte au même instant ──
+      const cue = A.counterCue(S, T, VD, LEAD);
+      if (cue) {
+        tl.fromTo("#ph-badge", { opacity: 0, scale: 0.2, svgOrigin: "752 1046" }, { opacity: 1, scale: 1, duration: 0.25, ease: "back.out(3)" }, cue.at - 0.1);
+        K.count("#ph-count", 0, cue.n, cue.at, 0.6, (v) => String(Math.round(v)));
+        tl.fromTo("#ph-glow", { opacity: 0.6 }, { opacity: 1, duration: 0.15, ease: "power2.out", yoyo: true, repeat: 3, immediateRender: false }, cue.at);
+        if (S[cue.scene].type === "cta" && cue.n === 15) {
+          const el = document.getElementById(`s${cue.scene}-n15`);
+          if (el) { K.count(`#s${cue.scene}-n15`, 0, 15, Math.max(cue.at, T[cue.scene] + 0.05), 0.6, (v) => `+${Math.round(v)}`); tl.fromTo(el, { scale: 1 }, { scale: 1.3, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 }, cue.at + 0.6); }
+        }
+      }
+
+      // ── Caméra et enchaînement des étiquettes ──
+      S.forEach((s, i) => {
+        const t = T[i], next = i + 1 < T.length ? T[i + 1] : END, d = next - t;
+        const shot = camOf(s, i);
+        if (i === 0) tl.fromTo("#cam", camAt("wide", 1.12), { ...camAt("head", 0.62), duration: d, ease: "sine.inOut" }, 0);
+        else {
+          tl.to("#cam", { ...camAt(shot), duration: 0.7, ease: "power3.inOut" }, t - 0.1);
+          // Fin : de la fenêtre, la caméra recule pour montrer la pièce en plein jour
+          const back = s.type === "cta" ? Math.min(END - 1.4, t + Math.max(1.6, d * 0.45)) : next;
+          tl.to("#cam", { ...camAt(shot, 1.05), duration: Math.max(0.3, back - t - 0.6), ease: "none" }, t + 0.6);
+          if (s.type === "cta") tl.to("#cam", { ...camAt("wide", 1.0), duration: 1.2, ease: "power2.inOut" }, back);
+        }
+        if (i > 0) K.swap(`#s${i - 1}`, `#s${i}`, t, (i - 1) % 2 ? 1 : 0);
+        SCENES[s.type].anim(s, i, t, d, PF_BEATS.times(s, d));
+        if (s.type !== "cta" && document.getElementById("s" + i + "-e")) tl.fromTo(`#s${i}-e`, { opacity: 0, scale: 0.2, rotation: -25 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.3, ease: "back.out(2.6)" }, t + 0.02);
+      });
+      K.fadeOut(`#s${S.length - 1} .scene-content`);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

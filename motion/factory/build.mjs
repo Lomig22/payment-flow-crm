@@ -24,6 +24,9 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 // Durées minimales et bruitages : beats.js (partagé avec le gabarit)
 createRequire(import.meta.url)("./shared/beats.js");
 const B = globalThis.PF_BEATS;
+// Gabarit v3 (bureau de chantier) : arc.js copié dans le dossier du reel par render.mjs
+const V3 = existsSync(join(dir, "arc.js"));
+if (V3) createRequire(import.meta.url)(join(dirname(fileURLToPath(import.meta.url)), "shared", "v3", "arc.js"));
 const read = (s) => clamp(0.5 + words(s) * 0.2, 0, 4);   // sans voix : lecture rapide (Reels)
 
 // 1. Voix : silences du début et de la fin retirés
@@ -45,10 +48,14 @@ const D = S.map((s, i) => {
 });
 for (let i = 0; i < S.length - 1; i++) T.push(Math.round((T[i] + D[i]) * 100) / 100);
 const END = Math.round((T[S.length - 1] + D[S.length - 1]) * 100) / 100;
-writeFileSync(join(dir, "timing.js"), `// Généré par build.mjs\nwindow.__PF_T = ${JSON.stringify({ T, END })};\n`);
+// VD : durée de chaque voix (sous-titres mot par mot du gabarit v3)
+const VD = vo.map((v) => (v ? Math.round(v.d * 1000) / 1000 : 0));
+writeFileSync(join(dir, "timing.js"), `// Généré par build.mjs\nwindow.__PF_T = ${JSON.stringify({ T, END, VD, LEAD })};\n`);
 writeFileSync(join(dir, "data.js"), `// Généré par build.mjs\nwindow.__PF_DATA = ${JSON.stringify(data)};\n`);
 
 // 3. Son
+if (V3) mixV3();
+else {
 const cues = [];
 S.forEach((s, i) => {
   if (i > 0) cues.push(["whoosh", T[i] - 0.06, 0.38]);
@@ -87,6 +94,70 @@ if (vlabels.length) {
   );
 }
 run([...inputs, "-filter_complex", parts.join(";"), "-map", "[out]", "-ar", "44100", "-ac", "2", join(dir, "audio.wav")]);
+}
+
+// Son du gabarit v3 : musique en deux temps (nuit → aube, fondu enchaîné au lever du jour), voix
+// ~10 dB au-dessus (la musique s'efface sous la voix), bruitages réalistes et discrets
+function mixV3() {
+  const A = globalThis.PF_ARC, V3DIR = join(dirname(SFX), "v3");
+  const dawnI = A.dawn(S), dawnT = T[dawnI];
+  const cues = [];   // [son, instant, volume, durée max]
+  const add = (name, at, vol, len) => at != null && at < END - 0.2 && cues.push([name, at, vol, len ?? 0]);
+  // Nuit : l'horloge tourne jusqu'au lever du jour
+  for (let at = 0; at < dawnT - 1; at += 6) add("tictac", at, 0.26, Math.min(6, dawnT - at));
+  add("oiseaux", dawnT + 0.15, 0.3);
+  S.forEach((s, i) => {
+    const t = B.times(s, D[i]), at = (x) => T[i] + x;
+    switch (s.type) {
+      case "notifs": t.items.forEach((x, j) => { add("vibration", at(x), 0.14, 0.7); add("notification", at(x) + 0.04, j % 2 ? 0.2 : 0.26, 1.2); }); break;
+      case "leads": t.items.forEach((x) => add("notification", at(x), 0.2, 1.2)); break;
+      case "chat": t.items.forEach((x, j) => (s.messages?.[j]?.from === "toi" ? null : add("notification", at(x), 0.2, 1.2))); break;
+      case "calendar": case "checklist": t.items.forEach((x) => add("stylo", at(x), 0.32, 0.6)); break;
+      case "search": add("typing", at(t.type), 0.18, 0.6); break;
+      case "cta": add("moteur", at(0.25), 0.26); break;
+    }
+  });
+  // Le chiffre prononcé (« quinze ») : le téléphone vibre et sonne au même instant
+  const cue = A.counterCue(S, T, VD, LEAD);
+  if (cue) { add("vibration", cue.at, 0.16, 0.8); add("notification", cue.at + 0.05, 0.3, 1.2); }
+
+  const inputs = [], parts = [], vl = [], fl = [];
+  let count = 0;
+  const n = () => count++;
+  vo.forEach((v, i) => {
+    if (!v) return;
+    const k = n(), ms = Math.round((T[i] + LEAD) * 1000);
+    inputs.push("-i", v.path);
+    parts.push(`[${k}]adelay=${ms}|${ms}[v${i}]`);
+    vl.push(`[v${i}]`);
+  });
+  cues.forEach(([name, at, vol, len], j) => {
+    const k = n(), ms = Math.round(Math.max(0, at) * 1000);
+    inputs.push("-i", join(name === "typing" ? SFX : V3DIR, `${name}.mp3`));
+    const trim = len ? `atrim=0:${len},afade=t=out:st=${Math.max(0, len - 0.25)}:d=0.25,` : "";
+    parts.push(`[${k}]${trim}volume=${vol},adelay=${ms}|${ms}[f${j}]`);
+    fl.push(`[f${j}]`);
+  });
+  // Musique : nuit (piano intime → tension) jusqu'à l'aube, puis aube (éclat majeur → accord chaud)
+  const night = n(); inputs.push("-stream_loop", "-1", "-i", join(V3DIR, "music-night.mp3"));
+  const day = n(); inputs.push("-stream_loop", "-1", "-i", join(V3DIR, "music-dawn.mp3"));
+  const xf = 1.2, dStart = Math.max(0, dawnT - 0.5), dLen = END - dStart;
+  parts.push(
+    `[${night}]atrim=0:${dawnT + 0.7},afade=t=in:d=0.4,afade=t=out:st=${Math.max(0, dawnT - 0.5)}:d=${xf},apad=whole_dur=${END}[mn]`,
+    `[${day}]atrim=0:${dLen},afade=t=in:d=${xf},afade=t=out:st=${Math.max(0, dLen - 1.5)}:d=1.5,adelay=${Math.round(dStart * 1000)}|${Math.round(dStart * 1000)},apad=whole_dur=${END}[md]`,
+    `[mn][md]amix=inputs=2:normalize=0,volume=0.7,atrim=0:${END}[mus]`,
+    `${fl.length ? fl.join("") + `amix=inputs=${fl.length}:normalize=0,` : "anullsrc=r=44100:cl=stereo,"}apad=whole_dur=${END},atrim=0:${END}[fx]`,
+  );
+  if (vl.length) parts.push(
+    `${vl.join("")}amix=inputs=${vl.length}:normalize=0,apad=whole_dur=${END},atrim=0:${END}[vo]`,
+    "[vo]asplit=2[vomix][key]",
+    // ~10 dB de réduction de la musique pendant la voix, retour en douceur dans les silences
+    "[mus][key]sidechaincompress=threshold=0.06:ratio=3:attack=25:release=500:knee=4[musd]",
+    `[vomix][musd][fx]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=0:${END}[out]`,
+  );
+  else parts.push(`[mus][fx]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=0:${END}[out]`);
+  run([...inputs, "-filter_complex", parts.join(";"), "-map", "[out]", "-ar", "44100", "-ac", "2", join(dir, "audio.wav")]);
+}
 
 // 4. Durée de la composition
 const idx = join(dir, "index.html");
