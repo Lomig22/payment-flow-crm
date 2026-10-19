@@ -31,7 +31,18 @@ export async function GET(request: NextRequest) {
   const dry = request.nextUrl.searchParams.get('dry') === '1';
   const db = supabase as any;
 
-  const { data: rows } = await db.from('content_queue').select('id, status, storage_path, crosspost, clean_report, updated_at');
+  const { data: rows } = await db.from('content_queue').select('id, status, storage_path, crosspost, clean_report, updated_at, published_at');
+  // YouTube n'accepte qu'un envoi par jour : un reel publié depuis plus de 3 jours qui attend encore
+  // YouTube sort de cette file (sa vidéo, gardée pour lui seul, faisait grossir le stockage)
+  const staleYt = (r: any) => r.status === 'published' && r.crosspost?.youtube?.status === 'pending'
+    && r.published_at && Date.now() - new Date(r.published_at).getTime() > 3 * 86_400_000;
+  const ytDropped = (rows ?? []).filter(staleYt);
+  if (!dry) {
+    for (const r of ytDropped) {
+      r.crosspost = { ...r.crosspost, youtube: { ...r.crosspost.youtube, status: 'skipped', reason: 'Plus de 3 jours après la publication : vidéo retirée du stockage' } };
+      await db.from('content_queue').update({ crosspost: r.crosspost }).eq('id', r.id);
+    }
+  }
   const weekAgo = Date.now() - 7 * 86_400_000;
   const byId = new Map<string, any>((rows ?? []).map((r: any) => [r.id, r]));
   const files = [...(await listAll('clean')), ...(await listAll('frames')), ...(await listAll('raw'))];
@@ -46,7 +57,7 @@ export async function GET(request: NextRequest) {
       continue;
     }
     if (row.status === 'published') {
-      const pending = Object.values(row.crosspost ?? {}).some((c: any) => c?.status === 'pending');
+      const pending = Object.entries(row.crosspost ?? {}).some(([p, c]: [string, any]) => c?.status === 'pending' && !(p === 'youtube' && staleYt(row)));
       if (!pending || f.name !== row.storage_path) remove.push({ ...f, why: 'reel publié' });
       continue;
     }
@@ -83,5 +94,5 @@ export async function GET(request: NextRequest) {
       .map((f) => f.name.split('/')[1].slice(0, 36))));
     if (cleaned.length) await db.from('content_queue').update({ storage_path: null, frame_paths: null }).in('id', cleaned);
   }
-  return NextResponse.json({ dry, supprimes: remove.length, mo: total(remove), detail: summary });
+  return NextResponse.json({ dry, supprimes: remove.length, mo: total(remove), detail: summary, youtube_retires: ytDropped.length });
 }
