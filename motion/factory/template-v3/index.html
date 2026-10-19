@@ -43,7 +43,7 @@
 
       /* ── Étiquettes : sur fond sombre, dans la moitié haute (le décor reste visible autour) ── */
       .scene-content { padding: 270px 60px 850px; gap: 18px; justify-content: center; }
-      .emo { font-size: 92px; line-height: 1; filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6)); }
+      .emo { font-size: 76px; line-height: 1; width: 132px; height: 132px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(6, 10, 30, 0.92); border: 3px solid rgba(81, 134, 253, 0.6); box-shadow: 0 16px 50px rgba(2, 4, 15, 0.7); }
       .title, .hook, .hook2 { background: rgba(6, 10, 30, 0.8); padding: 16px 28px 20px; border-radius: 26px; box-shadow: 0 20px 60px rgba(2, 4, 15, 0.6); }
       .hook2 { background: rgba(47, 98, 224, 0.88); color: #f0f4ff; }
       .sub { background: rgba(6, 10, 30, 0.78); padding: 10px 22px; border-radius: 18px; color: #d6e0ff; }
@@ -85,7 +85,7 @@
       .hand { font-family: "Caveat", cursive; font-weight: 700; font-size: 112px; line-height: 1; color: #fbbf24; text-shadow: 0 6px 30px rgba(2, 4, 15, 0.8); clip-path: inset(0 100% 0 0); }
 
       /* ── Sous-titres : mot par mot, Jost 54 px, juste sous le centre, hors des zones d'Instagram ── */
-      #caps { position: absolute; z-index: 6; left: 110px; width: 860px; top: 1112px; height: 230px; }
+      #caps { position: absolute; z-index: 6; left: 100px; width: 800px; top: 1112px; height: 230px; }
       .cap { position: absolute; left: 0; right: 0; top: 0; text-align: center; opacity: 0; font-family: "Jost", sans-serif; font-weight: 700; font-size: 54px; line-height: 1.22; color: #ffffff;
         text-shadow: 0 3px 0 rgba(2, 4, 15, 0.9), 0 0 24px rgba(2, 4, 15, 0.95), 0 0 6px rgba(2, 4, 15, 1); }
       .cw { display: inline-block; }
@@ -186,12 +186,12 @@
           </g>
           <!-- Boucle au sol : prospection → chantier → planning vide -->
           <g id="loop" opacity="0">
-            <ellipse id="loop-path" cx="540" cy="1660" rx="420" ry="120" fill="none" stroke="#5186fd" stroke-width="8" stroke-dasharray="26 18" class="neon" />
-            <polygon points="960,1650 940,1690 985,1680" fill="#5186fd" /><polygon points="120,1670 140,1630 95,1640" fill="#5186fd" />
+            <ellipse id="loop-path" cx="520" cy="1425" rx="330" ry="78" fill="none" stroke="#5186fd" stroke-width="8" stroke-dasharray="26 18" class="neon" />
+            <polygon points="850,1418 832,1452 868,1446" fill="#5186fd" /><polygon points="190,1432 208,1398 172,1404" fill="#5186fd" />
             <g font-family="Jost" font-weight="700" font-size="36" text-anchor="middle">
-              <g id="lp0"><rect x="40" y="1510" width="300" height="62" rx="31" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="190" y="1553" fill="#f0f4ff">🔍 Prospection</text></g>
-              <g id="lp1"><rect x="740" y="1510" width="300" height="62" rx="31" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="890" y="1553" fill="#f0f4ff">🔨 Chantier</text></g>
-              <g id="lp2"><rect x="360" y="1750" width="360" height="62" rx="31" fill="#060a1e" stroke="#f87171" stroke-width="3" /><text x="540" y="1793" fill="#f87171">📅 Planning vide</text></g>
+              <g id="lp0"><rect x="110" y="1330" width="290" height="58" rx="29" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="255" y="1371" fill="#f0f4ff">🔍 Prospection</text></g>
+              <g id="lp1"><rect x="600" y="1330" width="270" height="58" rx="29" fill="#060a1e" stroke="#5186fd" stroke-width="3" /><text x="735" y="1371" fill="#f0f4ff">🔨 Chantier</text></g>
+              <g id="lp2"><rect x="340" y="1398" width="360" height="58" rx="29" fill="#060a1e" stroke="#f87171" stroke-width="3" /><text x="520" y="1439" fill="#f87171">📅 Planning vide</text></g>
             </g>
           </g>
           <!-- La boucle devient une cage -->
@@ -221,6 +221,13 @@
       const D = window.__PF_DATA, PT = window.__PF_T, T = PT.T, END = PT.END, VD = PT.VD || [], LEAD = PT.LEAD || 0.08;
       const A = window.PF_ARC, { words, rich, esc } = PF;
       const K = PF.kit(tl, END);
+      // Mots qui tombent un par un ; le mot d'accent bat sans gonfler sur ses voisins
+      K.words = (sel, t, step) => {
+        tl.fromTo(`${sel} .w`, { opacity: 0, y: 70, rotationX: -70, scale: 0.8, transformPerspective: 900 },
+          { opacity: 1, y: 0, rotationX: 0, scale: 1, transformPerspective: 900, duration: 0.3, ease: "back.out(2)", stagger: step || 0.055 }, t);
+        const n = document.querySelectorAll(sel + " .w").length, after = t + n * (step || 0.055) + 0.2;
+        if (document.querySelector(sel + " .em")) tl.fromTo(`${sel} .em`, { scale: 1 }, { scale: 1.06, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 }, after);
+      };
       const S = D.scenes, DAWN = A.dawn(S), TD = T[DAWN];
       const size = (s, steps) => { const n = String(s || "").length; for (const [max, px] of steps) if (n <= max) return px; return steps[steps.length - 1][1]; };
       const W = (id, text, steps, cls) => `<div class="${cls || "title"}" id="${id}" style="font-size:${size(text, steps)}px">${words(text)}</div>`;
@@ -238,25 +245,24 @@
       const FILL = [[0, 0], [1, 1], [2, 0], [3, 2], [4, 1], [0, 2], [2, 3], [1, 0], [3, 0], [4, 3], [2, 1], [0, 3]];
       FILL.forEach(([c, r], k) => svgEl("rect", { id: `pf${k}`, x: COLX[c], y: ROWY[r], width: 80, height: 70, rx: 10, fill: k % 3 === 2 ? "#fbbf24" : "#5186fd", opacity: 0 }, "pl-fill"));
       // Barreaux de la cage (autour du personnage)
-      for (let k = 0; k < 9; k++) { const x = 170 + k * 92; svgEl("line", { id: `cb${k}`, x1: x, y1: 980, x2: x, y2: 1700, opacity: 0 }, "cage"); }
+      for (let k = 0; k < 9; k++) { const x = 170 + k * 92; svgEl("line", { id: `cb${k}`, x1: x, y1: 980, x2: x, y2: 1480, opacity: 0 }, "cage"); }
       const cageTop = svgEl("line", { id: "cb-top", x1: 160, y1: 980, x2: 920, y2: 980, opacity: 0 }, "cage");
 
       // ── Caméra : points d'intérêt du décor [x, y, zoom] ──
       const FOCUS = {
-        wide: [540, 960, 1], head: [425, 1040, 2.0], loop: [540, 1560, 1.3], phone: [705, 1150, 2.1],
-        planner: [305, 600, 1.75], window: [800, 640, 1.6], desk: [560, 1150, 1.45],
+        wide: [540, 960, 1], head: [425, 1040, 2.0], loop: [520, 1300, 1.06, 1300], phone: [705, 1150, 2.1],
+        planner: [305, 600, 1.75, 534], window: [830, 640, 1.75], desk: [560, 1150, 1.45],
       };
       const camAt = (name, zoom) => {
-        const [fx, fy, z0] = FOCUS[name], s = z0 * (zoom || 1), SY = name === "wide" ? 960 : 800;
+        const [fx, fy, z0, sy] = FOCUS[name], s = z0 * (zoom || 1), SY = sy || (name === "wide" ? 960 : 800);
         const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
         return { x: clamp(540 - fx * s, 1080 - 1080 * s, 0), y: clamp(SY - fy * s, 1920 - 1920 * s, 0), scale: s };
       };
-      let pre = 0;
       const camOf = (s, i) => {
         if (i === 0) return "wide";
         if (s.type === "cta") return "window";
         if (s.type === "versus") return "wide";
-        if (i < DAWN) return pre++ % 2 ? "head" : "loop";
+        if (i < DAWN) return "loop";   // la nuit : la boucle puis la cage, entières dans le cadre
         return { notifs: "phone", leads: "phone", chat: "phone", search: "phone", calendar: "planner", checklist: "planner", number: "desk", point: "head" }[s.type] || "desk";
       };
 
@@ -483,10 +489,10 @@
         tl.set("#loop", { opacity: 1 }, t0);
         tl.fromTo("#loop-path", { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" }, t0);
         tl.to("#loop-path", { strokeDashoffset: -880, duration: Math.max(0.5, TD - t0 - 1), ease: "none" }, t0 + 1);
-        ["#lp0", "#lp1", "#lp2"].forEach((id, k) => tl.fromTo(id, { opacity: 0, scale: 0.6, svgOrigin: ["190 1540", "890 1540", "540 1780"][k] }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t0 + 0.25 + k * 0.35));
+        ["#lp0", "#lp1", "#lp2"].forEach((id, k) => tl.fromTo(id, { opacity: 0, scale: 0.6, svgOrigin: ["255 1359", "735 1359", "520 1427"][k] }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t0 + 0.25 + k * 0.35));
         const tc = probs.length > 1 ? T[probs[1]] + 0.3 : T[probs[0]] + Math.max(1.4, (TD - T[probs[0]]) * 0.6);
         if (tc < TD - 0.4) {
-          for (let k = 0; k < 9; k++) tl.fromTo(`#cb${k}`, { opacity: 0, attr: { y1: 1700 } }, { opacity: 1, attr: { y1: 980 }, duration: 0.3, ease: "power3.out" }, tc + k * 0.05);
+          for (let k = 0; k < 9; k++) tl.fromTo(`#cb${k}`, { opacity: 0, attr: { y1: 1480 } }, { opacity: 1, attr: { y1: 980 }, duration: 0.3, ease: "power3.out" }, tc + k * 0.05);
           tl.fromTo("#cb-top", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, tc + 0.5);
         }
       }
