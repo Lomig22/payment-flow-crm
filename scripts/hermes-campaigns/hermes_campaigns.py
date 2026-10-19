@@ -74,7 +74,8 @@ def campaigns():
             continue
         stem = os.path.splitext(os.path.basename(f))[0]
         for r in csv.DictReader(open(path, encoding='utf-8')):
-            if r.get('statut_envoi') != 'envoye' or not r.get('message_id'):
+            # Envoyé : un identifiant Gmail, quel que soit le statut (Hermès passe la ligne en « a_repondu » quand on lui répond)
+            if not r.get('message_id') or (r.get('statut_envoi') or '').upper() == 'ERREUR':
                 continue
             day = (r.get('date_envoi') or '')[:10]
             word = re.sub(r'\W+', '', (r.get('objet') or 'mail').split(' ')[0].lower()) or 'mail'
@@ -82,6 +83,16 @@ def campaigns():
             c = out.setdefault(cid, {'id': cid, 'name': f"{word.capitalize()} · {day[8:10]}/{day[5:7]}", 'source': f, 'messages': []})
             c['messages'].append({'gmail_id': r['message_id'], 'email': r['email'].strip().lower(), 'company': r.get('entreprise'),
                                   'subject': r.get('objet'), 'sent_at': iso_local(r.get('date_envoi', ''))})
+    # Nom lisible : début d'objet commun à tous les mails de la campagne (« Votre vidéo … », « maquette »)
+    for c in out.values():
+        subj = [(m['subject'] or '').split() for m in c['messages']]
+        common = []
+        for words in zip(*subj):
+            if len(set(w.lower() for w in words)) > 1:
+                break
+            common.append(words[0])
+        day = c['id'][-10:]
+        c['name'] = f"{' '.join(common[:6]) or c['name'].split(' · ')[0]} · {day[8:10]}/{day[5:7]}"
     return out
 
 
