@@ -19,11 +19,12 @@ const LEASE_MS = 30 * 60_000;
 // Voix : Anatole (voix partagée française), modèle flash (0,5 crédit par caractère)
 const VOICE_ID = process.env.AGENCY_VOICE_ID ?? 'Jrq4GqCKqYpigdQsZRkP';
 const TTS_MODEL = 'eleven_flash_v2_5';
-const VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.8, style: 0.3, speed: 1.12, use_speaker_boost: true };
+// Débit : jamais plus de ×1,05 (brief des reels du 19/10/2026)
+const VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.8, style: 0.3, speed: 1.05, use_speaker_boost: true };
 const CREDIT_RESERVE = Number(process.env.AGENCY_VOICE_RESERVE ?? 500);
 // Phrases de fin : toujours les mêmes, donc générées une seule fois (cache)
 // « Écris DEVIS en commentaire » : « Commente » était entendu « Commande » avec la voix Piper
-export const OFFER_VO  = "Écris DEVIS en commentaire : je t'offre ton audit et ton plan d'action pour quinze demandes de devis de plus par mois.";
+export const OFFER_VO  = "Écris DEVIS en commentaire : je t'offre ton audit et ton plan d'action pour quinze demandes de devis de plus par semaine.";
 export const FOLLOW_VO = "Abonne-toi, et écris DEVIS en commentaire pour recevoir ton plan d'action offert.";
 // Voix des reels : « local » = Piper sur le VPS (gratuit, sans clé, défaut) ; « cloud » = Google si la
 // clé existe, sinon ElevenLabs dans la limite des crédits
@@ -83,7 +84,9 @@ const SYSTEM = `Tu écris des reels Instagram (vidéos verticales en motion desi
 
 CIBLE : artisans et entreprises du bâtiment et de l'habitat (plombiers, électriciens, cuisinistes, menuisiers, couvreurs, paysagistes, peintres, chauffagistes, maçons…) qui font moins de 10 000 € de chiffre d'affaires par mois. Ils veulent plus de demandes de devis qualifiées chaque mois, sans avoir à s'en occuper, pour rester concentrés sur leur métier, et être plus visibles. Tutoiement, phrases courtes, vocabulaire de chantier, zéro jargon marketing.
 
-CE QUE FAIT PAYMENT FLOW : rendre l'artisan visible là où ses clients le cherchent (Google, fiche Google, publicités, réseaux sociaux), lui apporter des demandes de devis déjà qualifiées (projet, budget, délai), gérer tout le reste (réponses, relances, prises de rendez-vous) pendant qu'il reste sur ses chantiers.
+CE QUE FAIT PAYMENT FLOW : un flux régulier de demandes de devis déjà qualifiées (projet, budget, délai) pour l'artisan, qui reste sur ses chantiers pendant qu'on gère tout le reste (réponses, relances, prises de rendez-vous). Plus de 250 artisans accompagnés partout en France (chiffre vérifié, utilisable tel quel).
+ON VEND LE RÉSULTAT, JAMAIS LES MOYENS : demandes de devis, chantiers signés, planning plein, chiffre d'affaires. Ne cite jamais « Meta Ads », « Google Ads », « publicité », « pub » ni « campagne », ni à l'écran ni dans la voix.
+UNIVERS : un artisan dans son bureau de chantier (téléphone, planning mural, camionnette par la fenêtre). Le problème se vit la nuit (planning vide, téléphone muet, appels manqués), la solution fait lever le jour (notifications de demandes, planning qui se remplit). Écris les scènes dans cet ordre : problème d'abord, solution ensuite.
 
 FORMAT REEL : l'attention se gagne à la seconde. Rythme très rapide, une idée par scène, une coupe toutes les 2 à 3 secondes. Le reel fait 15 à 25 secondes au total.
 - 6 à 8 scènes avant la scène finale (cta).
@@ -102,7 +105,7 @@ TYPES DE SCÈNES (champs utilisés ; les autres : chaîne vide, 0 ou liste vide)
 - checklist : kicker (facultatif), title (≤ 32 car.), items (3 ou 4, ≤ 30 car. chacun), icon « ok » (à faire) ou « ko » (à éviter).
 - versus : title (≤ 28 car.), left_label / right_label (≤ 16 car., ex. « Aujourd'hui » / « Ce qu'il faut »), left_items et right_items (2 ou 3 chacun, ≤ 28 car.).
 - number : kicker (facultatif), value (entier), prefix / suffix (facultatifs, ex. « + », « € », « % »), label (≤ 36 car.), note (obligatoire si le chiffre n'est pas un simple calcul : « Exemple »).
-- search : title (≤ 28 car.), query (recherche Google réaliste, ex. « plombier nantes »), business (ex. « Ton entreprise · Plombier »).
+- search : title (≤ 28 car.), query (recherche réaliste d'un particulier, ex. « plombier nantes »), business (ex. « Ton entreprise · Plombier »). Le titre parle d'être trouvé par les clients, jamais d'outil ou de publicité.
 - leads : title (≤ 28 car.), total (entier, 8 à 20), leads (exactement 3 : prénom + initiale, projet ≤ 22 car., budget réaliste).
 - chat : title (≤ 28 car.), contact (prénom du client), messages (2 à 4 SMS ≤ 55 car., from « client » ou « toi ») : une relance, une réponse rapide, une prise de rendez-vous…
 - notifs : title (≤ 28 car.), notifs (2 à 4 notifications : title ≤ 26 car. ex. « Nouvelle demande de devis », sub ≤ 38 car.).
@@ -114,9 +117,9 @@ VOIX OFF (vo) : naturelle à l'oral, tutoiement, nombres en toutes lettres, pas 
 
 RÈGLES ABSOLUES :
 - N'invente jamais de statistique, d'étude, de client, de témoignage ni de résultat garanti. Un chiffre n'est permis que comme exemple explicite (note « Exemple ») ou calcul simple et vrai.
-- Pas de promesse chiffrée en dehors de l'offre : audit gratuit avec Lomig et plan d'action pour +15 demandes de devis par mois.
+- Pas de promesse chiffrée en dehors de l'offre (audit gratuit avec Lomig et plan d'action pour +15 demandes de devis par semaine) et du fait vérifié « plus de 250 artisans accompagnés ». Jamais « garanti », ni de délai promis (« dès la première semaine »).
 - Chaque reel a un sujet différent des autres et de l'historique fourni. Varie les métiers, les angles et les accroches.
-- Légende (caption) : 2 ou 3 phrases courtes qui prolongent le reel, puis une ligne « 👉 Commente DEVIS : audit gratuit + ton plan d'action pour +15 demandes de devis par mois. ». Pas de hashtag dans caption. Hashtags : 5 à 8, en minuscules, sans espace, avec #.`;
+- Légende (caption) : 2 ou 3 phrases courtes qui prolongent le reel, puis une ligne « 👉 Commente DEVIS : audit gratuit + ton plan d'action pour +15 demandes de devis par semaine. ». Pas de hashtag dans caption. Hashtags : 5 à 8, en minuscules, sans espace, avec #.`;
 
 interface RawScene { [k: string]: any }
 interface RawReel { funnel: Funnel; topic: string; scenes: RawScene[]; caption: string; hashtags: string[] }
@@ -154,11 +157,15 @@ export function toTemplateScene(s: RawScene, funnel: Funnel): Record<string, any
   }
 }
 
+const BANNED_MEANS = /meta\s*ads|google\s*ads|campagnes?\b|publicit|\bpubs?\b|garanti/i;
+
 export function normalizeReel(r: RawReel): { funnel: Funnel; topic: string; scenes: Record<string, any>[]; caption: string } | null {
   if (!['tofu', 'mofu', 'bofu'].includes(r?.funnel) || !Array.isArray(r.scenes)) return null;
   const body = r.scenes.filter((s) => s?.type !== 'cta').map((s) => toTemplateScene(s, r.funnel)).filter(Boolean).slice(0, 8) as Record<string, any>[];
   // Chaque scène parlée (un reel sans voix ne retient personne), au moins 5 scènes avant la fin
   if (body.length < 5 || body[0].type !== 'hook' || body.some((x) => !x.vo)) return null;
+  // Règle de marque : on vend le résultat, jamais les moyens (ni à l'écran ni dans la voix)
+  if (BANNED_MEANS.test(JSON.stringify(body) + ' ' + String(r.caption ?? ''))) return null;
   const cta = r.funnel === 'tofu' ? { type: 'cta', mode: 'follow', keyword: 'DEVIS', vo: FOLLOW_VO } : { type: 'cta', mode: 'offer', keyword: 'DEVIS', vo: OFFER_VO };
   const tags = (r.hashtags ?? []).map((h) => '#' + String(h).replace(/^#+/, '').replace(/\s+/g, '').toLowerCase()).filter((h) => h.length > 2).slice(0, 8);
   const caption = `${String(r.caption ?? '').trim()}\n\n${tags.join(' ')}`.trim().slice(0, 2200);
@@ -254,7 +261,7 @@ export const pronounce = (t: string, rules = RULES) => rules.reduce((x, [k, v]) 
 // Voix Google (Chirp 3 HD, gratuite jusqu'à 1 million de caractères par mois) dès que la clé est
 // configurée ; sinon Anatole sur ElevenLabs, dans la limite des crédits
 const GOOGLE_VOICE = process.env.AGENCY_GOOGLE_VOICE ?? 'fr-FR-Chirp3-HD-Charon';
-const GOOGLE_RATE = Number(process.env.AGENCY_GOOGLE_RATE ?? 1.12);
+const GOOGLE_RATE = Number(process.env.AGENCY_GOOGLE_RATE ?? 1.05);
 const GOOGLE_MONTHLY_CAP = 900_000;   // marge sous le million gratuit
 const useGoogle = () => !!process.env.GOOGLE_TTS_API_KEY;
 // « devis » : correction propre à ElevenLabs (il lisait « Davis »)

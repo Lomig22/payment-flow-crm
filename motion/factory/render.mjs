@@ -16,7 +16,7 @@ const HF = process.env.HYPERFRAMES ?? "hyperframes@0.8.157";
 const PIPER = process.env.PIPER_PYTHON ?? "/opt/piper/venv/bin/python";
 const PIPER_VOICES = process.env.PIPER_VOICES ?? "/opt/piper/voices";
 const PIPER_MODEL = process.env.PIPER_MODEL ?? "fr_FR-tom-medium";
-const PIPER_SPEED = process.env.PIPER_LENGTH_SCALE ?? "0.88";
+const PIPER_SPEED = process.env.PIPER_LENGTH_SCALE ?? "0.95";   // ≈ ×1,05, jamais plus rapide (brief du 19/10/2026)
 if (!KEY) { console.error("CRON_SECRET manquant"); process.exit(1); }
 
 const api = async (method, query, body) => {

@@ -53,3 +53,5 @@ imports/*
 !imports/emailing/
 imports/emailing/*
 !imports/emailing/LISEZMOI.txt
+motion/reel-premium/*
+!motion/reel-premium/LISEZMOI.txt
