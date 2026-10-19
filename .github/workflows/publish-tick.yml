@@ -1,0 +1,12 @@
+# Publication des reels programmés (secours de cron-job.org) : publie ce qui est dû, toutes les 5 min.
+name: Publication des reels
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl -fsS -m 70 https://payment-flow-crm-delta.vercel.app/api/cron/publish-tick
