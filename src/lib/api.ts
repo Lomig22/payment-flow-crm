@@ -485,6 +485,17 @@ export const linkedinPostsApi = {
   connectUrl: () => api.get<{ url: string }>('/linkedin/oauth/start'),
 };
 
+// ── Campagnes envoyées par Hermès (suivi réponses / rebonds, classement +/−) ──
+export interface EmailCampaign { id: string; name: string; source: string | null; first_sent_at: string | null; open_tracking: boolean;
+  contacted: number; delivered: number; bounced: number; opened: number | null; opens_total: number | null; open_rate: number | null;
+  replied: number; reply_rate: number | null; positive: number; negative: number }
+export interface EmailCampaignReply { id: string; campaign_id: string; email: string; company: string | null; subject: string | null;
+  sent_at: string | null; replied_at: string; reply_snippet: string | null; sentiment: 'positive' | 'negative' | null }
+export const campaignsApi = {
+  list: () => api.get<{ campaigns: EmailCampaign[]; replies: EmailCampaignReply[] }>('/emailing/campaigns'),
+  classify: (id: string, sentiment: 'positive' | 'negative' | null) => api.post('/emailing/campaigns', { id, sentiment }),
+};
+
 // ── Emailing (envois par l'agent Hermès) ──
 export interface EmailStepCfg { step: number; delay_days: number; subject: string; body: string }
 export type EmailSegment = 'site' | 'no_site';

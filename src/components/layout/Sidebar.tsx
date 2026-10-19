@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Upload, UsersRound, LogOut, Zap, User, X,
   MessageSquare, BarChart3, BookOpen, Instagram, Phone, Facebook,
-  Users, Kanban, ChevronDown, Award, Megaphone, Clapperboard, CalendarClock, Linkedin,
+  Users, Kanban, ChevronDown, Award, Megaphone, Clapperboard, CalendarClock, Linkedin, Send,
   CheckSquare, Gauge, Settings2, Inbox,
   Factory, Mail,
 } from 'lucide-react';
@@ -152,6 +152,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {isAdmin && (
           <PoleSection icon={Mail} label="Emailing" color="text-indigo-500" segment="emailing">
             <NavLink href="/emailing" icon={Gauge} label="Pilotage" onClick={onClose} exact />
+            <NavLink href="/emailing/campagnes" icon={Send} label="Campagnes" onClick={onClose} />
             <NavLink href="/emailing/leads" icon={Users} label="Leads" onClick={onClose} />
           </PoleSection>
         )}
