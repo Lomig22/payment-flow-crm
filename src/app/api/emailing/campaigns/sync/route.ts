@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     campaign_id: c.id, gmail_id: String(m.gmail_id), thread_id: m.thread_id ?? null, email: String(m.email).toLowerCase().trim(),
     company: m.company ?? null, subject: m.subject ?? null, sent_at: m.sent_at ?? null,
     replied_at: m.replied_at ?? null, reply_snippet: m.reply_snippet ? String(m.reply_snippet).slice(0, 500) : null,
+    reply_kind: ['human', 'auto', 'antispam'].includes(m.reply_kind) ? m.reply_kind : null, reply_gmail_id: m.reply_gmail_id ?? null,
     bounced_at: m.bounced_at ?? null, updated_at: new Date().toISOString(),
   }));
   for (let i = 0; i < rows.length; i += 500) {

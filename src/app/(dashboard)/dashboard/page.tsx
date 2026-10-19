@@ -4,13 +4,14 @@ import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
   Users, PhoneCall, CalendarCheck, TrendingUp,
-  UserCheck, XCircle, Award, BarChart3, Instagram,
+  UserCheck, XCircle, Award, BarChart3, Instagram, Mail,
 } from 'lucide-react';
 import { dashboardApi, qualiopiDashboardApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import StatCard from '@/components/ui/StatCard';
 import Spinner from '@/components/ui/Spinner';
 import InstagramDashboardView from '@/components/dashboard/InstagramDashboardView';
+import EmailingDashboardView from '@/components/dashboard/EmailingDashboardView';
 import { formatDate } from '@/lib/utils';
 import type { DashboardStats } from '@/types';
 
@@ -39,7 +40,7 @@ const shortName = (n: string) => (n === 'Non assigné' ? n : n.split(' ')[0]);
 export default function DashboardPage() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
-  const [view, setView] = useState<'cold_call' | 'instagram' | 'qualiopi'>('cold_call');
+  const [view, setView] = useState<'cold_call' | 'instagram' | 'emailing' | 'qualiopi'>('cold_call');
   const [dayIndex, setDayIndex] = useState(0);
 
   const statsApi = view === 'qualiopi' ? qualiopiDashboardApi : dashboardApi;
@@ -128,6 +129,16 @@ export default function DashboardPage() {
         >
           <Instagram className="w-4 h-4" /> Instagram
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setView('emailing')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              view === 'emailing' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Mail className="w-4 h-4" /> Emailing
+          </button>
+        )}
         <button
           onClick={() => setView('qualiopi')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -140,6 +151,8 @@ export default function DashboardPage() {
 
       {view === 'instagram' ? (
         <InstagramDashboardView />
+      ) : view === 'emailing' ? (
+        <EmailingDashboardView />
       ) : isLoading ? (
         <div className="flex items-center justify-center h-64">
           <Spinner className="w-8 h-8" />

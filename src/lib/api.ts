@@ -485,14 +485,16 @@ export const linkedinPostsApi = {
   connectUrl: () => api.get<{ url: string }>('/linkedin/oauth/start'),
 };
 
-// ── Campagnes envoyées par Hermès (suivi réponses / rebonds, classement +/−) ──
-export interface EmailCampaign { id: string; name: string; source: string | null; first_sent_at: string | null; open_tracking: boolean;
-  contacted: number; delivered: number; bounced: number; opened: number | null; opens_total: number | null; open_rate: number | null;
-  replied: number; reply_rate: number | null; positive: number; negative: number }
-export interface EmailCampaignReply { id: string; campaign_id: string; email: string; company: string | null; subject: string | null;
-  sent_at: string | null; replied_at: string; reply_snippet: string | null; sentiment: 'positive' | 'negative' | null }
+// ── Emailing global (Dashboard > Emailing) : envois d'Hermès, réponses classées +/− ──
+export interface EmailKpis { contacted: number; delivered: number; bounced: number; opened: number | null; opens_total: number | null; open_rate: number | null;
+  replied: number; reply_rate: number | null; auto: number; antispam: number; positive: number; negative: number }
+export interface EmailCampaign extends EmailKpis { id: string; name: string; first_sent_at: string | null; open_tracking: boolean }
+export interface EmailReplyRow { id: string; campaign: string; email: string; company: string | null; subject: string | null; sent_at: string | null;
+  replied_at: string; reply_snippet: string | null; reply_gmail_id: string | null; sentiment: 'positive' | 'negative' | null }
+export interface EmailingDashboard { totals: EmailKpis; campaigns: EmailCampaign[]; by_day: { date: string; sent: number; replied: number }[];
+  replies: EmailReplyRow[]; blocked: EmailReplyRow[]; auto: EmailReplyRow[] }
 export const campaignsApi = {
-  list: () => api.get<{ campaigns: EmailCampaign[]; replies: EmailCampaignReply[] }>('/emailing/campaigns'),
+  list: () => api.get<EmailingDashboard>('/emailing/campaigns'),
   classify: (id: string, sentiment: 'positive' | 'negative' | null) => api.post('/emailing/campaigns', { id, sentiment }),
 };
 

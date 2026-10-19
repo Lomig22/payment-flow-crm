@@ -58,6 +58,15 @@ def iso_ms(ms):
     return datetime.fromtimestamp(int(ms) / 1000, timezone.utc).isoformat()
 
 
+def norm(subject):
+    return re.sub(r'^((re|tr|fw|fwd|aw|auto|réf)\s*:\s*)+', '', (subject or '').strip(), flags=re.I).strip().lower()
+
+
+ANTISPAM = re.compile(r'mailinblack|xefi|antispam|altospam|vade|mailcontrol|spamenmoins|challenge', re.I)
+ANTISPAM_SUBJECT = re.compile(r'en attente de lib[ée]ration|validez|confirm(ez|er) (votre|que)|authentifi|anti.?spam', re.I)
+AUTO_SUBJECT = re.compile(r'^auto\s*:|r[ée]ponse automatique|automatic reply|auto.?reply|absen(ce|t)|out of office|accus[ée] de r[ée]ception', re.I)
+
+
 def iso_local(s):
     # date_envoi d'Hermès : heure du VPS (UTC)
     try:
@@ -106,58 +115,69 @@ def main():
     # Réponses et rebonds reçus depuis le premier envoi (y compris hors du fil d'origine)
     start = min(m['sent_at'] for c in camps.values() for m in c['messages'] if m['sent_at'])
     after = int(datetime.fromisoformat(start).timestamp())
-    by_email = {m['email']: m for c in camps.values() for m in c['messages']}
-    inbox_replies, bounces = {}, {}
-    seen = state.setdefault('_inbox', {})   # messages de la boîte déjà lus : id -> [expéditeur, date, extrait] ou rien
-    for q, sink in ((f'in:inbox after:{after} -from:me -from:mailer-daemon -from:postmaster', inbox_replies), (f'after:{after} (from:mailer-daemon OR from:postmaster)', bounces)):
+    msgs = [m for c in camps.values() for m in c['messages']]
+    by_email = {m['email']: m for m in msgs}
+    by_id = {m['gmail_id']: m for m in msgs}                         # fil d'un nouveau mail = identifiant de ce mail
+    by_subject = {norm(m['subject']): m for m in msgs if m['subject']}   # anti-spam : « Re: <notre objet> » depuis l'adresse du filtre
+    bounces = {}
+    # Messages reçus depuis le premier envoi, spams compris : chacun est rattaché à un mail envoyé
+    # (expéditeur, fil ou objet), puis classé : vraie réponse, réponse automatique ou anti-spam
+    seen = state.setdefault('_msg', {})   # id -> [gmail_id du mail envoyé, type, date, extrait] ou rien (cache : quota Gmail partagé)
+    for q, is_bounce in ((f'after:{after} -from:me -from:mailer-daemon -from:postmaster', False), (f'after:{after} (from:mailer-daemon OR from:postmaster)', True)):
         page = None
         while True:
-            res = gmail(tok, 'messages', q=q, maxResults=500, **({'pageToken': page} if page else {})) or {}
+            res = gmail(tok, 'messages', q=q, maxResults=500, includeSpamTrash=True, **({'pageToken': page} if page else {})) or {}
             for it in res.get('messages', []):
-                if sink is inbox_replies and it['id'] in seen:
-                    if seen[it['id']] and seen[it['id']][0] in by_email:
-                        sink.setdefault(seen[it['id']][0], tuple(seen[it['id']][1:]))
+                if not is_bounce and it['id'] in seen:
                     continue
                 m = gmail(tok, f"messages/{it['id']}", format='metadata', metadataHeaders=['From', 'X-Failed-Recipients', 'Auto-Submitted', 'X-Autoreply', 'X-Autorespond', 'Precedence', 'Subject'])
                 if not m:
                     continue
-                if sink is bounces:
+                if is_bounce:
                     failed = header(m, 'X-Failed-Recipients').lower()
                     for e in re.findall(r'[\w.+-]+@[\w-]+\.[\w.-]+', failed or m.get('snippet', '').lower()):
                         bounces.setdefault(e, iso_ms(m['internalDate']))
+                    continue
+                sender, subject = parseaddr(header(m, 'From'))[1].lower(), header(m, 'Subject')
+                target = by_email.get(sender) or by_id.get(it['threadId']) or by_subject.get(norm(subject))
+                if not target:
+                    seen[it['id']] = None
+                    continue
+                if ANTISPAM.search(sender) or ANTISPAM_SUBJECT.search(subject):
+                    kind = 'antispam'
+                elif header(m, 'Auto-Submitted').lower() not in ('', 'no') or header(m, 'X-Autoreply') or header(m, 'X-Autorespond') \
+                        or header(m, 'Precedence').lower() in ('auto_reply', 'bulk', 'junk') or AUTO_SUBJECT.search(subject):
+                    kind = 'auto'
                 else:
-                    sender = parseaddr(header(m, 'From'))[1].lower()
-                    # Réponses automatiques (absence, changement d'adresse, accusé de réception) : pas des réponses
-                    auto = header(m, 'Auto-Submitted').lower() not in ('', 'no') or header(m, 'X-Autoreply') or header(m, 'X-Autorespond') \
-                        or header(m, 'Precedence').lower() in ('auto_reply', 'bulk', 'junk') \
-                        or re.search(r'r[ée]ponse automatique|automatic reply|auto.?reply|absence|out of office', header(m, 'Subject'), re.I)
-                    seen[it['id']] = [sender, iso_ms(m['internalDate']), html.unescape(m.get('snippet', ''))] if sender in by_email and not auto else None
-                    if auto:
-                        continue
-                    if sender in by_email and sender not in sink:
-                        sink[sender] = (iso_ms(m['internalDate']), html.unescape(m.get('snippet', '')))
+                    kind = 'human'
+                seen[it['id']] = [target['gmail_id'], kind, iso_ms(m['internalDate']), html.unescape(m.get('snippet', ''))]
             page = res.get('nextPageToken')
             if not page:
                 break
-    # Réponses (dans le fil ou non) : messages de la boîte venant d'un destinataire ; le fil d'un
-    # nouveau mail porte l'identifiant de ce mail (pas d'appel par mail envoyé : quota Gmail partagé)
+    # Par mail envoyé : la vraie réponse l'emporte sur l'anti-spam, qui l'emporte sur la réponse automatique
+    RANK = {'human': 3, 'antispam': 2, 'auto': 1}
+    best = {}
+    for mid, v in seen.items():
+        if v and v[0] in by_id and RANK[v[1]] > RANK.get(best.get(v[0], [None, None])[1], 0):
+            best[v[0]] = [mid] + v[1:]
     for c in camps.values():
         for m in c['messages']:
             m['thread_id'] = m['gmail_id']
-            if m['email'] in inbox_replies:
-                m['replied_at'], m['reply_snippet'] = inbox_replies[m['email']]
+            if m['gmail_id'] in best:
+                mid, kind, at, snip = best[m['gmail_id']]
+                m.update(replied_at=at, reply_snippet=snip, reply_kind=kind, reply_gmail_id=mid)
             if m['email'] in bounces:
                 m['bounced_at'] = bounces[m['email']]
         sent = [m['sent_at'] for m in c['messages'] if m['sent_at']]
         body = {'campaign': {'id': c['id'], 'name': c['name'], 'source': c['source'], 'first_sent_at': min(sent) if sent else None,
                              'open_tracking': False}, 'messages': c['messages']}
         if DRY:
-            print(f"{c['id']} : {len(c['messages'])} envoyés, {sum(1 for m in c['messages'] if m.get('replied_at'))} réponses, {sum(1 for m in c['messages'] if m.get('bounced_at'))} rebonds (essai, rien envoyé au CRM)")
+            print(f"{c['id']} : {len(c['messages'])} envoyés, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'human')} réponses, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'auto')} auto, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'antispam')} anti-spam, {sum(1 for m in c['messages'] if m.get('bounced_at'))} rebonds (essai, rien envoyé au CRM)")
             continue
         req = urllib.request.Request(f'{CRM}/api/emailing/campaigns/sync', json.dumps(body).encode(),
                                      headers={'Authorization': f'Bearer {KEY}', 'Content-Type': 'application/json'})
         r = json.load(urllib.request.urlopen(req, timeout=60))
-        replied = sum(1 for m in c['messages'] if m.get('replied_at'))
+        replied = sum(1 for m in c['messages'] if m.get('reply_kind') == 'human')
         bounced = sum(1 for m in c['messages'] if m.get('bounced_at'))
         print(f"{c['id']} : {len(c['messages'])} envoyés, {replied} réponses, {bounced} rebonds -> {r}")
     if not DRY:
