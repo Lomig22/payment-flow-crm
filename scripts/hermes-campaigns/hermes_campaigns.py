@@ -3,16 +3,25 @@
 
 Lit le journal d'envoi d'Hermès (ses CSV : statut_envoi = envoye, message_id Gmail), puis la boîte
 lomig.guegueniat@gmail.com par l'API Gmail (accès d'Hermès, ~/.hermes/google_token.json, lecture
-seule ici) : réponse et rebond de chaque mail. Remonte tout au CRM (/api/emailing/campaigns/sync,
-clé EMAILING_AGENT_KEY). Installé sur le VPS : /opt/pf-cron/hermes_campaigns.py, cron toutes les 15 min.
+seule ici) : réponse et rebond de chaque mail. Ouvertures : journal du pixel d'Hermès
+(pixel_server.py, data/ouvertures.log), présent dans les mails partis en HTML (email_utils.send_html).
+Remonte tout au CRM (/api/emailing/campaigns/sync, clé EMAILING_AGENT_KEY).
+Installé sur le VPS : /opt/pf-cron/hermes_campaigns.py, cron toutes les 15 min.
 Bibliothèque standard uniquement (le Python système n'a pas les bibliothèques Google d'Hermès).
 """
-import csv, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
+import csv, hashlib, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from email.utils import parseaddr
 
 HERMES = '/root/.hermes'
 FILES = ['data/emails_a_envoyer.csv', 'data/emails_video_a_envoyer.csv']
+# Mails partis en HTML avec le pixel d'Hermès (send_video_daily.py) ; ceux de send_emails.py partent en texte brut
+TRACKED = {'data/emails_video_a_envoyer.csv'}
+OPENS = f'{HERMES}/data/ouvertures.log'      # une ligne JSON par ouverture : id = md5(email), ts, ip
+OWN_IPS = {'187.55.224.186', '127.0.0.1'}    # tests du pixel depuis le VPS
+# Gmail (proxy d'images Google) et les filtres Microsoft chargent le pixel 2 à 30 s après l'envoi, sans lecteur :
+# une ouverture plus rapprochée de l'envoi n'est pas comptée
+MIN_DELAY = 60
 TOKEN = f'{HERMES}/google_token.json'
 KEY = open(f'{HERMES}/secrets/pf_crm_emailing.key').read().strip()
 CRM = os.environ.get('CRM_URL', 'https://payment-flow-crm-delta.vercel.app')
@@ -89,7 +98,8 @@ def campaigns():
             day = (r.get('date_envoi') or '')[:10]
             word = re.sub(r'\W+', '', (r.get('objet') or 'mail').split(' ')[0].lower()) or 'mail'
             cid = f'hermes-{stem}-{word}-{day}'
-            c = out.setdefault(cid, {'id': cid, 'name': f"{word.capitalize()} · {day[8:10]}/{day[5:7]}", 'source': f, 'messages': []})
+            c = out.setdefault(cid, {'id': cid, 'name': f"{word.capitalize()} · {day[8:10]}/{day[5:7]}", 'source': f,
+                                     'tracked': f in TRACKED, 'messages': []})
             c['messages'].append({'gmail_id': r['message_id'], 'email': r['email'].strip().lower(), 'company': r.get('entreprise'),
                                   'subject': r.get('objet'), 'sent_at': iso_local(r.get('date_envoi', ''))})
     # Nom lisible : début d'objet commun à tous les mails de la campagne (« Votre vidéo … », « maquette »)
@@ -102,6 +112,21 @@ def campaigns():
             common.append(words[0])
         day = c['id'][-10:]
         c['name'] = f"{' '.join(common[:6]) or c['name'].split(' · ')[0]} · {day[8:10]}/{day[5:7]}"
+    return out
+
+
+def opens():
+    # md5(email) -> horodatages des ouvertures (le pixel identifie le destinataire, pas le mail)
+    out = {}
+    if not os.path.exists(OPENS):
+        return out
+    for line in open(OPENS, encoding='utf-8'):
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if o.get('ip') not in OWN_IPS:
+            out.setdefault(o['id'], []).append(int(o['ts']))
     return out
 
 
@@ -160,9 +185,16 @@ def main():
     for mid, v in seen.items():
         if v and v[0] in by_id and RANK[v[1]] > RANK.get(best.get(v[0], [None, None])[1], 0):
             best[v[0]] = [mid] + v[1:]
+    pixel = opens()
     for c in camps.values():
         for m in c['messages']:
             m['thread_id'] = m['gmail_id']
+            if c['tracked'] and m['sent_at']:
+                # Ouvertures postérieures à l'envoi (le même destinataire a pu recevoir d'autres mails d'Hermès avant)
+                sent = datetime.fromisoformat(m['sent_at']).timestamp()
+                seen_at = sorted(t for t in pixel.get(hashlib.md5(m['email'].encode()).hexdigest(), []) if t >= sent + MIN_DELAY)
+                m['open_count'] = len(seen_at)
+                m['opened_at'] = datetime.fromtimestamp(seen_at[0], timezone.utc).isoformat() if seen_at else None
             if m['gmail_id'] in best:
                 mid, kind, at, snip = best[m['gmail_id']]
                 m.update(replied_at=at, reply_snippet=snip, reply_kind=kind, reply_gmail_id=mid)
@@ -170,9 +202,9 @@ def main():
                 m['bounced_at'] = bounces[m['email']]
         sent = [m['sent_at'] for m in c['messages'] if m['sent_at']]
         body = {'campaign': {'id': c['id'], 'name': c['name'], 'source': c['source'], 'first_sent_at': min(sent) if sent else None,
-                             'open_tracking': False}, 'messages': c['messages']}
+                             'open_tracking': c['tracked']}, 'messages': c['messages']}
         if DRY:
-            print(f"{c['id']} : {len(c['messages'])} envoyés, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'human')} réponses, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'auto')} auto, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'antispam')} anti-spam, {sum(1 for m in c['messages'] if m.get('bounced_at'))} rebonds (essai, rien envoyé au CRM)")
+            print(f"{c['id']} : {len(c['messages'])} envoyés, {sum(1 for m in c['messages'] if m.get('opened_at'))} ouverts,{sum(1 for m in c['messages'] if m.get('reply_kind') == 'human')} réponses, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'auto')} auto, {sum(1 for m in c['messages'] if m.get('reply_kind') == 'antispam')} anti-spam, {sum(1 for m in c['messages'] if m.get('bounced_at'))} rebonds (essai, rien envoyé au CRM)")
             continue
         req = urllib.request.Request(f'{CRM}/api/emailing/campaigns/sync', json.dumps(body).encode(),
                                      headers={'Authorization': f'Bearer {KEY}', 'Content-Type': 'application/json'})

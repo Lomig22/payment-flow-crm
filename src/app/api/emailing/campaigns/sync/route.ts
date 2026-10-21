@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { hasAgentKey } from '@/lib/emailingAuth';
 
 // Remontée des campagnes envoyées directement par Hermès (script du VPS /opt/pf-cron/hermes-campaigns.py,
-// toutes les 15 min) : chaque mail envoyé, sa réponse éventuelle et son rebond, lus dans la boîte Gmail.
+// toutes les 15 min) : chaque mail envoyé, sa réponse éventuelle et son rebond, lus dans la boîte Gmail,
+// et ses ouvertures (pixel d'Hermès) pour les campagnes suivies (open_tracking).
 // Clé EMAILING_AGENT_KEY. Le classement positif / négatif de Lomig n'est jamais écrasé.
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -24,7 +25,8 @@ export async function POST(request: NextRequest) {
     company: m.company ?? null, subject: m.subject ?? null, sent_at: m.sent_at ?? null,
     replied_at: m.replied_at ?? null, reply_snippet: m.reply_snippet ? String(m.reply_snippet).slice(0, 500) : null,
     reply_kind: ['human', 'auto', 'antispam'].includes(m.reply_kind) ? m.reply_kind : null, reply_gmail_id: m.reply_gmail_id ?? null,
-    bounced_at: m.bounced_at ?? null, updated_at: new Date().toISOString(),
+    bounced_at: m.bounced_at ?? null, opened_at: m.opened_at ?? null, open_count: Math.max(0, Number(m.open_count) || 0),
+    updated_at: new Date().toISOString(),
   }));
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from('email_campaign_messages').upsert(rows.slice(i, i + 500), { onConflict: 'gmail_id' });
