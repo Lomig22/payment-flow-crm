@@ -28,6 +28,22 @@ async function update(id: string, fields: Record<string, unknown>) {
 
 async function fail(row: QueueRow, message: string) {
   await update(row.id, { status: 'failed', error: message });
+  if (/validating access token|session has been invalidated/i.test(message)) await alertInvalidToken(row.account_username);
+}
+
+// Jeton Instagram invalidé (mot de passe changé, sécurité Meta) : plus rien ne part sur le compte.
+// 20-21/10/2026 : 24 reels de @lomig_guegueniat en échec pendant deux jours sans que personne le sache.
+// Un mail par panne (repère : last_sync_error), remis à zéro quand le compte est reconnecté.
+async function alertInvalidToken(account: string) {
+  const db = supabase as any;
+  const { data: t } = await db.from('instagram_tokens').select('last_sync_error').eq('account_username', account).maybeSingle();
+  if (String(t?.last_sync_error ?? '').startsWith('JETON INVALIDE')) return;
+  await db.from('instagram_tokens').update({ last_sync_error: `JETON INVALIDE depuis le ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}` }).eq('account_username', account);
+  const { notifyLomig } = await import('@/lib/linkedin');
+  await notifyLomig(`Instagram @${account} déconnecté`, [
+    `Instagram a invalidé la connexion du compte @${account} (mot de passe changé ou contrôle de sécurité de Meta) : plus aucun reel ne peut être publié sur ce compte.`,
+    'Génère un nouveau jeton dans l\'app Meta (Instagram > Configuration de l\'API > Générer un jeton), puis colle-le dans le CRM : Instagram > Publication > Comptes connectés.',
+  ], { label: 'Reconnecter le compte', url: 'https://payment-flow-crm-delta.vercel.app/instagram/publication' });
 }
 
 // Conteneur Instagram : Instagram télécharge et traite la vidéo (20 s à quelques minutes)

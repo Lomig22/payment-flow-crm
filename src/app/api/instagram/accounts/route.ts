@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
   const { error } = await (supabase as any).from('instagram_tokens').upsert({
     account_username: me.username, ig_user_id: me.user_id, access_token: t,
     expires_at: new Date(now.getTime() + 60 * 86_400_000).toISOString(), refreshed_at: now.toISOString(),
+    last_sync_error: null,   // reconnecté : l'alerte « jeton invalide » pourra repartir à la prochaine panne
   }, { onConflict: 'account_username' });
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json({ account_username: me.username });
