@@ -273,7 +273,10 @@ async function syncAccount(tokIn: TokenRow): Promise<SyncResult> {
     (existing ?? []).map((e: any) => [e.ig_media_id, e]),
   );
 
-  for (const m of recent) {
+  // 8 publications à la fois (21/10/2026 : traitées une par une, 300 reels de @lomig_guegueniat
+  // dépassaient les 60 s de Vercel) ; au-delà de 35 s, les stats attendent le passage suivant
+  const started = Date.now();
+  const one = async (m: IgMedia) => {
     const format      = formatOf(m);
     const publishedAt = new Date(m.timestamp).getTime();
     const prev        = known.get(m.id);
@@ -292,7 +295,7 @@ async function syncAccount(tokIn: TokenRow): Promise<SyncResult> {
     }
 
     let metrics: Awaited<ReturnType<typeof mediaInsights>> | null = null;
-    if (metricsDue(publishedAt, prev?.metrics_updated_at ? new Date(prev.metrics_updated_at).getTime() : null, format)) {
+    if (Date.now() - started < 35_000 && metricsDue(publishedAt, prev?.metrics_updated_at ? new Date(prev.metrics_updated_at).getTime() : null, format)) {
       try {
         metrics = await mediaInsights(m.id, format, tok.access_token);
         Object.assign(row, metrics, { metrics_updated_at: new Date().toISOString() });
@@ -306,7 +309,7 @@ async function syncAccount(tokIn: TokenRow): Promise<SyncResult> {
       .upsert(row, { onConflict: 'ig_media_id' })
       .select('id')
       .single();
-    if (error) { result.errors.push(`${m.id} : ${error.message}`); continue; }
+    if (error) { result.errors.push(`${m.id} : ${error.message}`); return; }
     result.media++;
 
     if (metrics) {
@@ -322,7 +325,8 @@ async function syncAccount(tokIn: TokenRow): Promise<SyncResult> {
         total_interactions: metrics.total_interactions,
       });
     }
-  }
+  };
+  for (let i = 0; i < recent.length; i += 8) await Promise.all(recent.slice(i, i + 8).map(one));
 
   try {
     await syncAccountDaily(tok);
