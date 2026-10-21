@@ -477,7 +477,8 @@ export const fabriqueApi = {
 
 // ── Posts LinkedIn automatiques (profil de Lomig) ──
 export interface LinkedinPost { id: string; scheduled_at: string; topic: string | null; body: string; photo_id: string | null; photo_url: string | null;
-  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'; post_urn: string | null; error: string | null; feedback: string | null; published_at: string | null }
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'; post_urn: string | null; error: string | null; feedback: string | null; published_at: string | null;
+  keyword: string | null; resource_title: string | null; resource_slug: string | null }
 export interface LinkedinPhoto { id: string; storage_path: string; url: string; uses: number }
 export const linkedinPostsApi = {
   list:   () => api.get<{ connection: { connected: boolean; name?: string; expires_at?: string }; photos: LinkedinPhoto[]; posts: LinkedinPost[] }>('/linkedin/posts'),

@@ -1,14 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Linkedin, Link2, ImagePlus, Trash2, X, Pencil, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { Linkedin, Link2, ImagePlus, Trash2, X, Pencil, Check, ExternalLink, Sparkles, Copy, Gift, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { linkedinPostsApi, type LinkedinPost } from '@/lib/api';
 import Spinner from '@/components/ui/Spinner';
 
-// Posts LinkedIn automatiques sur le profil de Lomig : Claude écrit 2 à 3 posts par jour (accroche,
-// valeur, offre gratuite en commentaire), publiés à l'heure par l'API officielle. Lomig relit, corrige,
-// retire et laisse un retour que Claude applique aux posts suivants.
+// LinkedIn inbound sur le profil de Lomig : Claude écrit 2 posts par jour (accroche, valeur, « Commente
+// MOT et je t'envoie… ») et la ressource promise (page publique /r/<slug>), publiés à l'heure par l'API
+// officielle avec un selfie de Lomig. Lomig relit, corrige, retire, envoie la ressource en message privé
+// à ceux qui commentent, et laisse un retour que Claude applique aux posts suivants.
+const SITE = 'https://payment-flow-crm-delta.vercel.app';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const STATE: Record<LinkedinPost['status'], { label: string; cls: string }> = {
@@ -43,6 +45,15 @@ function PostCard({ p }: { p: LinkedinPost }) {
         ? <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={14} className="input text-sm font-sans" />
         : <p className="text-sm text-gray-800 whitespace-pre-wrap">{p.body}</p>}
       {p.photo_url && <img src={p.photo_url} alt="" className="w-full max-w-sm rounded-lg" />}
+      {p.resource_slug && (
+        <div className="rounded-lg bg-indigo-50 p-3 text-sm flex flex-wrap items-center gap-2">
+          <Gift className="w-4 h-4 text-indigo-600" />
+          <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border">{p.keyword}</span>
+          <a href={`/r/${p.resource_slug}`} target="_blank" rel="noreferrer" className="text-indigo-700 font-medium inline-flex items-center gap-1">{p.resource_title} <ExternalLink className="w-3 h-3" /></a>
+          <button onClick={() => { navigator.clipboard.writeText(`Hello ! Comme promis, voici ${p.resource_title?.replace(/^./, (c) => c.toLowerCase())} : ${SITE}/r/${p.resource_slug}\n\nDis-moi ce que tu en penses 🙂`); toast.success('Message copié : colle-le en message privé'); }}
+            className="ml-auto btn-secondary text-xs inline-flex items-center gap-1"><Copy className="w-3.5 h-3.5" />Copier le message privé</button>
+        </div>
+      )}
       {p.error && <p className="text-xs text-red-600">{p.error}</p>}
       <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ton retour (ton, accroche, offre, longueur…) : Claude l'appliquera aux prochains posts" className="input text-sm" />
       <div className="flex flex-wrap gap-2">
@@ -105,8 +116,14 @@ export default function LinkedinPostsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Linkedin className="w-6 h-6 text-[#0a66c2]" />Posts LinkedIn automatiques</h1>
-        <p className="text-sm text-gray-500 mt-1">Claude écrit 3 posts par jour en semaine et 2 le week-end, sur ton profil : une accroche, de la valeur, une offre gratuite à demander en commentaire. Ils partent à l&apos;heure via l&apos;API officielle de LinkedIn. Tu peux les modifier ou les retirer avant publication, et ton retour est appliqué aux suivants.</p>
+        <p className="text-sm text-gray-500 mt-1">2 posts par jour sur ton profil (vers 8 h 25 et 12 h 35) : une accroche, de la valeur, puis « Commente MOT et je t&apos;envoie la ressource ». Claude écrit aussi la ressource : envoie son lien en message privé à chaque personne qui commente. Chaque post part avec un de tes selfies, le moins utilisé d&apos;abord.</p>
       </div>
+      {(!c.connected || data.photos.length === 0) && (
+        <div className="card p-4 border-amber-300 bg-amber-50 text-sm text-amber-800 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>Aucun post ne peut partir tant que {!c.connected ? 'ton profil LinkedIn n\'est pas connecté' : ''}{!c.connected && data.photos.length === 0 ? ' et que ' : ''}{data.photos.length === 0 ? 'tu n\'as pas déposé de selfies (15 à 30 idéalement)' : ''}.</span>
+        </div>
+      )}
 
       <div className="card p-4 flex flex-wrap items-center gap-3">
         {c.connected
@@ -118,10 +135,10 @@ export default function LinkedinPostsPage() {
 
       <div className="card p-4 space-y-3">
         <div className="flex items-center gap-3">
-          <h2 className="font-semibold text-gray-900">Photos ({data.photos.length})</h2>
-          <p className="text-xs text-gray-500">Réutilisées par les posts, la moins utilisée d&apos;abord.</p>
+          <h2 className="font-semibold text-gray-900">Selfies ({data.photos.length})</h2>
+          <p className="text-xs text-gray-500">Un par post, le moins utilisé d&apos;abord. Des photos naturelles, prises au téléphone.</p>
           <input ref={file} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
-          <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des photos</button>
+          <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des selfies</button>
         </div>
         {data.photos.length > 0 && (
           <div className="flex flex-wrap gap-3">

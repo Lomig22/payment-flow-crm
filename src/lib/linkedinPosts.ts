@@ -1,13 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { createHmac } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { MEDIA_BUCKET } from '@/lib/instagramPublish';
 import { notifyLomig } from '@/lib/linkedin';
 
 // Posts LinkedIn automatiques sur le profil de Lomig (demande du 19/10/2026), via l'API officielle
 // « Share on LinkedIn » (aucun navigateur automatisé : le compte a été restreint le 16/10 pour ça).
-// Claude écrit 2 à 3 posts par jour : une accroche, de la valeur, une offre gratuite à demander en
-// commentaire. Quelques espaces mal placés (jamais de fautes) donnent un rendu « écrit à la main ».
+// LinkedIn inbound (22/10/2026) : Claude écrit 2 posts par jour — une accroche, de la valeur, puis
+// « Commente MOT et je t'envoie la ressource » — et la ressource elle-même (page publique /r/<slug>,
+// dont Lomig envoie le lien en message privé). Chaque post part avec un selfie de Lomig, choisi à la
+// publication. Quelques espaces mal placés (jamais de fautes) donnent un rendu « écrit à la main ».
 // Stock : 7 jours d'avance. Publication à l'heure par le VPS (publish-tick, chaque minute).
 
 const db = () => supabase as any;
@@ -17,8 +19,11 @@ export const REDIRECT_URI = 'https://payment-flow-crm-delta.vercel.app/api/linke
 const SCOPES = 'openid profile w_member_social';
 const DAYS_AHEAD = 7;
 
-// Créneaux (heure de Paris) : 3 en semaine, 2 le week-end ; quelques minutes de décalage par jour
-const SLOTS: Record<'week' | 'weekend', [number, number][]> = { week: [[8, 12], [12, 18], [17, 48]], weekend: [[9, 34], [18, 6]] };
+// Créneaux (heure de Paris) : 2 posts par jour, tous les jours (LinkedIn inbound, 22/10/2026) ;
+// quelques minutes de décalage d'un jour à l'autre
+const SLOTS: [number, number][] = [[8, 25], [12, 35]];
+export const SITE = 'https://payment-flow-crm-delta.vercel.app';
+export const resourceUrl = (slug: string) => `${SITE}/r/${slug}`;
 
 // ── OAuth ──
 const sign = (s: string) => createHmac('sha256', process.env.CRON_SECRET ?? 'pf').update(s).digest('hex').slice(0, 24);
@@ -82,12 +87,22 @@ async function uploadImage(token: string, owner: string, path: string): Promise<
   return j.value.image as string;
 }
 
-async function publishOne(post: any, auth: any): Promise<void> {
-  let media: string | null = null;
+// Selfie du post : choisi à la publication (le moins utilisé, puis le plus ancien), sauf s'il a été fixé à la main
+async function pickPhoto(post: any): Promise<any | null> {
   if (post.photo_id) {
-    const { data: photo } = await db().from('linkedin_photos').select('storage_path').eq('id', post.photo_id).single();
-    if (photo) media = await uploadImage(auth.access_token, auth.member_urn, photo.storage_path);
+    const { data } = await db().from('linkedin_photos').select('*').eq('id', post.photo_id).maybeSingle();
+    if (data) return data;
   }
+  const { data } = await db().from('linkedin_photos').select('*').order('uses').order('last_used_at', { ascending: true, nullsFirst: true }).limit(1);
+  return data?.[0] ?? null;
+}
+
+async function publishOne(post: any, auth: any): Promise<void> {
+  const photo = await pickPhoto(post);
+  if (!photo) throw new Error('Aucun selfie dans le CRM');
+  const media = await uploadImage(auth.access_token, auth.member_urn, photo.storage_path);
+  await db().from('linkedin_photos').update({ uses: photo.uses + 1, last_used_at: new Date().toISOString() }).eq('id', photo.id);
+  await db().from('linkedin_posts').update({ photo_id: photo.id }).eq('id', post.id);
   const r = await rest('posts', auth.access_token, {
     author: auth.member_urn, commentary: escapeLittle(post.body), visibility: 'PUBLIC',
     distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
@@ -105,6 +120,9 @@ export async function publishDuePosts(): Promise<{ id: string; status: string }[
   if (!due?.length) return [];
   const { data: auth } = await db().from('linkedin_oauth').select('*').eq('id', 1).maybeSingle();
   if (!auth || new Date(auth.expires_at).getTime() < Date.now()) return [];   // reconnexion nécessaire : rien ne part
+  // Chaque post part avec un selfie de Lomig : sans photo dans le CRM, on attend
+  const { count: photos } = await db().from('linkedin_photos').select('id', { count: 'exact', head: true });
+  if (!photos) return [];
   const out: { id: string; status: string }[] = [];
   for (const post of due) {
     // Réclamation atomique (plusieurs déclencheurs peuvent passer en même temps)
@@ -146,8 +164,7 @@ const parisDay = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone
 const hash = (s: string) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 
 function slotsFor(day: string): Date[] {
-  const wd = new Date(`${day}T12:00:00Z`).getUTCDay();
-  return SLOTS[wd === 0 || wd === 6 ? 'weekend' : 'week'].map(([h, m], k) => parisInstant(day, h, m + (hash(day + k) % 9) - 4));
+  return SLOTS.map(([h, m], k) => parisInstant(day, h, m + (hash(day + k) % 9) - 4));
 }
 
 // Rendu « écrit à la main » : 1 à 2 espaces mal placés, hors de la phrase d'accroche, jamais dans un mot
@@ -173,10 +190,12 @@ export function humanize(text: string, seed: string): string {
 
 const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['posts'],
-  properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['topic', 'body', 'photo'], properties: {
+  properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['topic', 'body', 'keyword', 'resource_title', 'resource_body'], properties: {
     topic: { type: 'string', description: 'Sujet en 3 à 6 mots (pour éviter les répétitions)' },
-    body: { type: 'string', description: 'Le post complet, prêt à publier' },
-    photo: { type: 'boolean', description: 'true si le post gagne à être illustré par une photo de Lomig' },
+    body: { type: 'string', description: 'Le post complet, prêt à publier, qui se termine par le CTA avec le mot-clé' },
+    keyword: { type: 'string', description: 'Le mot à commenter, un seul mot en majuscules sans accent (ex. CHECKLIST, GUIDE, SCRIPT)' },
+    resource_title: { type: 'string', description: 'Titre de la ressource offerte, 4 à 10 mots (ex. « La checklist des 12 points qui font appeler un client »)' },
+    resource_body: { type: 'string', description: 'La ressource complète en Markdown simple (# titres, - listes, 1. étapes, **gras**), 2 500 à 6 000 caractères' },
   } } } },
 };
 
@@ -185,7 +204,9 @@ const SYSTEM = `Tu écris les posts LinkedIn de Lomig Guéguéniat, fondateur de
 STRUCTURE (toujours la même) :
 1. Première ligne = l'accroche, une seule phrase forte qui donne envie de cliquer sur « voir plus ». Exemple : « Voici comment j'ai automatisé ma visibilité sur internet. »
 2. Le corps : de la vraie valeur, concrète et applicable (étapes, méthode, erreur à éviter, leçon tirée du terrain). Phrases courtes, une idée par ligne, lignes vides entre les blocs. 600 à 1 300 caractères au total.
-3. La fin = une offre gratuite à demander en commentaire, avec un mot-clé en majuscules. Exemples : « Commente GO et je te prépare une liste de 150 leads adaptée à ton offre. », « Écris AUDIT en commentaire : je regarde ta visibilité et je te dis quoi changer en premier. » Une seule offre par post, varie les mots-clés et les formulations.
+3. La fin = le CTA : « Commente MOT et je t'envoie [la ressource] gratuitement. » (formulation libre, mais toujours : commenter le mot-clé en majuscules, recevoir la ressource en message privé). Varie les mots-clés d'un post à l'autre.
+
+LA RESSOURCE (champ resource_body) : c'est ce que reçoivent les personnes qui commentent. Elle doit tenir la promesse du post et valoir plus que le post lui-même : guide pas à pas, checklist détaillée, modèles de messages à copier, script d'appel, plan sur 7 jours… Concrète, actionnable tout de suite, structurée en Markdown simple (titres, listes, étapes numérotées, gras), signée « Lomig — Payment Flow ». Aucun chiffre, résultat ou témoignage inventé ; pas de lien externe ; pas de promesse garantie. Elle peut finir par une invitation douce à échanger avec Lomig.
 
 RÈGLES :
 - Ton direct, humain, tutoiement, zéro jargon corporate. Pas de hashtags en rafale (0 à 2 maximum, en fin de post).
@@ -201,17 +222,16 @@ export async function fillPosts(): Promise<{ created: number }> {
   const days = Array.from({ length: DAYS_AHEAD }, (_, k) => parisDay(new Date(now + k * 86400_000)));
   const { data: taken } = await db().from('linkedin_posts').select('scheduled_at').neq('status', 'cancelled').gte('scheduled_at', new Date(now).toISOString());
   const busy = new Set((taken ?? []).map((t: any) => new Date(t.scheduled_at).getTime()));
-  const free = days.flatMap(slotsFor).filter((d) => d.getTime() > now + 10 * 60_000 && !busy.has(d.getTime())).slice(0, 4);   // 4 par passage : l'écriture tient dans le temps d'une fonction Vercel
+  const free = days.flatMap(slotsFor).filter((d) => d.getTime() > now + 10 * 60_000 && !busy.has(d.getTime())).slice(0, 2);   // 2 par passage (post + ressource) : l'écriture tient dans le temps d'une fonction Vercel
   if (!free.length) return { created: 0 };
 
-  const [{ data: recent }, { data: notes }, { data: photos }] = await Promise.all([
-    db().from('linkedin_posts').select('topic').order('created_at', { ascending: false }).limit(30),
+  const [{ data: recent }, { data: notes }] = await Promise.all([
+    db().from('linkedin_posts').select('topic, keyword').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(30),
     db().from('linkedin_posts').select('topic, feedback').not('feedback', 'is', null).order('updated_at', { ascending: false }).limit(15),
-    db().from('linkedin_photos').select('id, uses, last_used_at').order('uses').order('last_used_at', { ascending: true, nullsFirst: true }),
   ]);
   const prompt = [
     `Écris ${free.length} posts LinkedIn différents.`,
-    recent?.length ? `Sujets récents à ne pas répéter :\n${recent.map((r: any) => `- ${r.topic}`).join('\n')}` : '',
+    recent?.length ? `Sujets récents à ne pas répéter (mot-clé utilisé) :\n${recent.map((r: any) => `- ${r.topic}${r.keyword ? ` (${r.keyword})` : ''}`).join('\n')}` : '',
     notes?.length ? `Retours de Lomig sur des posts précédents (à appliquer) :\n${notes.map((n: any) => `- « ${n.topic} » : ${n.feedback}`).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
   const response = await new Anthropic().messages.create({
@@ -220,18 +240,18 @@ export async function fillPosts(): Promise<{ created: number }> {
     messages: [{ role: 'user', content: prompt }],
   } as any);
   const text = (response.content as any[]).find((b) => b.type === 'text')?.text ?? '{}';
-  const posts = (JSON.parse(text).posts ?? []).filter((p: any) => p.body?.trim().length > 200);
+  const posts = (JSON.parse(text).posts ?? []).filter((p: any) => p.body?.trim().length > 200 && p.resource_body?.trim().length > 800 && p.keyword);
 
-  let created = 0, pi = 0;
+  let created = 0;
   for (const [k, p] of posts.slice(0, free.length).entries()) {
-    const photo = p.photo && photos?.length ? photos[pi++ % photos.length] : null;
+    const keyword = String(p.keyword).normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 20);
+    const slug = `${keyword.toLowerCase()}-${randomBytes(3).toString('hex')}`;
     const { error } = await db().from('linkedin_posts').insert({
       scheduled_at: free[k].toISOString(), topic: String(p.topic).slice(0, 120),
-      body: humanize(String(p.body).trim(), free[k].toISOString()), photo_id: photo?.id ?? null,
+      body: humanize(String(p.body).trim(), free[k].toISOString()), keyword,
+      resource_title: String(p.resource_title).slice(0, 160), resource_body: String(p.resource_body).trim(), resource_slug: slug,
     });
-    if (error) continue;
-    created++;
-    if (photo) await db().from('linkedin_photos').update({ uses: photo.uses + 1, last_used_at: new Date().toISOString() }).eq('id', photo.id);
+    if (!error) created++;
   }
   return { created };
 }
