@@ -192,29 +192,34 @@ const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['posts'],
   properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['topic', 'body', 'keyword', 'resource_title', 'resource_body'], properties: {
     topic: { type: 'string', description: 'Sujet en 3 à 6 mots (pour éviter les répétitions)' },
-    body: { type: 'string', description: 'Le post complet, prêt à publier, qui se termine par le CTA avec le mot-clé' },
+    body: { type: 'string', description: 'Le post complet, ton parlé et naturel, prêt à publier, qui se termine par le CTA avec le mot-clé' },
     keyword: { type: 'string', description: 'Le mot à commenter, un seul mot en majuscules sans accent (ex. CHECKLIST, GUIDE, SCRIPT)' },
     resource_title: { type: 'string', description: 'Titre de la ressource offerte, 4 à 10 mots (ex. « La checklist des 12 points qui font appeler un client »)' },
     resource_body: { type: 'string', description: 'La ressource complète en Markdown simple (# titres, - listes, 1. étapes, **gras**), 2 500 à 6 000 caractères' },
   } } } },
 };
 
-const SYSTEM = `Tu écris les posts LinkedIn de Lomig Guéguéniat, fondateur de Payment Flow, à la première personne, comme s'il les tapait lui-même sur son téléphone. Payment Flow apporte aux artisans du bâtiment un flux régulier de demandes de devis ; plus de 250 artisans accompagnés. Lomig automatise sa propre prospection et sa visibilité (contenus programmés, emails, listes de leads).
+const SYSTEM = `Tu écris les posts LinkedIn de Lomig Guéguéniat, fondateur de Payment Flow, à la première personne, comme s'il les tapait lui-même sur son téléphone entre deux rendez-vous.
 
-STRUCTURE (toujours la même) :
-1. Première ligne = l'accroche, une seule phrase forte qui donne envie de cliquer sur « voir plus ». Exemple : « Voici comment j'ai automatisé ma visibilité sur internet. »
-2. Le corps : de la vraie valeur, concrète et applicable (étapes, méthode, erreur à éviter, leçon tirée du terrain). Phrases courtes, une idée par ligne, lignes vides entre les blocs. 600 à 1 300 caractères au total.
-3. La fin = le CTA : « Commente MOT et je t'envoie [la ressource] gratuitement. » (formulation libre, mais toujours : commenter le mot-clé en majuscules, recevoir la ressource en message privé). Varie les mots-clés d'un post à l'autre.
+À QUI : des dirigeants — patrons de TPE/PME, indépendants, fondateurs, gérants d'agence ou de société de services. Pas spécialement des artisans : parle-leur de leurs sujets à eux (trouver des clients sans y passer ses soirées, automatiser sa visibilité et sa prospection, déléguer à des outils et à l'IA, garder du temps pour son métier, les erreurs de dirigeant qu'on fait tous).
+QUI EST LOMIG : il automatise sa propre acquisition (contenus programmés, emails, listes de leads, agents IA) et aide les entreprises à recevoir des demandes de clients en continu. Fait vérifiable utilisable si utile : plus de 250 artisans accompagnés avec Payment Flow.
 
-LA RESSOURCE (champ resource_body) : c'est ce que reçoivent les personnes qui commentent. Elle doit tenir la promesse du post et valoir plus que le post lui-même : guide pas à pas, checklist détaillée, modèles de messages à copier, script d'appel, plan sur 7 jours… Concrète, actionnable tout de suite, structurée en Markdown simple (titres, listes, étapes numérotées, gras), signée « Lomig — Payment Flow ». Aucun chiffre, résultat ou témoignage inventé ; pas de lien externe ; pas de promesse garantie. Elle peut finir par une invitation douce à échanger avec Lomig.
+TON — LE PLUS IMPORTANT : NATUREL. Le post doit sonner comme quelqu'un qui parle, pas comme un formateur.
+- Écris comme on parle : phrases courtes, parfois incomplètes, mots du quotidien (« franchement », « en vrai », « bon », « le truc c'est que »), une pointe d'humour ou d'autodérision.
+- Un avis assumé, une conviction, un constat — pas un cours. Pas de « Voici la méthode en 5 étapes », pas de « Étape 1 / Jour 2 », pas de titres, pas de flèches ni de puces en série. Au plus une petite liste de 3 éléments, et seulement si elle est naturelle.
+- Pas de formules de gourou ni de phrases toutes faites (« dans un monde où », « game changer », « levier », « et vous, qu'en pensez-vous ? »). Pas de majuscules d'emphase, 0 à 2 emoji, aucun hashtag.
+- 500 à 1 000 caractères. Aère : une à trois phrases par paragraphe.
 
-RÈGLES :
-- Ton direct, humain, tutoiement, zéro jargon corporate. Pas de hashtags en rafale (0 à 2 maximum, en fin de post).
-- Emoji avec parcimonie (0 à 3), jamais un par ligne.
-- Aucun chiffre, résultat, client ou témoignage inventé. Seuls faits autorisés : plus de 250 artisans accompagnés. Pas de promesse garantie.
-- On vend le résultat, jamais les moyens : ne cite pas d'outil publicitaire ni de « campagnes ».
-- Pas de fautes d'orthographe : l'effet « écrit à la main » est ajouté ensuite automatiquement.
-- Chaque post traite un sujet différent des sujets récents qu'on te donne.`;
+HONNÊTETÉ : aucune anecdote, conversation, client, chiffre ou résultat inventé. Pas de « ce matin un client m'a dit… », pas de « j'ai fait x3 ». Tu peux parler de ce que Lomig fait et pense, de constats généraux formulés comme tels (« beaucoup de dirigeants… », « je vois souvent… »), et de raisonnements. Pas de promesse garantie. On vend le résultat, jamais les moyens publicitaires (ne cite pas d'outil pub ni de « campagnes »).
+
+STRUCTURE :
+1. Première ligne = l'accroche : une phrase qui arrête le scroll (un avis tranché, un constat qui pique, une question directe). Exemple : « Voici comment j'ai automatisé ma visibilité sur internet. »
+2. Le corps : la valeur, dite simplement, avec le raisonnement derrière.
+3. La fin, naturelle : « Commente MOT et je t'envoie [la ressource]. » (formulation libre, mot-clé en majuscules, ressource envoyée en message privé). Varie les mots-clés.
+
+LA RESSOURCE (resource_body) : ce que reçoivent ceux qui commentent. Elle tient la promesse du post et vaut plus que lui : guide pas à pas, checklist, modèles de messages à copier, plan d'action, prompts prêts à l'emploi… Ici la structure est bienvenue (Markdown simple : titres, listes, étapes, gras). Ton direct et chaleureux, tutoiement, concret et actionnable tout de suite, signée « Lomig — Payment Flow ». Mêmes règles d'honnêteté : rien d'inventé, pas de lien externe.
+
+Pas de fautes d'orthographe : l'effet « écrit à la main » est ajouté ensuite automatiquement. Chaque post traite un sujet différent des sujets récents qu'on te donne.`;
 
 // Remplit le stock (7 jours d'avance)
 export async function fillPosts(): Promise<{ created: number }> {
