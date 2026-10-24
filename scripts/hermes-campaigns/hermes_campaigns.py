@@ -20,6 +20,8 @@ HERMES = '/root/.hermes'
 FILES = ['data/emails_a_envoyer.csv', 'data/emails_video_a_envoyer.csv']
 # Mails partis en HTML avec le pixel d'Hermès (send_video_daily.py) ; ceux de send_emails.py partent en texte brut
 TRACKED = {'data/emails_video_a_envoyer.csv'}
+# Pixel d'Hermès en service depuis le 19/10/2026 au soir : les mails envoyés avant ne peuvent pas avoir d'ouverture
+PIXEL_SINCE = '2026-10-20'
 OPENS = f'{HERMES}/data/ouvertures.log'      # une ligne JSON par ouverture : id = md5(email), ts, ip
 OWN_IPS = {'187.55.224.186', '127.0.0.1'}    # tests du pixel depuis le VPS
 # Gmail (proxy d'images Google) et les filtres Microsoft chargent le pixel 2 à 30 s après l'envoi, sans lecteur :
@@ -104,7 +106,7 @@ def campaigns():
             word = re.sub(r'\W+', '', (r.get('objet') or 'mail').split(' ')[0].lower()) or 'mail'
             cid = f'hermes-{stem}-{word}-{day}'
             c = out.setdefault(cid, {'id': cid, 'name': f"{word.capitalize()} · {day[8:10]}/{day[5:7]}", 'source': f,
-                                     'tracked': f in TRACKED, 'messages': []})
+                                     'tracked': f in TRACKED and day >= PIXEL_SINCE, 'messages': []})
             c['messages'].append({'gmail_id': r['message_id'], 'email': r['email'].strip().lower(), 'company': r.get('entreprise'),
                                   'subject': r.get('objet'), 'sent_at': iso_local(r.get('date_envoi', '')),
                                   'mailbox': (r.get('expediteur') or ME).strip().lower()})
