@@ -114,8 +114,30 @@ async function publishOne(post: any, auth: any): Promise<void> {
   await db().from('linkedin_posts').update({ status: 'published', post_urn: urn, published_at: new Date().toISOString(), error: null, updated_at: new Date().toISOString() }).eq('id', post.id);
 }
 
+// Posts en retard de plus de 3 h (profil déconnecté, pas de selfie…) : décalés à la suite du planning,
+// sur les créneaux libres, au lieu de partir en rafale dès que la publication redevient possible
+async function rescheduleLate(): Promise<number> {
+  const { data: late } = await db().from('linkedin_posts').select('id').eq('status', 'scheduled')
+    .lt('scheduled_at', new Date(Date.now() - 3 * 3600_000).toISOString()).order('scheduled_at');
+  if (!late?.length) return 0;
+  const { data: taken } = await db().from('linkedin_posts').select('scheduled_at').in('status', ['scheduled', 'publishing', 'published']).gte('scheduled_at', new Date().toISOString());
+  const busy = new Set((taken ?? []).map((t: any) => Math.floor(new Date(t.scheduled_at).getTime() / 3600_000)));
+  const free: Date[] = [];
+  for (let k = 0; free.length < late.length && k < 60; k++) {
+    for (const d of slotsFor(parisDay(new Date(Date.now() + k * 86400_000)))) {
+      if (d.getTime() > Date.now() + 10 * 60_000 && !busy.has(Math.floor(d.getTime() / 3600_000))) free.push(d);
+    }
+  }
+  for (const [i, p] of late.entries()) {
+    if (!free[i]) break;
+    await db().from('linkedin_posts').update({ scheduled_at: free[i].toISOString(), updated_at: new Date().toISOString() }).eq('id', p.id).eq('status', 'scheduled');
+  }
+  return late.length;
+}
+
 // Publie les posts dus (appelé chaque minute par le VPS via publish-tick)
 export async function publishDuePosts(): Promise<{ id: string; status: string }[]> {
+  await rescheduleLate();
   const { data: due } = await db().from('linkedin_posts').select('*').eq('status', 'scheduled').lte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(2);
   if (!due?.length) return [];
   const { data: auth } = await db().from('linkedin_oauth').select('*').eq('id', 1).maybeSingle();
