@@ -79,6 +79,36 @@ async function toSquare(f: File): Promise<Blob> {
   return new Promise((ok, ko) => c.toBlob((b) => (b ? ok(b) : ko(new Error(`Photo illisible : ${f.name}`))), 'image/jpeg', 0.9));
 }
 
+// CTA du modèle : toujours le même mot, ajouté par le CRM à la fin de chaque post (et des posts non publiés)
+function TemplateCta({ settings, example }: { settings: { cta_keyword: string; cta_template: string }; example: string }) {
+  const qc = useQueryClient();
+  const [word, setWord] = useState(settings.cta_keyword);
+  const [tpl, setTpl] = useState(settings.cta_template);
+  const save = useMutation({
+    mutationFn: () => linkedinPostsApi.action({ action: 'settings', cta_keyword: word, cta_template: tpl }).then((r) => r.data as { updated: number }),
+    onSuccess: (d) => { toast.success(`Modèle enregistré${d.updated ? ` : ${d.updated} post${d.updated > 1 ? 's' : ''} à venir mis à jour` : ''}`); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
+  });
+  const preview = tpl.replace(/\{mot\}/g, word.toUpperCase() || 'GO').replace(/\{ressource\}/g, example.replace(/^./, (c) => c.toLowerCase()));
+  const changed = word !== settings.cta_keyword || tpl !== settings.cta_template;
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          <span className="block text-xs text-gray-500 mb-1">Mot à commenter (le même pour tous les posts)</span>
+          <input value={word} onChange={(e) => setWord(e.target.value.toUpperCase())} className="input w-36 font-mono" maxLength={20} />
+        </label>
+        <label className="text-sm flex-1 min-w-[280px]">
+          <span className="block text-xs text-gray-500 mb-1">Phrase du CTA : {'{mot}'} = le mot, {'{ressource}'} = la ressource du post</span>
+          <input value={tpl} onChange={(e) => setTpl(e.target.value)} className="input w-full" maxLength={300} />
+        </label>
+        <button onClick={() => save.mutate()} disabled={!changed || save.isPending} className="btn-primary text-sm">Enregistrer</button>
+      </div>
+      <p className="text-sm text-gray-600">Aperçu : <i>{preview}</i></p>
+    </div>
+  );
+}
+
 export default function LinkedinPostsPage() {
   const qc = useQueryClient();
   const file = useRef<HTMLInputElement>(null);
@@ -130,7 +160,7 @@ export default function LinkedinPostsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Linkedin className="w-6 h-6 text-[#0a66c2]" />Posts LinkedIn automatiques</h1>
-        <p className="text-sm text-gray-500 mt-1">10 posts par semaine sur ton profil, du lundi au vendredi : un post 💡 valeur vers 8 h 25 et un post 🔥 provoc vers 12 h 35. Accroche d&apos;une ligne, des raisons ou des points en liste, puis « Commente MOT et je t&apos;envoie la ressource ». <b>Aucun post ne part sans ta validation</b> : relis, modifie, valide. Claude en prépare 4 à l&apos;avance. Chaque post part avec un de tes selfies, recadré en carré.</p>
+        <p className="text-sm text-gray-500 mt-1">10 posts par semaine sur ton profil, du lundi au vendredi : un post 💡 valeur vers 8 h 25 et un post 🔥 provoc vers 12 h 35. Accroche d&apos;une ligne, des raisons ou des points en liste, puis ton CTA, toujours le même mot (réglé dans le modèle ci-dessous). <b>Aucun post ne part sans ta validation</b> : relis, modifie, valide. Claude en prépare 4 à l&apos;avance. Chaque post part avec un de tes selfies, recadré en carré.</p>
       </div>
       {(!c.connected || data.photos.length === 0) && (
         <div className="card p-4 border-amber-300 bg-amber-50 text-sm text-amber-800 flex items-start gap-2">
@@ -147,24 +177,28 @@ export default function LinkedinPostsPage() {
         <button onClick={() => fill.mutate()} disabled={fill.isPending} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{fill.isPending ? <Spinner /> : <Sparkles className="w-4 h-4" />}Écrire les prochains posts</button>
       </div>
 
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold text-gray-900">Selfies ({data.photos.length})</h2>
-          <p className="text-xs text-gray-500">Un par post, le moins utilisé d&apos;abord. Des photos naturelles, prises au téléphone.</p>
-          <input ref={file} type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
-          <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des selfies</button>
-        </div>
-        {data.photos.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {data.photos.map((ph) => (
-              <div key={ph.id} className="relative group">
-                <img src={ph.url} alt="" className="w-28 h-28 object-cover rounded-lg" />
-                <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 rounded">{ph.uses} post{ph.uses > 1 ? 's' : ''}</span>
-                <button onClick={() => delPhoto.mutate(ph.id)} className="absolute top-1 right-1 p-1 rounded bg-white/90 text-red-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
+      <div className="card p-4 space-y-4">
+        <h2 className="font-semibold text-gray-900">Modèle des posts</h2>
+        <TemplateCta settings={data.settings} example={upcoming[0]?.resource_title ?? 'ma checklist pour lancer son activité'} />
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center gap-3">
+            <h3 className="font-medium text-gray-900">Tes selfies ({data.photos.length})</h3>
+            <p className="text-xs text-gray-500">Recadrés en carré au dépôt. Un par post, le moins utilisé d&apos;abord.</p>
+            <input ref={file} type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
+            <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des selfies</button>
           </div>
-        )}
+          {data.photos.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {data.photos.map((ph) => (
+                <div key={ph.id} className="relative group">
+                  <img src={ph.url} alt="" className="w-28 h-28 object-cover rounded-lg" />
+                  <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 rounded">{ph.uses} post{ph.uses > 1 ? 's' : ''}</span>
+                  <button onClick={() => delPhoto.mutate(ph.id)} className="absolute top-1 right-1 p-1 rounded bg-white/90 text-red-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div>

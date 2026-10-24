@@ -219,11 +219,10 @@ export function humanize(text: string, seed: string): string {
 
 const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['posts'],
-  properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['topic', 'body', 'keyword', 'resource_title', 'resource_body'], properties: {
+  properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['topic', 'body', 'resource_title', 'resource_body'], properties: {
     topic: { type: 'string', description: 'Sujet en 3 à 6 mots (pour éviter les répétitions)' },
-    body: { type: 'string', description: 'Le post complet, ton parlé et naturel, prêt à publier, qui se termine par le CTA avec le mot-clé' },
-    keyword: { type: 'string', description: 'Le mot à commenter, un seul mot en majuscules sans accent (ex. CHECKLIST, GUIDE, SCRIPT)' },
-    resource_title: { type: 'string', description: 'Titre de la ressource offerte, 4 à 10 mots (ex. « La checklist des 12 points qui font appeler un client »)' },
+    body: { type: 'string', description: 'Le post SANS le CTA final (le CRM l\'ajoute), ton parlé et naturel' },
+    resource_title: { type: 'string', description: 'La ressource offerte, 4 à 10 mots, commençant par un déterminant, qui se lit après « je t\'envoie » (ex. « ma checklist pour lancer son activité », « mon organisation de semaine »)' },
     resource_body: { type: 'string', description: 'La ressource complète en Markdown simple (# titres, - listes, 1. étapes, **gras**), 2 500 à 6 000 caractères' },
   } } } },
 };
@@ -250,21 +249,32 @@ DEUX TYPES DE POSTS (on te dit lequel écrire) :
 - Ligne 1 = l'accroche, UNE seule ligne, tranchée, à contre-courant. Exemples de Lomig : « Je travaille 80h par semaine et je trouve ça normal. » / « J'ai 24 ans, je vais faire 100k/mois de CA à la fin de l'année et voici pourquoi j'ai décidé de quitter la France. » / « Arrête de… »
 - Puis 3 ou 4 raisons, une par ligne, courtes et percutantes, présentées en liste (- raison).
 - Puis une phrase qui assume la position (sans se justifier ni s'excuser).
-- Puis le CTA.
 
 « valeur » — un contenu utile qui donne envie de récupérer la ressource.
 - Ligne 1 = l'accroche, UNE seule ligne : « Voici comment … » ou « Arrête de … » (ou très proche).
 - Puis le contenu : 3 ou 4 points concrets, en liste (- point), chacun applicable tout de suite.
 - Puis une phrase de conclusion.
-- Puis le CTA.
 
-CTA (les deux types) : « Commente MOT et je t'envoie [la ressource] gratuitement. » Mot-clé en majuscules, un seul mot, différent d'un post à l'autre.
+CTA : ne l'écris PAS. Le CRM ajoute lui-même la dernière ligne (« Commente GO et je t'envoie [resource_title] gratuitement. », modèle réglé par Lomig). Ton texte s'arrête juste avant, sur la phrase qui assume ou qui conclut, et resource_title doit se lire naturellement après « je t'envoie ».
 
 TON : naturel, direct, parlé, tutoiement. Phrases courtes. Pas de jargon ni de formules de gourou (« game changer », « levier », « dans un monde où »), pas de question finale du type « et vous ? », 0 à 2 emoji, aucun hashtag. 400 à 900 caractères.
 
 LA RESSOURCE (resource_body) : ce que reçoivent ceux qui commentent. Elle tient la promesse du post et va plus loin : guide pas à pas, checklist, modèles à copier, plan d'action, prompts… Markdown simple (titres, listes, étapes, gras), tutoiement, concrète, signée « Lomig — Payment Flow ». Pour un post « provoc », la ressource prolonge le sujet de façon utile (ex. « mon organisation de semaine », « ma checklist pour… »). Rien d'inventé, pas de lien externe.
 
 Pas de fautes d'orthographe : l'effet « écrit à la main » est ajouté ensuite automatiquement. Chaque post traite un sujet différent des sujets récents qu'on te donne.`;
+
+// ── Modèle réglé par Lomig : CTA toujours le même mot, ajouté par le CRM à la fin de chaque post ──
+export interface PostSettings { cta_keyword: string; cta_template: string }
+export async function postSettings(): Promise<PostSettings> {
+  const { data } = await db().from('linkedin_post_settings').select('cta_keyword, cta_template').eq('id', 1).maybeSingle();
+  return { cta_keyword: data?.cta_keyword || 'GO', cta_template: data?.cta_template || 'Commente {mot} et je t\'envoie {ressource} gratuitement.' };
+}
+const lowerFirst = (t: string) => t.trim().replace(/^./, (c) => c.toLowerCase()).replace(/[.!\s]+$/, '');
+export const ctaLine = (tpl: PostSettings, resource: string) =>
+  tpl.cta_template.replace(/\{mot\}/g, tpl.cta_keyword).replace(/\{ressource\}/g, lowerFirst(resource || 'la ressource'));
+// Dernier paragraphe « Commente … » / « Écris … en commentaire » retiré (Claude l'ajoute parfois quand même)
+export const stripCta = (body: string) => body.trim().replace(/\n\n(?:[^\n]*\b(?:commente|commentaire)\b[^\n]*)$/i, '').trim();
+export const withCta = (body: string, tpl: PostSettings, resource: string) => `${stripCta(body)}\n\n${ctaLine(tpl, resource)}`;
 
 // Remplit le stock (7 jours d'avance)
 export async function fillPosts(): Promise<{ created: number }> {
@@ -295,15 +305,16 @@ export async function fillPosts(): Promise<{ created: number }> {
     messages: [{ role: 'user', content: prompt }],
   } as any);
   const text = (response.content as any[]).find((b) => b.type === 'text')?.text ?? '{}';
-  const posts = (JSON.parse(text).posts ?? []).filter((p: any) => p.body?.trim().length > 200 && p.resource_body?.trim().length > 800 && p.keyword);
+  const posts = (JSON.parse(text).posts ?? []).filter((p: any) => p.body?.trim().length > 200 && p.resource_body?.trim().length > 800 && p.resource_title);
 
+  const tpl = await postSettings();
   let created = 0;
   for (const [k, p] of posts.slice(0, free.length).entries()) {
-    const keyword = String(p.keyword).normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 20);
+    const keyword = tpl.cta_keyword;
     const slug = `${keyword.toLowerCase()}-${randomBytes(3).toString('hex')}`;
     const { error } = await db().from('linkedin_posts').insert({
       scheduled_at: free[k].toISOString(), topic: String(p.topic).slice(0, 120), kind: kinds[k],
-      body: humanize(String(p.body).trim(), free[k].toISOString()), keyword,
+      body: withCta(humanize(stripCta(String(p.body)), free[k].toISOString()), tpl, String(p.resource_title)), keyword,
       resource_title: String(p.resource_title).slice(0, 160), resource_body: String(p.resource_body).trim(), resource_slug: slug,
     });
     if (!error) created++;

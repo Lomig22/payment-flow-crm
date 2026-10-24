@@ -481,7 +481,7 @@ export interface LinkedinPost { id: string; scheduled_at: string; topic: string 
   keyword: string | null; resource_title: string | null; resource_slug: string | null; approved_at: string | null; kind: 'provoc' | 'valeur' | null }
 export interface LinkedinPhoto { id: string; storage_path: string; url: string; uses: number }
 export const linkedinPostsApi = {
-  list:   () => api.get<{ connection: { connected: boolean; name?: string; expires_at?: string }; photos: LinkedinPhoto[]; posts: LinkedinPost[] }>('/linkedin/posts'),
+  list:   () => api.get<{ connection: { connected: boolean; name?: string; expires_at?: string }; settings: { cta_keyword: string; cta_template: string }; photos: LinkedinPhoto[]; posts: LinkedinPost[] }>('/linkedin/posts'),
   action: (body: Record<string, unknown>) => api.post('/linkedin/posts', body),
   connectUrl: () => api.get<{ url: string }>('/linkedin/oauth/start'),
 };
