@@ -21,7 +21,10 @@ const DAYS_AHEAD = 7;
 
 // Créneaux (heure de Paris) : 2 posts par jour, tous les jours (LinkedIn inbound, 22/10/2026) ;
 // quelques minutes de décalage d'un jour à l'autre
-const SLOTS: [number, number][] = [[8, 25], [12, 35]];
+// 10 posts par semaine (notes de Lomig du 25/10/2026) : du lundi au vendredi, un post « valeur » le matin
+// et un post « provoc » le midi, soit 5 + 5. Aucun le week-end.
+const SLOTS: [number, number, 'valeur' | 'provoc'][] = [[8, 25, 'valeur'], [12, 35, 'provoc']];
+const PENDING_MAX = 4;   // posts à valider en attente : Claude n'en écrit pas plus tant que Lomig n'a pas validé
 export const SITE = 'https://payment-flow-crm-delta.vercel.app';
 export const resourceUrl = (slug: string) => `${SITE}/r/${slug}`;
 
@@ -138,7 +141,8 @@ async function rescheduleLate(): Promise<number> {
 // Publie les posts dus (appelé chaque minute par le VPS via publish-tick)
 export async function publishDuePosts(): Promise<{ id: string; status: string }[]> {
   await rescheduleLate();
-  const { data: due } = await db().from('linkedin_posts').select('*').eq('status', 'scheduled').lte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(2);
+  // Seulement les posts validés par Lomig (25/10/2026)
+  const { data: due } = await db().from('linkedin_posts').select('*').eq('status', 'scheduled').not('approved_at', 'is', null).lte('scheduled_at', new Date().toISOString()).order('scheduled_at').limit(2);
   if (!due?.length) return [];
   const { data: auth } = await db().from('linkedin_oauth').select('*').eq('id', 1).maybeSingle();
   if (!auth || new Date(auth.expires_at).getTime() < Date.now()) return [];   // reconnexion nécessaire : rien ne part
@@ -186,8 +190,11 @@ const parisDay = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone
 const hash = (s: string) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 
 function slotsFor(day: string): Date[] {
+  const wd = new Date(`${day}T12:00:00Z`).getUTCDay();
+  if (wd === 0 || wd === 6) return [];
   return SLOTS.map(([h, m], k) => parisInstant(day, h, m + (hash(day + k) % 9) - 4));
 }
+const kindOf = (d: Date) => (Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false }).format(d)) < 11 ? 'valeur' : 'provoc');
 
 // Rendu « écrit à la main » : 1 à 2 espaces mal placés, hors de la phrase d'accroche, jamais dans un mot
 export function humanize(text: string, seed: string): string {
@@ -221,25 +228,41 @@ const SCHEMA = {
   } } } },
 };
 
-const SYSTEM = `Tu écris les posts LinkedIn de Lomig Guéguéniat, fondateur de Payment Flow, à la première personne, comme s'il les tapait lui-même sur son téléphone entre deux rendez-vous.
+// Faits personnels donnés par Lomig (notes du 25/10/2026) : les seuls que les posts peuvent affirmer sur lui
+const FACTS = [
+  'Lomig a 24 ans.',
+  'Objectif annoncé : 100 000 € de chiffre d\'affaires par mois d\'ici la fin de l\'année (c\'est un objectif, pas un résultat atteint).',
+  'Il a décidé de quitter la France.',
+  'Il travaille autour de 80 heures par semaine, et l\'assume.',
+  'Il est fondateur de Payment Flow : plus de 250 artisans accompagnés.',
+  'Il automatise sa propre acquisition : contenus programmés, emails, listes de leads, agents IA.',
+];
 
-À QUI : des dirigeants — patrons de TPE/PME, indépendants, fondateurs, gérants d'agence ou de société de services. Pas spécialement des artisans : parle-leur de leurs sujets à eux (trouver des clients sans y passer ses soirées, automatiser sa visibilité et sa prospection, déléguer à des outils et à l'IA, garder du temps pour son métier, les erreurs de dirigeant qu'on fait tous).
-QUI EST LOMIG : il automatise sa propre acquisition (contenus programmés, emails, listes de leads, agents IA) et aide les entreprises à recevoir des demandes de clients en continu. Fait vérifiable utilisable si utile : plus de 250 artisans accompagnés avec Payment Flow.
+const SYSTEM = `Tu écris les posts LinkedIn de Lomig Guéguéniat, à la première personne, comme s'il les tapait lui-même sur son téléphone. Lectorat : des dirigeants (TPE/PME, indépendants, fondateurs). Objectif : un maximum de commentaires.
 
-TON — LE PLUS IMPORTANT : NATUREL. Le post doit sonner comme quelqu'un qui parle, pas comme un formateur.
-- Écris comme on parle : phrases courtes, parfois incomplètes, mots du quotidien (« franchement », « en vrai », « bon », « le truc c'est que »), une pointe d'humour ou d'autodérision.
-- Un avis assumé, une conviction, un constat — pas un cours. Pas de « Voici la méthode en 5 étapes », pas de « Étape 1 / Jour 2 », pas de titres, pas de flèches ni de puces en série. Au plus une petite liste de 3 éléments, et seulement si elle est naturelle.
-- Pas de formules de gourou ni de phrases toutes faites (« dans un monde où », « game changer », « levier », « et vous, qu'en pensez-vous ? »). Pas de majuscules d'emphase, 0 à 2 emoji, aucun hashtag.
-- 500 à 1 000 caractères. Aère : une à trois phrases par paragraphe.
+FAITS SUR LOMIG (les seuls que tu peux affirmer sur lui, sans les déformer ni les grossir) :
+${FACTS.map((f) => `- ${f}`).join('\n')}
+Rien d'autre d'inventé : ni anecdote, ni client, ni chiffre, ni résultat. Un objectif reste un objectif (« je vais faire », « je vise »), jamais « j'ai fait ».
 
-HONNÊTETÉ : aucune anecdote, conversation, client, chiffre ou résultat inventé. Pas de « ce matin un client m'a dit… », pas de « j'ai fait x3 ». Tu peux parler de ce que Lomig fait et pense, de constats généraux formulés comme tels (« beaucoup de dirigeants… », « je vois souvent… »), et de raisonnements. Pas de promesse garantie. On vend le résultat, jamais les moyens publicitaires (ne cite pas d'outil pub ni de « campagnes »).
+DEUX TYPES DE POSTS (on te dit lequel écrire) :
 
-STRUCTURE :
-1. Première ligne = l'accroche : une phrase qui arrête le scroll (un avis tranché, un constat qui pique, une question directe). Exemple : « Voici comment j'ai automatisé ma visibilité sur internet. »
-2. Le corps : la valeur, dite simplement, avec le raisonnement derrière.
-3. La fin, naturelle : « Commente MOT et je t'envoie [la ressource]. » (formulation libre, mot-clé en majuscules, ressource envoyée en message privé). Varie les mots-clés.
+« provoc » — une prise de position qui fait réagir et débattre.
+- Ligne 1 = l'accroche, UNE seule ligne, tranchée, à contre-courant. Exemples de Lomig : « Je travaille 80h par semaine et je trouve ça normal. » / « J'ai 24 ans, je vais faire 100k/mois de CA à la fin de l'année et voici pourquoi j'ai décidé de quitter la France. » / « Arrête de… »
+- Puis 3 ou 4 raisons, une par ligne, courtes et percutantes, présentées en liste (- raison).
+- Puis une phrase qui assume la position (sans se justifier ni s'excuser).
+- Puis le CTA.
 
-LA RESSOURCE (resource_body) : ce que reçoivent ceux qui commentent. Elle tient la promesse du post et vaut plus que lui : guide pas à pas, checklist, modèles de messages à copier, plan d'action, prompts prêts à l'emploi… Ici la structure est bienvenue (Markdown simple : titres, listes, étapes, gras). Ton direct et chaleureux, tutoiement, concret et actionnable tout de suite, signée « Lomig — Payment Flow ». Mêmes règles d'honnêteté : rien d'inventé, pas de lien externe.
+« valeur » — un contenu utile qui donne envie de récupérer la ressource.
+- Ligne 1 = l'accroche, UNE seule ligne : « Voici comment … » ou « Arrête de … » (ou très proche).
+- Puis le contenu : 3 ou 4 points concrets, en liste (- point), chacun applicable tout de suite.
+- Puis une phrase de conclusion.
+- Puis le CTA.
+
+CTA (les deux types) : « Commente MOT et je t'envoie [la ressource] gratuitement. » Mot-clé en majuscules, un seul mot, différent d'un post à l'autre.
+
+TON : naturel, direct, parlé, tutoiement. Phrases courtes. Pas de jargon ni de formules de gourou (« game changer », « levier », « dans un monde où »), pas de question finale du type « et vous ? », 0 à 2 emoji, aucun hashtag. 400 à 900 caractères.
+
+LA RESSOURCE (resource_body) : ce que reçoivent ceux qui commentent. Elle tient la promesse du post et va plus loin : guide pas à pas, checklist, modèles à copier, plan d'action, prompts… Markdown simple (titres, listes, étapes, gras), tutoiement, concrète, signée « Lomig — Payment Flow ». Pour un post « provoc », la ressource prolonge le sujet de façon utile (ex. « mon organisation de semaine », « ma checklist pour… »). Rien d'inventé, pas de lien externe.
 
 Pas de fautes d'orthographe : l'effet « écrit à la main » est ajouté ensuite automatiquement. Chaque post traite un sujet différent des sujets récents qu'on te donne.`;
 
@@ -249,15 +272,20 @@ export async function fillPosts(): Promise<{ created: number }> {
   const days = Array.from({ length: DAYS_AHEAD }, (_, k) => parisDay(new Date(now + k * 86400_000)));
   const { data: taken } = await db().from('linkedin_posts').select('scheduled_at').neq('status', 'cancelled').gte('scheduled_at', new Date(now).toISOString());
   const busy = new Set((taken ?? []).map((t: any) => new Date(t.scheduled_at).getTime()));
-  const free = days.flatMap(slotsFor).filter((d) => d.getTime() > now + 10 * 60_000 && !busy.has(d.getTime())).slice(0, 2);   // 2 par passage (post + ressource) : l'écriture tient dans le temps d'une fonction Vercel
+  // Pas plus de PENDING_MAX posts en attente de validation ; 2 par passage (post + ressource : temps d'une fonction Vercel)
+  const { count: pending } = await db().from('linkedin_posts').select('id', { count: 'exact', head: true }).eq('status', 'scheduled').is('approved_at', null);
+  const room = Math.min(2, PENDING_MAX - (pending ?? 0));
+  if (room <= 0) return { created: 0 };
+  const free = days.flatMap(slotsFor).filter((d) => d.getTime() > now + 10 * 60_000 && !busy.has(d.getTime())).slice(0, room);
   if (!free.length) return { created: 0 };
+  const kinds = free.map(kindOf);
 
   const [{ data: recent }, { data: notes }] = await Promise.all([
     db().from('linkedin_posts').select('topic, keyword').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(30),
     db().from('linkedin_posts').select('topic, feedback').not('feedback', 'is', null).order('updated_at', { ascending: false }).limit(15),
   ]);
   const prompt = [
-    `Écris ${free.length} posts LinkedIn différents.`,
+    `Écris ${free.length} posts LinkedIn différents, dans cet ordre : ${kinds.map((k, i) => `${i + 1}. un post « ${k} »`).join(', ')}.`,
     recent?.length ? `Sujets récents à ne pas répéter (mot-clé utilisé) :\n${recent.map((r: any) => `- ${r.topic}${r.keyword ? ` (${r.keyword})` : ''}`).join('\n')}` : '',
     notes?.length ? `Retours de Lomig sur des posts précédents (à appliquer) :\n${notes.map((n: any) => `- « ${n.topic} » : ${n.feedback}`).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
@@ -274,7 +302,7 @@ export async function fillPosts(): Promise<{ created: number }> {
     const keyword = String(p.keyword).normalize('NFD').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 20);
     const slug = `${keyword.toLowerCase()}-${randomBytes(3).toString('hex')}`;
     const { error } = await db().from('linkedin_posts').insert({
-      scheduled_at: free[k].toISOString(), topic: String(p.topic).slice(0, 120),
+      scheduled_at: free[k].toISOString(), topic: String(p.topic).slice(0, 120), kind: kinds[k],
       body: humanize(String(p.body).trim(), free[k].toISOString()), keyword,
       resource_title: String(p.resource_title).slice(0, 160), resource_body: String(p.resource_body).trim(), resource_slug: slug,
     });

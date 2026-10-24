@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
     case 'cancel':
       await db().from('linkedin_posts').update({ status: 'cancelled', feedback: b.feedback?.trim() || null, updated_at: now }).eq('id', b.id).eq('status', 'scheduled');
       return NextResponse.json({ ok: true });
+    case 'approve':
+    case 'unapprove':
+      await db().from('linkedin_posts').update({ approved_at: b.action === 'approve' ? now : null, updated_at: now }).eq('id', b.id).eq('status', 'scheduled');
+      return NextResponse.json({ ok: true });
     case 'feedback':
       await db().from('linkedin_posts').update({ feedback: b.feedback?.trim() || null, updated_at: now }).eq('id', b.id);
       return NextResponse.json({ ok: true });

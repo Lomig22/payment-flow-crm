@@ -28,7 +28,7 @@ function PostCard({ p }: { p: LinkedinPost }) {
   const [body, setBody] = useState(p.body);
   const act = useMutation({
     mutationFn: (b: Record<string, unknown>) => linkedinPostsApi.action({ id: p.id, ...b }),
-    onSuccess: (_d, b) => { toast.success(b.action === 'cancel' ? 'Post retiré' : b.action === 'edit' ? 'Post modifié' : 'Retour enregistré : Claude en tiendra compte'); setEdit(false); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
+    onSuccess: (_d, b) => { toast.success(b.action === 'cancel' ? 'Post retiré' : b.action === 'edit' ? 'Post modifié' : b.action === 'approve' ? 'Post validé : il partira à l\'heure prévue' : b.action === 'unapprove' ? 'Validation retirée' : 'Retour enregistré : Claude en tiendra compte'); setEdit(false); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
   });
   const open = p.status === 'scheduled';
@@ -37,7 +37,8 @@ function PostCard({ p }: { p: LinkedinPost }) {
   return (
     <div className="card p-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>{st.label} · {fmt(p.published_at ?? p.scheduled_at)}</span>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>{open && !p.approved_at ? 'À valider' : st.label} · {fmt(p.published_at ?? p.scheduled_at)}</span>
+        {p.kind && <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${p.kind === 'provoc' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>{p.kind === 'provoc' ? '🔥 Provoc' : '💡 Valeur'}</span>}
         {p.topic && <span className="text-xs text-gray-500">{p.topic}</span>}
         {link && <a href={link} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 inline-flex items-center gap-1">Voir sur LinkedIn <ExternalLink className="w-3 h-3" /></a>}
       </div>
@@ -58,12 +59,24 @@ function PostCard({ p }: { p: LinkedinPost }) {
       <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ton retour (ton, accroche, offre, longueur…) : Claude l'appliquera aux prochains posts" className="input text-sm" />
       <div className="flex flex-wrap gap-2">
         <button onClick={() => act.mutate({ action: 'feedback', feedback: note })} disabled={act.isPending || !note.trim()} className="btn-secondary text-sm">Envoyer le retour</button>
+        {open && !p.approved_at && <button onClick={() => act.mutate({ action: 'approve' })} disabled={act.isPending} className="btn-primary inline-flex items-center gap-1.5 text-sm"><Check className="w-4 h-4" />Valider</button>}
+        {open && p.approved_at && <button onClick={() => act.mutate({ action: 'unapprove' })} disabled={act.isPending} className="btn-secondary text-sm">Retirer la validation</button>}
         {open && !edit && <button onClick={() => setEdit(true)} className="btn-secondary inline-flex items-center gap-1.5 text-sm"><Pencil className="w-4 h-4" />Modifier</button>}
         {open && edit && <button onClick={() => act.mutate({ action: 'edit', body, photo_id: p.photo_id })} disabled={act.isPending} className="btn-primary inline-flex items-center gap-1.5 text-sm"><Check className="w-4 h-4" />Enregistrer</button>}
         {open && <button onClick={() => act.mutate({ action: 'cancel', feedback: note })} disabled={act.isPending} className="btn-secondary inline-flex items-center gap-1.5 text-sm text-red-600"><X className="w-4 h-4" />Retirer</button>}
       </div>
     </div>
   );
+}
+
+// Selfie recadré en carré (centré, 1 080 × 1 080, JPEG) avant l'envoi : format demandé par Lomig
+async function toSquare(f: File): Promise<Blob> {
+  const img = await createImageBitmap(f, { imageOrientation: 'from-image' } as any);
+  const side = Math.min(img.width, img.height), out = Math.min(1080, side);
+  const c = document.createElement('canvas');
+  c.width = c.height = out;
+  c.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, out, out);
+  return new Promise((ok, ko) => c.toBlob((b) => (b ? ok(b) : ko(new Error(`Photo illisible : ${f.name}`))), 'image/jpeg', 0.9));
 }
 
 export default function LinkedinPostsPage() {
@@ -83,7 +96,7 @@ export default function LinkedinPostsPage() {
   const connect = async () => { const { data: d } = await linkedinPostsApi.connectUrl(); window.location.href = d.url; };
   const fill = useMutation({
     mutationFn: () => linkedinPostsApi.action({ action: 'fill' }).then((r) => r.data as { created: number }),
-    onSuccess: (d) => { toast.success(d.created ? `${d.created} posts écrits` : 'Le planning des 7 prochains jours est déjà plein'); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
+    onSuccess: (d) => { toast.success(d.created ? `${d.created} posts écrits` : 'Rien de plus pour l\'instant : 4 posts attendent déjà ta validation'); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
   });
   const upload = async (files: FileList | null) => {
@@ -91,10 +104,11 @@ export default function LinkedinPostsPage() {
     setUploading(true);
     try {
       for (const f of Array.from(files)) {
-        const { data: u } = await linkedinPostsApi.action({ action: 'photo_upload_url', name: f.name }) as any;
+        const square = await toSquare(f);
+        const { data: u } = await linkedinPostsApi.action({ action: 'photo_upload_url', name: 'selfie.jpg' }) as any;
         const form = new FormData();
         form.append('cacheControl', '3600');
-        form.append('', f, f.name);
+        form.append('', square, 'selfie.jpg');
         const r = await fetch(u.signed_url, { method: 'PUT', body: form });
         if (!r.ok) throw new Error(`Envoi de ${f.name} : HTTP ${r.status}`);
         await linkedinPostsApi.action({ action: 'photo_add', path: u.path, label: f.name });
@@ -116,7 +130,7 @@ export default function LinkedinPostsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Linkedin className="w-6 h-6 text-[#0a66c2]" />Posts LinkedIn automatiques</h1>
-        <p className="text-sm text-gray-500 mt-1">2 posts par jour sur ton profil (vers 8 h 25 et 12 h 35) : une accroche, de la valeur, puis « Commente MOT et je t&apos;envoie la ressource ». Claude écrit aussi la ressource : envoie son lien en message privé à chaque personne qui commente. Chaque post part avec un de tes selfies, le moins utilisé d&apos;abord.</p>
+        <p className="text-sm text-gray-500 mt-1">10 posts par semaine sur ton profil, du lundi au vendredi : un post 💡 valeur vers 8 h 25 et un post 🔥 provoc vers 12 h 35. Accroche d&apos;une ligne, des raisons ou des points en liste, puis « Commente MOT et je t&apos;envoie la ressource ». <b>Aucun post ne part sans ta validation</b> : relis, modifie, valide. Claude en prépare 4 à l&apos;avance. Chaque post part avec un de tes selfies, recadré en carré.</p>
       </div>
       {(!c.connected || data.photos.length === 0) && (
         <div className="card p-4 border-amber-300 bg-amber-50 text-sm text-amber-800 flex items-start gap-2">
@@ -137,7 +151,7 @@ export default function LinkedinPostsPage() {
         <div className="flex items-center gap-3">
           <h2 className="font-semibold text-gray-900">Selfies ({data.photos.length})</h2>
           <p className="text-xs text-gray-500">Un par post, le moins utilisé d&apos;abord. Des photos naturelles, prises au téléphone.</p>
-          <input ref={file} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
+          <input ref={file} type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
           <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des selfies</button>
         </div>
         {data.photos.length > 0 && (
