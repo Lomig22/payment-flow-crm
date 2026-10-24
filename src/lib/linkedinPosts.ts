@@ -17,14 +17,14 @@ const MODEL = 'claude-opus-5-5';
 const API = 'https://api.linkedin.com';
 export const REDIRECT_URI = 'https://payment-flow-crm-delta.vercel.app/api/linkedin/oauth/callback';
 const SCOPES = 'openid profile w_member_social';
-const DAYS_AHEAD = 7;
+const DAYS_AHEAD = 14;   // deux semaines d'avance (10 posts par semaine)
 
 // Créneaux (heure de Paris) : 2 posts par jour, tous les jours (LinkedIn inbound, 22/10/2026) ;
 // quelques minutes de décalage d'un jour à l'autre
 // 10 posts par semaine (notes de Lomig du 25/10/2026) : du lundi au vendredi, un post « valeur » le matin
 // et un post « provoc » le midi, soit 5 + 5. Aucun le week-end.
 const SLOTS: [number, number, 'valeur' | 'provoc'][] = [[8, 25, 'valeur'], [12, 35, 'provoc']];
-const PENDING_MAX = 4;   // posts à valider en attente : Claude n'en écrit pas plus tant que Lomig n'a pas validé
+const PENDING_MAX = 20;   // posts à valider en attente (deux semaines) : Claude n'en écrit pas plus tant que Lomig n'a pas validé
 export const SITE = 'https://payment-flow-crm-delta.vercel.app';
 export const resourceUrl = (slug: string) => `${SITE}/r/${slug}`;
 
