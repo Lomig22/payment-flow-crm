@@ -42,19 +42,28 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin';
   const [view, setView] = useState<'cold_call' | 'instagram' | 'emailing' | 'qualiopi'>('cold_call');
   const [dayIndex, setDayIndex] = useState(0);
+  // Période affichée (Cold Call, Emailing, Qualiopi ; Instagram a son propre sélecteur)
+  const [preset, setPreset] = useState<'7' | '30' | '90' | '365' | 'all' | 'custom'>('30');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState(today);
+  const daysAgo = (n: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(Date.now() - (n - 1) * 86400_000));
+  const range = preset === 'all' ? {} : preset === 'custom' ? { from: from || undefined, to: to || undefined } : { from: daysAgo(Number(preset)), to: today };
+  // Cold Call / Qualiopi : les N derniers jours (du début de la période jusqu'à aujourd'hui)
+  const periodDays = preset === 'all' ? 365 : preset === 'custom' ? Math.max(1, Math.min(365, Math.round((Date.parse(today) - Date.parse(from || today)) / 86400_000) + 1)) : Number(preset);
 
   const statsApi = view === 'qualiopi' ? qualiopiDashboardApi : dashboardApi;
   const isChartView = view === 'cold_call' || view === 'qualiopi';
 
   const { data, isLoading, error } = useQuery({
-    queryKey: [view === 'qualiopi' ? 'qualiopi-dashboard-stats' : 'dashboard-stats'],
-    queryFn:  () => statsApi.getStats().then((r) => r.data as DashboardStats),
+    queryKey: [view === 'qualiopi' ? 'qualiopi-dashboard-stats' : 'dashboard-stats', periodDays],
+    queryFn:  () => statsApi.getStats(periodDays).then((r) => r.data as DashboardStats),
     enabled:  isChartView,
   });
 
   const { data: leaderboard } = useQuery({
-    queryKey: [view === 'qualiopi' ? 'qualiopi-leaderboard' : 'leaderboard'],
-    queryFn:  () => statsApi.getLeaderboard().then((r) => r.data),
+    queryKey: [view === 'qualiopi' ? 'qualiopi-leaderboard' : 'leaderboard', periodDays],
+    queryFn:  () => statsApi.getLeaderboard(periodDays).then((r) => r.data),
     enabled:  isAdmin && isChartView,
   });
 
@@ -149,10 +158,28 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      {view !== 'instagram' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500 mr-1">Période :</span>
+          {([['7', '7 jours'], ['30', '30 jours'], ['90', '90 jours'], ['365', '12 mois'], ['all', 'Tout'], ['custom', 'Dates…']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => { setPreset(k); if (k === 'custom' && !from) setFrom(daysAgo(30)); }}
+              className={`px-3 py-1 rounded-lg text-sm border ${preset === k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>{label}</button>
+          ))}
+          {preset === 'custom' && (
+            <span className="flex items-center gap-2 text-sm">
+              <input type="date" value={from} max={to || today} onChange={(e) => setFrom(e.target.value)} className="input py-1 w-auto" />
+              <span className="text-gray-400">→</span>
+              <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="input py-1 w-auto" />
+            </span>
+          )}
+          {preset === 'custom' && view !== 'emailing' && <span className="text-xs text-gray-400">Cold Call / Qualiopi : du {from ? new Date(from).toLocaleDateString('fr-FR') : '…'} à aujourd&apos;hui</span>}
+        </div>
+      )}
+
       {view === 'instagram' ? (
         <InstagramDashboardView />
       ) : view === 'emailing' ? (
-        <EmailingDashboardView />
+        <EmailingDashboardView range={range} />
       ) : isLoading ? (
         <div className="flex items-center justify-center h-64">
           <Spinner className="w-8 h-8" />
@@ -178,7 +205,7 @@ export default function DashboardPage() {
           {/* Timeline + Funnel par statut */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="card p-5 lg:col-span-2">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité — 30 derniers jours</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité — {periodDays} derniers jours</h3>
               <TimelineChart data={timelineFormatted} />
             </div>
             <div className="card p-5">
@@ -193,7 +220,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {isAdmin && data.by_setter && data.by_setter.length > 0 && (
               <div className="card p-5 lg:col-span-2">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance par setter — 30 derniers jours</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance par setter — {periodDays} derniers jours</h3>
                 <SetterBarChart data={setterChartData} />
               </div>
             )}

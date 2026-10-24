@@ -56,32 +56,49 @@ function ReplyRow({ r }: { r: EmailReplyRow }) {
   );
 }
 
-export default function EmailingDashboardView() {
-  const { data, isLoading } = useQuery({ queryKey: ['emailing-dashboard'], queryFn: () => campaignsApi.list().then((r) => r.data), refetchInterval: 60_000 });
+// Écart avec la période précédente : en points pour un taux, en % pour un volume (rien sans base de comparaison)
+const ptsTrend = (cur: number | null, prev: number | null | undefined, higherIsBetter = true) => {
+  if (cur == null || prev == null) return undefined;
+  const v = Math.round((cur - prev) * 1000) / 10;
+  return { value: v, isPositive: higherIsBetter ? v >= 0 : v <= 0, unit: ' pts', label: 'vs période préc.' };
+};
+const volTrend = (cur: number, prev: number | null | undefined, higherIsBetter = true) => {
+  if (!prev) return undefined;
+  const v = Math.round(((cur - prev) / prev) * 100);
+  return { value: v, isPositive: higherIsBetter ? v >= 0 : v <= 0, label: 'vs période préc.' };
+};
+const shortDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+
+export default function EmailingDashboardView({ range }: { range: { from?: string; to?: string } }) {
+  const { data, isLoading } = useQuery({ queryKey: ['emailing-dashboard', range.from, range.to], queryFn: () => campaignsApi.list(range).then((r) => r.data), refetchInterval: 60_000 });
   const [filter, setFilter] = useState<'todo' | 'all'>('todo');
   const [showAuto, setShowAuto] = useState(false);
   if (isLoading || !data) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
   const t = data.totals;
-  if (!t.contacted) return <div className="card p-8 text-center text-gray-500">Aucun envoi remonté pour l&apos;instant.</div>;
+  const p = data.previous;
+  if (!t.contacted) return <div className="card p-8 text-center text-gray-500">Aucun mail envoyé sur cette période.</div>;
   const replies = data.replies.filter((r) => filter === 'all' || !r.sentiment);
-  const maxDay = Math.max(1, ...data.by_day.map((d) => d.sent));
+  const maxDay = Math.max(1, ...data.by_day.map((d) => d.contacted));
+  const maxRate = Math.max(0.01, ...data.by_day.map((d) => d.open_rate ?? 0));
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500">Tous les mails envoyés par Hermès (lomig.guegueniat@gmail.com et paymentfloww@gmail.com). Réponses et rebonds lus dans la boîte Gmail toutes les 15 min ; les réponses automatiques et les blocages anti-spam ne comptent pas comme des réponses.</p>
+      <p className="text-sm text-gray-500">Du {shortDay(data.period.from)} au {shortDay(data.period.to)}{p ? <>, comparé au {shortDay(data.period.prev_from)} – {shortDay(data.period.prev_to)}</> : ''}. Les chiffres portent sur les mails envoyés dans la période. Tous les mails envoyés par Hermès (lomig.guegueniat@gmail.com et paymentfloww@gmail.com). Réponses et rebonds lus dans la boîte Gmail toutes les 15 min ; les réponses automatiques et les blocages anti-spam ne comptent pas comme des réponses.</p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <StatCard title="Personnes contactées" value={t.contacted} icon={Users} color="purple" />
-        <StatCard title="Mails remis" value={t.delivered} icon={MailCheck} color="blue" />
-        <StatCard title="Ouvertures" value={t.opened ?? 'non mesuré'} icon={Eye} color="gray" />
-        <StatCard title="Taux d'ouverture" value={t.open_rate == null ? 'non mesuré' : pct(t.open_rate)} icon={Eye} color="gray" />
-        <StatCard title="Réponses" value={t.replied} icon={Reply} color="green" />
-        <StatCard title="Taux de réponse" value={pct(t.reply_rate)} icon={Reply} color="green" />
+        <StatCard title="Personnes contactées" value={t.contacted} icon={Users} color="purple" trend={volTrend(t.contacted, p?.contacted)} />
+        <StatCard title="Mails remis" value={t.delivered} icon={MailCheck} color="blue" trend={volTrend(t.delivered, p?.delivered)} />
+        <StatCard title="Ouvertures" value={t.opened ?? 'non mesuré'} icon={Eye} color="blue" trend={t.opened == null ? undefined : volTrend(t.opened, p?.opened)} />
+        <StatCard title="Taux d'ouverture" value={t.open_rate == null ? 'non mesuré' : pct(t.open_rate)} icon={Eye} color="blue" trend={ptsTrend(t.open_rate, p?.open_rate)} />
+        <StatCard title="Réponses" value={t.replied} icon={Reply} color="green" trend={volTrend(t.replied, p?.replied)} />
+        <StatCard title="Taux de réponse" value={pct(t.reply_rate)} icon={Reply} color="green" trend={ptsTrend(t.reply_rate, p?.reply_rate)} />
         <StatCard title="Positives" value={t.positive} icon={ThumbsUp} color="green" />
         <StatCard title="Négatives" value={t.negative} icon={ThumbsDown} color="red" />
-        <StatCard title="Rebonds" value={t.bounced} icon={AlertTriangle} color="orange" />
+        <StatCard title="Rebonds" value={t.bounced} icon={AlertTriangle} color="orange" trend={ptsTrend(t.contacted ? t.bounced / t.contacted : null, p?.contacted ? p.bounced / p.contacted : null, false)} />
         <StatCard title="Bloqués anti-spam" value={t.antispam} icon={ShieldAlert} color="orange" />
       </div>
-      {t.open_rate == null && <p className="text-xs text-gray-500 -mt-3">Ouvertures non mesurées : les mails partent en texte brut, sans pixel de suivi.</p>}
+      {t.open_rate == null
+        ? <p className="text-xs text-gray-500 -mt-3">Ouvertures non mesurées sur cette période : les mails sont partis en texte brut, sans pixel de suivi.</p>
+        : <p className="text-xs text-gray-500 -mt-3">Taux d&apos;ouverture calculé sur les mails partis avec le pixel de suivi d&apos;Hermès (mails vidéo, depuis le 20/10). Gmail et Apple Mail chargent parfois l&apos;image sans lecture : le taux réel peut être un peu plus bas.</p>}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="card p-5 space-y-3">
@@ -92,14 +109,20 @@ export default function EmailingDashboardView() {
           <Bar label="Positives" value={t.positive} max={t.contacted} cls="bg-emerald-600" />
         </div>
         <div className="card p-5 space-y-3">
-          <h3 className="font-semibold text-gray-900">Par jour</h3>
-          {data.by_day.map((d) => (
-            <div key={d.date} className="flex items-center gap-3 text-sm">
-              <span className="w-20 text-gray-600 flex-shrink-0">{new Date(`${d.date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-              <div className="flex-1 h-6 bg-gray-100 rounded-md overflow-hidden"><div className="h-full bg-indigo-400 rounded-md" style={{ width: `${(d.sent / maxDay) * 100}%` }} /></div>
-              <span className="w-32 text-right text-gray-700 tabular-nums">{d.sent} envoyés · <b className="text-emerald-700">{d.replied}</b> rép.</span>
-            </div>
-          ))}
+          <h3 className="font-semibold text-gray-900">Par jour d&apos;envoi</h3>
+          <div className="grid grid-cols-[5.5rem_1fr_1fr_4.5rem] gap-x-3 gap-y-2 items-center text-sm">
+            <span className="text-xs text-gray-400" /><span className="text-xs text-gray-400">Envoyés</span><span className="text-xs text-gray-400">Taux d&apos;ouverture</span><span className="text-xs text-gray-400 text-right">Réponses</span>
+            {data.by_day.map((d) => (
+              <div key={d.date} className="contents">
+                <span className="text-gray-600">{shortDay(d.date)}</span>
+                <div className="flex items-center gap-2"><div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden"><div className="h-full bg-indigo-400" style={{ width: `${(d.contacted / maxDay) * 100}%` }} /></div><span className="w-9 text-right tabular-nums">{d.contacted}</span></div>
+                <div className="flex items-center gap-2">{d.open_rate == null
+                  ? <span className="text-xs text-gray-400">non mesuré</span>
+                  : <><div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden"><div className="h-full bg-sky-500" style={{ width: `${(d.open_rate / maxRate) * 100}%` }} /></div><span className="w-12 text-right tabular-nums">{pct(d.open_rate)}</span></>}</div>
+                <span className="text-right tabular-nums text-emerald-700 font-semibold">{d.replied}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

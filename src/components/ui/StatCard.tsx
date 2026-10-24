@@ -6,7 +6,7 @@ interface StatCardProps {
   value:   string | number;
   icon:    LucideIcon;
   suffix?: string;
-  trend?:  { value: number; isPositive: boolean; label?: string };
+  trend?:  { value: number; isPositive: boolean; label?: string; unit?: string };   // unit : « % » par défaut, « pts » pour un écart de taux
   color?:  'purple' | 'green' | 'blue' | 'orange' | 'red' | 'gray';
 }
 
@@ -41,7 +41,7 @@ export default function StatCard({ title, value, icon: Icon, suffix, trend, colo
               ? <TrendingUp className="w-3 h-3" />
               : <TrendingDown className="w-3 h-3" />
             }
-            {Math.abs(trend.value)}% {trend.label ?? ''}
+            {Math.abs(trend.value)}{trend.unit ?? '%'} {trend.label ?? ''}
           </div>
         )}
       </div>

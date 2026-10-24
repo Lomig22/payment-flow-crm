@@ -261,8 +261,8 @@ export const usersApi = {
 };
 
 export const dashboardApi = {
-  getStats:          () => api.get('/dashboard/stats'),
-  getLeaderboard:    () => api.get('/dashboard/leaderboard'),
+  getStats:          (period?: number) => api.get('/dashboard/stats', { params: { period } }),
+  getLeaderboard:    (period?: number) => api.get('/dashboard/leaderboard', { params: { period } }),
   getInstagramStats: () => api.get('/dashboard/instagram-stats'),
 };
 
@@ -281,8 +281,8 @@ export const qualiopiLeadsApi = {
 };
 
 export const qualiopiDashboardApi = {
-  getStats:       () => api.get('/qualiopi-dashboard/stats'),
-  getLeaderboard: () => api.get('/qualiopi-dashboard/leaderboard'),
+  getStats:       (period?: number) => api.get('/qualiopi-dashboard/stats', { params: { period } }),
+  getLeaderboard: (period?: number) => api.get('/qualiopi-dashboard/leaderboard', { params: { period } }),
 };
 
 export const notificationsApi = {
@@ -492,10 +492,11 @@ export interface EmailKpis { contacted: number; delivered: number; bounced: numb
 export interface EmailCampaign extends EmailKpis { id: string; name: string; first_sent_at: string | null; open_tracking: boolean }
 export interface EmailReplyRow { id: string; campaign: string; email: string; company: string | null; subject: string | null; sent_at: string | null;
   replied_at: string; reply_snippet: string | null; reply_gmail_id: string | null; mailbox: string | null; sentiment: 'positive' | 'negative' | null }
-export interface EmailingDashboard { totals: EmailKpis; campaigns: EmailCampaign[]; by_day: { date: string; sent: number; replied: number }[];
+export interface EmailingDashboard { period: { from: string; to: string; prev_from: string; prev_to: string; first: string }; totals: EmailKpis; previous: EmailKpis | null;
+  campaigns: EmailCampaign[]; by_day: ({ date: string } & EmailKpis)[];
   replies: EmailReplyRow[]; blocked: EmailReplyRow[]; auto: EmailReplyRow[] }
 export const campaignsApi = {
-  list: () => api.get<EmailingDashboard>('/emailing/campaigns'),
+  list: (range?: { from?: string; to?: string }) => api.get<EmailingDashboard>('/emailing/campaigns', { params: range }),
   classify: (id: string, sentiment: 'positive' | 'negative' | null) => api.post('/emailing/campaigns', { id, sentiment }),
 };
 
