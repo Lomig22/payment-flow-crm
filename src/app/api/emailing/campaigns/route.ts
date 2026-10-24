@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const [{ data: camps }, msgs] = await Promise.all([
     db.from('email_campaigns').select('id, name, first_sent_at, open_tracking').order('first_sent_at', { ascending: false }),
     fetchAll<any>(() => db.from('email_campaign_messages')
-      .select('id, campaign_id, email, company, subject, sent_at, opened_at, open_count, replied_at, reply_snippet, reply_kind, reply_gmail_id, bounced_at, sentiment').order('id')),
+      .select('id, campaign_id, email, company, subject, sent_at, opened_at, open_count, replied_at, reply_snippet, reply_kind, reply_gmail_id, mailbox, bounced_at, sentiment').order('id')),
   ]);
   // Chiffres d'un ensemble de mails : seules les vraies réponses comptent dans le taux de réponse
   const kpis = (m: any[], tracked: boolean) => {

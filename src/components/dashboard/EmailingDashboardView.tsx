@@ -13,7 +13,11 @@ import Spinner from '@/components/ui/Spinner';
 
 const pct = (v: number | null) => (v == null ? '—' : `${Math.round(v * 1000) / 10} %`);
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
-const gmailLink = (r: EmailReplyRow) => (r.reply_gmail_id ? `https://mail.google.com/mail/u/0/#all/${r.reply_gmail_id}` : `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(r.email)}`);
+// Lien vers la réponse dans la boîte qui a reçu le mail (Hermès alterne deux boîtes Gmail)
+const gmailLink = (r: EmailReplyRow) => {
+  const base = `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(r.mailbox || 'lomig.guegueniat@gmail.com')}`;
+  return r.reply_gmail_id ? `${base}#all/${r.reply_gmail_id}` : `${base}#search/${encodeURIComponent(r.email)}`;
+};
 
 function Bar({ label, value, max, cls }: { label: string; value: number; max: number; cls: string }) {
   return (
@@ -63,7 +67,7 @@ export default function EmailingDashboardView() {
   const maxDay = Math.max(1, ...data.by_day.map((d) => d.sent));
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500">Tous les mails envoyés par Hermès depuis lomig.guegueniat@gmail.com. Réponses et rebonds lus dans la boîte Gmail toutes les 15 min ; les réponses automatiques et les blocages anti-spam ne comptent pas comme des réponses.</p>
+      <p className="text-sm text-gray-500">Tous les mails envoyés par Hermès (lomig.guegueniat@gmail.com et paymentfloww@gmail.com). Réponses et rebonds lus dans la boîte Gmail toutes les 15 min ; les réponses automatiques et les blocages anti-spam ne comptent pas comme des réponses.</p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard title="Personnes contactées" value={t.contacted} icon={Users} color="purple" />

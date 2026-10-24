@@ -491,7 +491,7 @@ export interface EmailKpis { contacted: number; delivered: number; bounced: numb
   replied: number; reply_rate: number | null; auto: number; antispam: number; positive: number; negative: number }
 export interface EmailCampaign extends EmailKpis { id: string; name: string; first_sent_at: string | null; open_tracking: boolean }
 export interface EmailReplyRow { id: string; campaign: string; email: string; company: string | null; subject: string | null; sent_at: string | null;
-  replied_at: string; reply_snippet: string | null; reply_gmail_id: string | null; sentiment: 'positive' | 'negative' | null }
+  replied_at: string; reply_snippet: string | null; reply_gmail_id: string | null; mailbox: string | null; sentiment: 'positive' | 'negative' | null }
 export interface EmailingDashboard { totals: EmailKpis; campaigns: EmailCampaign[]; by_day: { date: string; sent: number; replied: number }[];
   replies: EmailReplyRow[]; blocked: EmailReplyRow[]; auto: EmailReplyRow[] }
 export const campaignsApi = {

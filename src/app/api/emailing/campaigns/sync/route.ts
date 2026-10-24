@@ -12,6 +12,12 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   if (!hasAgentKey(request)) return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
   const b = await request.json().catch(() => null);
+  // Alerte du script de suivi (boîte d'envoi illisible, suivi en échec depuis une heure) : mail à Lomig
+  if (b?.alert) {
+    const { notifyLomig } = await import('@/lib/linkedin');
+    await notifyLomig('Emailing : suivi des réponses à vérifier', [String(b.alert).slice(0, 1000)]);
+    return NextResponse.json({ ok: true, alerted: true });
+  }
   const c = b?.campaign, msgs = Array.isArray(b?.messages) ? b.messages : [];
   if (!c?.id || !c?.name) return NextResponse.json({ message: 'Campagne manquante' }, { status: 400 });
   const db = supabase as any;
@@ -25,6 +31,7 @@ export async function POST(request: NextRequest) {
     company: m.company ?? null, subject: m.subject ?? null, sent_at: m.sent_at ?? null,
     replied_at: m.replied_at ?? null, reply_snippet: m.reply_snippet ? String(m.reply_snippet).slice(0, 500) : null,
     reply_kind: ['human', 'auto', 'antispam'].includes(m.reply_kind) ? m.reply_kind : null, reply_gmail_id: m.reply_gmail_id ?? null,
+    mailbox: m.mailbox ? String(m.mailbox).toLowerCase().slice(0, 120) : null,
     bounced_at: m.bounced_at ?? null, opened_at: m.opened_at ?? null, open_count: Math.max(0, Number(m.open_count) || 0),
     updated_at: new Date().toISOString(),
   }));

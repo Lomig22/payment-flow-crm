@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Suivi des campagnes envoyées directement par Hermès (19/10/2026, 1re campagne « maquette »).
 
-Lit le journal d'envoi d'Hermès (ses CSV : statut_envoi = envoye, message_id Gmail), puis la boîte
-lomig.guegueniat@gmail.com par l'API Gmail (accès d'Hermès, ~/.hermes/google_token.json, lecture
-seule ici) : réponse et rebond de chaque mail. Ouvertures : journal du pixel d'Hermès
+Lit le journal d'envoi d'Hermès (ses CSV : statut_envoi = envoye, message_id Gmail, expediteur), puis
+chaque boîte d'envoi par l'API Gmail (accès d'Hermès, lecture seule ici) : réponse et rebond de chaque
+mail. Depuis le 21/10/2026, Hermès alterne deux boîtes (lomig.guegueniat@gmail.com et paymentfloww@gmail.com) :
+une réponse arrive dans la boîte qui a envoyé le mail (24/10 : réponse de Golden Weaver manquée, seule la
+1re boîte était lue). Tous les messages reçus sont gardés en mémoire et rattachés à chaque passage
+(une réponse arrivée avant qu'Hermès ait écrit son fichier n'est plus perdue). Ouvertures : journal du pixel d'Hermès
 (pixel_server.py, data/ouvertures.log), présent dans les mails partis en HTML (email_utils.send_html).
 Remonte tout au CRM (/api/emailing/campaigns/sync, clé EMAILING_AGENT_KEY).
 Installé sur le VPS : /opt/pf-cron/hermes_campaigns.py, cron toutes les 15 min.
 Bibliothèque standard uniquement (le Python système n'a pas les bibliothèques Google d'Hermès).
 """
-import csv, hashlib, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
+import csv, glob, hashlib, html, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from email.utils import parseaddr
 
@@ -22,7 +25,9 @@ OWN_IPS = {'187.55.224.186', '127.0.0.1'}    # tests du pixel depuis le VPS
 # Gmail (proxy d'images Google) et les filtres Microsoft chargent le pixel 2 à 30 s après l'envoi, sans lecteur :
 # une ouverture plus rapprochée de l'envoi n'est pas comptée
 MIN_DELAY = 60
-TOKEN = f'{HERMES}/google_token.json'
+# Accès Gmail d'Hermès : un google_token.json par boîte (~/.hermes, ~/.hermes_pf…), boîte lue dans le profil
+TOKENS = '/root/.hermes*/google_token.json'
+FAILS = '/var/lib/pf-hermes-campaigns.fails'   # échecs consécutifs (alerte au 4e, soit une heure)
 KEY = open(f'{HERMES}/secrets/pf_crm_emailing.key').read().strip()
 CRM = os.environ.get('CRM_URL', 'https://payment-flow-crm-delta.vercel.app')
 STATE = '/var/lib/pf-hermes-campaigns.json'   # messages de la boîte déjà lus (évite de les redemander)
@@ -32,8 +37,8 @@ csv.field_size_limit(10_000_000)
 DRY = '--dry' in sys.argv   # essai : lit Gmail, n'envoie rien au CRM
 
 
-def access_token():
-    t = json.load(open(TOKEN))
+def access_token(path):
+    t = json.load(open(path))
     data = urllib.parse.urlencode({'grant_type': 'refresh_token', 'refresh_token': t['refresh_token'],
                                    'client_id': t['client_id'], 'client_secret': t['client_secret']}).encode()
     r = json.load(urllib.request.urlopen(t.get('token_uri', 'https://oauth2.googleapis.com/token'), data, timeout=30))
@@ -101,7 +106,8 @@ def campaigns():
             c = out.setdefault(cid, {'id': cid, 'name': f"{word.capitalize()} · {day[8:10]}/{day[5:7]}", 'source': f,
                                      'tracked': f in TRACKED, 'messages': []})
             c['messages'].append({'gmail_id': r['message_id'], 'email': r['email'].strip().lower(), 'company': r.get('entreprise'),
-                                  'subject': r.get('objet'), 'sent_at': iso_local(r.get('date_envoi', ''))})
+                                  'subject': r.get('objet'), 'sent_at': iso_local(r.get('date_envoi', '')),
+                                  'mailbox': (r.get('expediteur') or ME).strip().lower()})
     # Nom lisible : début d'objet commun à tous les mails de la campagne (« Votre vidéo … », « maquette »)
     for c in out.values():
         subj = [(m['subject'] or '').split() for m in c['messages']]
@@ -130,61 +136,93 @@ def opens():
     return out
 
 
+def alert(text):
+    # Mail à Lomig via le CRM (même clé que la synchro)
+    req = urllib.request.Request(f'{CRM}/api/emailing/campaigns/sync', json.dumps({'alert': text}).encode(),
+                                 headers={'Authorization': f'Bearer {KEY}', 'Content-Type': 'application/json'})
+    try:
+        urllib.request.urlopen(req, timeout=60)
+    except Exception as e:
+        print('alerte non envoyée', repr(e)[:200], file=sys.stderr)
+
+
+def mailboxes():
+    # Boîte -> (accès Gmail, jeton) pour chaque accès Gmail d'Hermès
+    out = {}
+    for path in glob.glob(TOKENS):
+        try:
+            tok = access_token(path)
+            out[gmail(tok, 'profile')['emailAddress'].lower()] = (path, tok)
+        except Exception as e:
+            print('accès illisible', path, repr(e)[:150], file=sys.stderr)
+    return out
+
+
 def main():
     state = json.load(open(STATE)) if os.path.exists(STATE) else {}
     camps = campaigns()
     if not camps:
         print('aucune campagne')
         return
-    tok = access_token()
-    # Réponses et rebonds reçus depuis le premier envoi (y compris hors du fil d'origine)
-    start = min(m['sent_at'] for c in camps.values() for m in c['messages'] if m['sent_at'])
-    after = int(datetime.fromisoformat(start).timestamp())
     msgs = [m for c in camps.values() for m in c['messages']]
-    by_email = {m['email']: m for m in msgs}
-    by_id = {m['gmail_id']: m for m in msgs}                         # fil d'un nouveau mail = identifiant de ce mail
-    by_subject = {norm(m['subject']): m for m in msgs if m['subject']}   # anti-spam : « Re: <notre objet> » depuis l'adresse du filtre
-    bounces = {}
-    # Messages reçus depuis le premier envoi, spams compris : chacun est rattaché à un mail envoyé
-    # (expéditeur, fil ou objet), puis classé : vraie réponse, réponse automatique ou anti-spam
-    seen = state.setdefault('_msg', {})   # id -> [gmail_id du mail envoyé, type, date, extrait] ou rien (cache : quota Gmail partagé)
-    for q, is_bounce in ((f'after:{after} -from:me -from:mailer-daemon -from:postmaster', False), (f'after:{after} (from:mailer-daemon OR from:postmaster)', True)):
-        page = None
-        while True:
-            res = gmail(tok, 'messages', q=q, maxResults=500, includeSpamTrash=True, **({'pageToken': page} if page else {})) or {}
-            for it in res.get('messages', []):
-                if not is_bounce and it['id'] in seen:
-                    continue
-                m = gmail(tok, f"messages/{it['id']}", format='metadata', metadataHeaders=['From', 'X-Failed-Recipients', 'Auto-Submitted', 'X-Autoreply', 'X-Autorespond', 'Precedence', 'Subject'])
-                if not m:
-                    continue
-                if is_bounce:
-                    failed = header(m, 'X-Failed-Recipients').lower()
-                    for e in re.findall(r'[\w.+-]+@[\w-]+\.[\w.-]+', failed or m.get('snippet', '').lower()):
-                        bounces.setdefault(e, iso_ms(m['internalDate']))
-                    continue
-                sender, subject = parseaddr(header(m, 'From'))[1].lower(), header(m, 'Subject')
-                target = by_email.get(sender) or by_id.get(it['threadId']) or by_subject.get(norm(subject))
-                if not target:
-                    seen[it['id']] = None
-                    continue
-                if ANTISPAM.search(sender) or ANTISPAM_SUBJECT.search(subject):
-                    kind = 'antispam'
-                elif header(m, 'Auto-Submitted').lower() not in ('', 'no') or header(m, 'X-Autoreply') or header(m, 'X-Autorespond') \
-                        or header(m, 'Precedence').lower() in ('auto_reply', 'bulk', 'junk') or AUTO_SUBJECT.search(subject):
-                    kind = 'auto'
-                else:
-                    kind = 'human'
-                seen[it['id']] = [target['gmail_id'], kind, iso_ms(m['internalDate']), html.unescape(m.get('snippet', ''))]
-            page = res.get('nextPageToken')
-            if not page:
-                break
-    # Par mail envoyé : la vraie réponse l'emporte sur l'anti-spam, qui l'emporte sur la réponse automatique
+    if state.get('version') != 2:
+        state = {'version': 2, 'boxes': {}}   # ancien cache (une seule boîte, messages non rattachés oubliés) : on repart de zéro
+    best, bounces = {}, {}
     RANK = {'human': 3, 'antispam': 2, 'auto': 1}
-    best = {}
-    for mid, v in seen.items():
-        if v and v[0] in by_id and RANK[v[1]] > RANK.get(best.get(v[0], [None, None])[1], 0):
-            best[v[0]] = [mid] + v[1:]
+    boxes = mailboxes()
+    # Boîte d'envoi sans accès Gmail : ses réponses seraient perdues -> alerte (une fois par boîte)
+    for box in sorted({m['mailbox'] for m in msgs} - set(boxes)):
+        if box not in state.setdefault('warned', []):
+            alert(f"Hermès envoie des mails depuis {box}, mais le suivi n'a pas d'accès Gmail à cette boîte : ses réponses ne remontent pas dans le CRM. "
+                  f"Il faut un fichier google_token.json pour cette boîte dans un dossier /root/.hermes*/ du VPS.")
+            state['warned'].append(box)
+    for box, (token_path, tok) in boxes.items():
+        mine = [m for m in msgs if m['mailbox'] == box]
+        if not mine:
+            continue
+        cache = state['boxes'].setdefault(box, {'msg': {}, 'bounce': {}})
+        # Messages reçus depuis le premier envoi de cette boîte, spams compris (lus une fois, gardés en mémoire)
+        after = int(datetime.fromisoformat(min(m['sent_at'] for m in mine if m['sent_at'])).timestamp())
+        for q, key in ((f'after:{after} -from:me -from:mailer-daemon -from:postmaster', 'msg'), (f'after:{after} (from:mailer-daemon OR from:postmaster)', 'bounce')):
+            page = None
+            while True:
+                res = gmail(tok, 'messages', q=q, maxResults=500, includeSpamTrash=True, **({'pageToken': page} if page else {})) or {}
+                for it in res.get('messages', []):
+                    if it['id'] in cache[key]:
+                        continue
+                    m = gmail(tok, f"messages/{it['id']}", format='metadata', metadataHeaders=['From', 'X-Failed-Recipients', 'Auto-Submitted', 'X-Autoreply', 'X-Autorespond', 'Precedence', 'Subject'])
+                    if not m:
+                        continue
+                    at = iso_ms(m['internalDate'])
+                    if key == 'bounce':
+                        failed = header(m, 'X-Failed-Recipients').lower()
+                        cache['bounce'][it['id']] = [re.findall(r'[\w.+-]+@[\w-]+\.[\w.-]+', failed or m.get('snippet', '').lower()), at]
+                        continue
+                    sender, subject = parseaddr(header(m, 'From'))[1].lower(), header(m, 'Subject')
+                    if ANTISPAM.search(sender) or ANTISPAM_SUBJECT.search(subject):
+                        kind = 'antispam'
+                    elif header(m, 'Auto-Submitted').lower() not in ('', 'no') or header(m, 'X-Autoreply') or header(m, 'X-Autorespond') \
+                            or header(m, 'Precedence').lower() in ('auto_reply', 'bulk', 'junk') or AUTO_SUBJECT.search(subject):
+                        kind = 'auto'
+                    else:
+                        kind = 'human'
+                    cache['msg'][it['id']] = {'from': sender, 'thread': it['threadId'], 'subject': norm(subject), 'kind': kind,
+                                              'at': at, 'snippet': html.unescape(m.get('snippet', ''))}
+                page = res.get('nextPageToken')
+                if not page:
+                    break
+        # Rattachement (à chaque passage) : expéditeur, fil du mail envoyé, ou objet repris (anti-spam)
+        by_email = {m['email']: m for m in mine}
+        by_thread = {m['gmail_id']: m for m in mine}       # fil d'un nouveau mail = identifiant de ce mail
+        by_subject = {norm(m['subject']): m for m in mine if m['subject']}
+        for mid, v in cache['msg'].items():
+            target = by_email.get(v['from']) or by_thread.get(v['thread']) or by_subject.get(v['subject'])
+            if target and RANK[v['kind']] > RANK.get(best.get(target['gmail_id'], {}).get('kind'), 0):
+                best[target['gmail_id']] = {**v, 'id': mid}
+        for emails, at in cache['bounce'].values():
+            for e in emails:
+                if e in by_email:
+                    bounces.setdefault((box, e), at)
     pixel = opens()
     for c in camps.values():
         for m in c['messages']:
@@ -196,10 +234,10 @@ def main():
                 m['open_count'] = len(seen_at)
                 m['opened_at'] = datetime.fromtimestamp(seen_at[0], timezone.utc).isoformat() if seen_at else None
             if m['gmail_id'] in best:
-                mid, kind, at, snip = best[m['gmail_id']]
-                m.update(replied_at=at, reply_snippet=snip, reply_kind=kind, reply_gmail_id=mid)
-            if m['email'] in bounces:
-                m['bounced_at'] = bounces[m['email']]
+                v = best[m['gmail_id']]
+                m.update(replied_at=v['at'], reply_snippet=v['snippet'], reply_kind=v['kind'], reply_gmail_id=v['id'])
+            if (m['mailbox'], m['email']) in bounces:
+                m['bounced_at'] = bounces[(m['mailbox'], m['email'])]
         sent = [m['sent_at'] for m in c['messages'] if m['sent_at']]
         body = {'campaign': {'id': c['id'], 'name': c['name'], 'source': c['source'], 'first_sent_at': min(sent) if sent else None,
                              'open_tracking': c['tracked']}, 'messages': c['messages']}
@@ -217,8 +255,16 @@ def main():
 
 
 if __name__ == '__main__':
+    fails = int(open(FAILS).read() or 0) if os.path.exists(FAILS) else 0
     try:
         main()
+        if not DRY:
+            open(FAILS, 'w').write('0')
     except Exception as e:
         print('échec', repr(e)[:300], file=sys.stderr)
+        if not DRY:
+            fails += 1
+            open(FAILS, 'w').write(str(fails))
+            if fails == 4:   # une heure sans suivi (cron toutes les 15 min) : on prévient une fois
+                alert(f"Le suivi des réponses aux mails d'Hermès échoue depuis une heure ({repr(e)[:200]}). Les réponses ne remontent plus dans le CRM tant que ce n'est pas réglé.")
         sys.exit(1)
