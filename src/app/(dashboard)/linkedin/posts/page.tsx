@@ -69,9 +69,25 @@ function PostCard({ p }: { p: LinkedinPost }) {
   );
 }
 
-// Selfie recadré en carré (centré, 1 080 × 1 080, JPEG) avant l'envoi : format demandé par Lomig
+// Selfie recadré en carré (centré, 1 080 × 1 080, JPEG) avant l'envoi : format demandé par Lomig.
+// Photos d'iPhone (HEIC, illisibles par Chrome : « The source image could not be decoded ») converties
+// en JPEG d'abord ; une photo qui reste illisible part telle quelle plutôt que de bloquer le dépôt.
+async function decode(f: Blob): Promise<ImageBitmap> {
+  return createImageBitmap(f, { imageOrientation: 'from-image' } as any);
+}
 async function toSquare(f: File): Promise<Blob> {
-  const img = await createImageBitmap(f, { imageOrientation: 'from-image' } as any);
+  let img: ImageBitmap;
+  try {
+    img = await decode(f);
+  } catch {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const jpg = await heic2any({ blob: f, toType: 'image/jpeg', quality: 0.92 });
+      img = await decode(Array.isArray(jpg) ? jpg[0] : jpg);
+    } catch {
+      return f;   // illisible ici : envoyée sans recadrage
+    }
+  }
   const side = Math.min(img.width, img.height), out = Math.min(1080, side);
   const c = document.createElement('canvas');
   c.width = c.height = out;
@@ -184,7 +200,7 @@ export default function LinkedinPostsPage() {
           <div className="flex items-center gap-3">
             <h3 className="font-medium text-gray-900">Tes selfies ({data.photos.length})</h3>
             <p className="text-xs text-gray-500">Recadrés en carré au dépôt. Un par post, le moins utilisé d&apos;abord.</p>
-            <input ref={file} type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
+            <input ref={file} type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
             <button onClick={() => file.current?.click()} disabled={uploading} className="btn-secondary inline-flex items-center gap-1.5 text-sm ml-auto">{uploading ? <Spinner /> : <ImagePlus className="w-4 h-4" />}Ajouter des selfies</button>
           </div>
           {data.photos.length > 0 && (
