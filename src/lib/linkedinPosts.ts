@@ -17,14 +17,14 @@ const MODEL = 'claude-opus-5-5';
 const API = 'https://api.linkedin.com';
 export const REDIRECT_URI = 'https://payment-flow-crm-delta.vercel.app/api/linkedin/oauth/callback';
 const SCOPES = 'openid profile w_member_social';
-const DAYS_AHEAD = 14;   // deux semaines d'avance (10 posts par semaine)
+const DAYS_AHEAD = 14;   // deux semaines d'avance (14 posts par semaine)
 
 // Créneaux (heure de Paris) : 2 posts par jour, tous les jours (LinkedIn inbound, 22/10/2026) ;
 // quelques minutes de décalage d'un jour à l'autre
-// 10 posts par semaine (notes de Lomig du 25/10/2026) : du lundi au vendredi, un post « valeur » le matin
-// et un post « provoc » le midi, soit 5 + 5. Aucun le week-end.
+// 2 posts par jour, tous les jours, week-end compris (Lomig, 25/10/2026) : un post « valeur » le matin
+// et un post « provoc » le midi, soit 7 + 7 par semaine.
 const SLOTS: [number, number, 'valeur' | 'provoc'][] = [[8, 25, 'valeur'], [12, 35, 'provoc']];
-const PENDING_MAX = 20;   // posts à valider en attente (deux semaines) : Claude n'en écrit pas plus tant que Lomig n'a pas validé
+const PENDING_MAX = 28;   // posts à valider en attente (deux semaines) : Claude n'en écrit pas plus tant que Lomig n'a pas validé
 export const SITE = 'https://payment-flow-crm-delta.vercel.app';
 export const resourceUrl = (slug: string) => `${SITE}/r/${slug}`;
 
@@ -190,8 +190,6 @@ const parisDay = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone
 const hash = (s: string) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 
 function slotsFor(day: string): Date[] {
-  const wd = new Date(`${day}T12:00:00Z`).getUTCDay();
-  if (wd === 0 || wd === 6) return [];
   return SLOTS.map(([h, m], k) => parisInstant(day, h, m + (hash(day + k) % 9) - 4));
 }
 const kindOf = (d: Date) => (Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false }).format(d)) < 11 ? 'valeur' : 'provoc');

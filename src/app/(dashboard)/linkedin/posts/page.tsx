@@ -154,7 +154,7 @@ export default function LinkedinPostsPage() {
   const connect = async () => { const { data: d } = await linkedinPostsApi.connectUrl(); window.location.href = d.url; };
   const fill = useMutation({
     mutationFn: () => linkedinPostsApi.action({ action: 'fill' }).then((r) => r.data as { created: number }),
-    onSuccess: (d) => { toast.success(d.created ? `${d.created} posts écrits` : 'Rien de plus pour l\'instant : 20 posts attendent déjà ta validation'); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
+    onSuccess: (d) => { toast.success(d.created ? `${d.created} posts écrits` : 'Rien de plus pour l\'instant : 28 posts attendent déjà ta validation'); qc.invalidateQueries({ queryKey: ['linkedin-posts'] }); },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Erreur'),
   });
   const upload = async (files: FileList | null) => {
@@ -188,7 +188,7 @@ export default function LinkedinPostsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Linkedin className="w-6 h-6 text-[#0a66c2]" />Posts LinkedIn automatiques</h1>
-        <p className="text-sm text-gray-500 mt-1">10 posts par semaine sur ton profil, du lundi au vendredi : un post 💡 valeur vers 8 h 25 et un post 🔥 provoc vers 12 h 35. Accroche d&apos;une ligne, des raisons ou des points en liste, puis ton CTA, toujours le même mot (réglé dans le modèle ci-dessous). <b>Aucun post ne part sans ta validation</b> : relis, modifie, valide. Claude en prépare deux semaines à l&apos;avance (20 posts). Chaque post part avec un de tes selfies, recadré en carré.</p>
+        <p className="text-sm text-gray-500 mt-1">2 posts par jour sur ton profil, week-end compris : un post 💡 valeur vers 8 h 25 et un post 🔥 provoc vers 12 h 35. Accroche d&apos;une ligne, des raisons ou des points en liste, puis ton CTA, toujours le même mot (réglé dans le modèle ci-dessous). <b>Aucun post ne part sans ta validation</b> : relis, modifie, valide. Claude en prépare deux semaines à l&apos;avance (28 posts). Chaque post part avec un de tes selfies, recadré en carré.</p>
       </div>
       {(!c.connected || data.photos.length === 0) && (
         <div className="card p-4 border-amber-300 bg-amber-50 text-sm text-amber-800 flex items-start gap-2">
