@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin';
   const [view, setView] = useState<'cold_call' | 'instagram' | 'emailing' | 'qualiopi'>('cold_call');
   const [dayIndex, setDayIndex] = useState(0);
-  // Période affichée (Cold Call, Emailing, Qualiopi ; Instagram a son propre sélecteur)
+  // Période affichée (tous les onglets)
   const [preset, setPreset] = useState<'7' | '30' | '90' | '365' | 'all' | 'custom'>('30');
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
   const [from, setFrom] = useState('');
@@ -158,7 +158,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {view !== 'instagram' && (
+      {(
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-gray-500 mr-1">Période :</span>
           {([['7', '7 jours'], ['30', '30 jours'], ['90', '90 jours'], ['365', '12 mois'], ['all', 'Tout'], ['custom', 'Dates…']] as const).map(([k, label]) => (
@@ -172,12 +172,12 @@ export default function DashboardPage() {
               <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="input py-1 w-auto" />
             </span>
           )}
-          {preset === 'custom' && view !== 'emailing' && <span className="text-xs text-gray-400">Cold Call / Qualiopi : du {from ? new Date(from).toLocaleDateString('fr-FR') : '…'} à aujourd&apos;hui</span>}
+          {preset === 'custom' && view !== 'emailing' && <span className="text-xs text-gray-400">Suivi des leads : du {from ? new Date(from).toLocaleDateString('fr-FR') : '…'} à aujourd&apos;hui</span>}
         </div>
       )}
 
       {view === 'instagram' ? (
-        <InstagramDashboardView />
+        <InstagramDashboardView range={range} periodDays={periodDays} />
       ) : view === 'emailing' ? (
         <EmailingDashboardView range={range} />
       ) : isLoading ? (

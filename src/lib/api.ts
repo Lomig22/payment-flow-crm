@@ -263,7 +263,7 @@ export const usersApi = {
 export const dashboardApi = {
   getStats:          (period?: number) => api.get('/dashboard/stats', { params: { period } }),
   getLeaderboard:    (period?: number) => api.get('/dashboard/leaderboard', { params: { period } }),
-  getInstagramStats: () => api.get('/dashboard/instagram-stats'),
+  getInstagramStats: (period?: number) => api.get('/dashboard/instagram-stats', { params: { period } }),
 };
 
 export const qualiopiLeadsApi = {

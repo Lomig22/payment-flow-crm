@@ -47,14 +47,14 @@ const SETTER_COLUMNS = [
   { key: 'actions',      label: 'Actions totales', hint: 'Toutes les modifications faites sur les leads (statuts, notes…)' },
 ];
 
-export default function InstagramDashboardView() {
+export default function InstagramDashboardView({ range, periodDays }: { range: { from?: string; to?: string }; periodDays: number }) {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
   const [dayIndex, setDayIndex] = useState(0);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['instagram-dashboard-stats'],
-    queryFn:  () => dashboardApi.getInstagramStats().then((r) => r.data as InstagramDashboardStats),
+    queryKey: ['instagram-dashboard-stats', periodDays],
+    queryFn:  () => dashboardApi.getInstagramStats(periodDays).then((r) => r.data as InstagramDashboardStats),
   });
 
   if (isLoading) {
@@ -121,7 +121,7 @@ export default function InstagramDashboardView() {
   return (
     <div className="space-y-6">
       {/* Contenu & profil : vues, visites, clics sur le lien en bio… (admins) */}
-      {isAdmin && <InstagramContentStats />}
+      {isAdmin && <InstagramContentStats range={range} />}
 
       {/* KPI — piste follow */}
       <div>
@@ -155,7 +155,7 @@ export default function InstagramDashboardView() {
       {/* Timeline + Funnel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-5 lg:col-span-2">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité du funnel — 30 derniers jours</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Activité du funnel — {periodDays} derniers jours</h3>
           <InstagramTimelineChart data={timelineFormatted} />
         </div>
         <div className="card p-5">

@@ -9,33 +9,29 @@ import Spinner from '@/components/ui/Spinner';
 
 const DailyMetricChart = dynamic(() => import('@/components/dashboard/DashboardCharts').then((m) => m.DailyMetricChart), { ssr: false });
 
-// Section « Contenu & profil » du dashboard Instagram : statistiques du compte
-// (aujourd'hui / 7 jours / 30 jours) comparées à la période précédente.
+// Section « Contenu & profil » du dashboard Instagram : statistiques du compte choisi sur la période
+// du sélecteur du dashboard, comparées à la période précédente de même durée.
 
-type Period = 'day' | 'week' | 'month';
 interface Stats {
+  account: string; accounts: string[]; since: string; until: string; prev_since: string;
   followers: number; inbound_leads: number;
   current: Record<string, number>; previous: Record<string, number>;
   daily: { day: string; views: number | null; profile_views: number | null; website_clicks: number | null }[];
   top: { id: string; caption: string | null; permalink: string | null; thumbnail_url: string | null; published_at: string; views: number | null; likes: number | null; comments: number | null; shares: number | null }[];
 }
 
-const PERIODS: { key: Period; label: string; prev: string }[] = [
-  { key: 'day',   label: "Aujourd'hui", prev: 'vs hier' },
-  { key: 'week',  label: '7 jours',     prev: 'vs 7 j précédents' },
-  { key: 'month', label: '30 jours',    prev: 'vs 30 j précédents' },
-];
-
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString('fr-FR');
 
-export default function InstagramContentStats() {
-  const [period, setPeriod] = useState<Period>('week');
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short' });
+
+export default function InstagramContentStats({ range }: { range: { from?: string; to?: string } }) {
+  const [account, setAccount] = useState<string | undefined>();
   const { data, isLoading, error } = useQuery({
-    queryKey: ['ig-account-stats', period],
-    queryFn:  () => api.get<Stats>('/instagram/account-stats', { params: { period } }).then((r) => r.data),
+    queryKey: ['ig-account-stats', range.from, range.to, account],
+    queryFn:  () => api.get<Stats>('/instagram/account-stats', { params: { ...range, range: range.from ? undefined : 'all', account } }).then((r) => r.data),
     staleTime: 10 * 60_000,
   });
-  const meta = PERIODS.find((p) => p.key === period)!;
+  const meta = { prev: 'vs période préc.', label: 'la période' };
 
   // Évolution en % par rapport à la période précédente (masquée si pas de base)
   const trend = (key: string) => {
@@ -53,16 +49,12 @@ export default function InstagramContentStats() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contenu &amp; profil — @lomig_guegueniat</p>
-        {data && <span className="text-xs text-gray-500">{fmt(data.followers)} abonnés</span>}
-        <div className="ml-auto flex gap-1.5">
-          {PERIODS.map((p) => (
-            <button key={p.key} onClick={() => setPeriod(p.key)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${period === p.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contenu &amp; profil</p>
+        {(data?.accounts ?? []).map((a) => (
+          <button key={a} onClick={() => setAccount(a)}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${(account ?? data?.account) === a ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>@{a}</button>
+        ))}
+        {data && <span className="text-xs text-gray-500">{fmt(data.followers)} abonnés · du {shortDate(data.since)} au {shortDate(data.until)}</span>}
       </div>
 
       {isLoading ? (
@@ -88,15 +80,15 @@ export default function InstagramContentStats() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Vues par jour — 30 jours</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Vues par jour</h3>
               <DailyMetricChart data={daily} dataKey="views" name="Vues" color="#6366f1" />
             </div>
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Visites du profil par jour — 30 jours</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Visites du profil par jour</h3>
               <DailyMetricChart data={daily} dataKey="profile_views" name="Visites du profil" color="#f97316" />
             </div>
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Meilleurs contenus — {meta.label.toLowerCase()}</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Meilleurs contenus de la période</h3>
               {data.top.length === 0 ? (
                 <p className="text-sm text-gray-400 py-6 text-center">Aucun contenu publié sur la période.</p>
               ) : (
