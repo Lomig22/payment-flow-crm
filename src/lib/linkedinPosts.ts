@@ -255,7 +255,7 @@ DEUX TYPES DE POSTS (on te dit lequel écrire) :
 - Puis le contenu : 3 ou 4 points concrets, en liste (- point), chacun applicable tout de suite.
 - Puis une phrase de conclusion.
 
-CTA : ne l'écris PAS. Le CRM ajoute lui-même la dernière ligne (« Commente GO et je t'envoie [resource_title] gratuitement. », modèle réglé par Lomig). Ton texte s'arrête juste avant, sur la phrase qui assume ou qui conclut, et resource_title doit se lire naturellement après « je t'envoie ».
+CTA : ne l'écris PAS. Le CRM ajoute lui-même la dernière ligne, l'offre gratuite réglée par Lomig (indiquée dans la demande). Ton texte s'arrête juste avant, sur la phrase qui assume ou qui conclut, et doit amener naturellement vers cette offre. resource_title doit se lire après « je t'envoie ».
 
 TON : naturel, direct, parlé, tutoiement. Phrases courtes. Pas de jargon ni de formules de gourou (« game changer », « levier », « dans un monde où »), pas de question finale du type « et vous ? », 0 à 2 emoji, aucun hashtag. 400 à 900 caractères.
 
@@ -294,8 +294,10 @@ export async function fillPosts(): Promise<{ created: number }> {
     db().from('linkedin_posts').select('topic, keyword').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(30),
     db().from('linkedin_posts').select('topic, feedback').not('feedback', 'is', null).order('updated_at', { ascending: false }).limit(15),
   ]);
+  const tpl = await postSettings();
   const prompt = [
     `Écris ${free.length} posts LinkedIn différents, dans cet ordre : ${kinds.map((k, i) => `${i + 1}. un post « ${k} »`).join(', ')}.`,
+    `Chaque post se terminera par cette ligne, ajoutée par le CRM : « ${ctaLine(tpl, '[ta ressource]')} »`,
     recent?.length ? `Sujets récents à ne pas répéter (mot-clé utilisé) :\n${recent.map((r: any) => `- ${r.topic}${r.keyword ? ` (${r.keyword})` : ''}`).join('\n')}` : '',
     notes?.length ? `Retours de Lomig sur des posts précédents (à appliquer) :\n${notes.map((n: any) => `- « ${n.topic} » : ${n.feedback}`).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
@@ -307,7 +309,6 @@ export async function fillPosts(): Promise<{ created: number }> {
   const text = (response.content as any[]).find((b) => b.type === 'text')?.text ?? '{}';
   const posts = (JSON.parse(text).posts ?? []).filter((p: any) => p.body?.trim().length > 200 && p.resource_body?.trim().length > 800 && p.resource_title);
 
-  const tpl = await postSettings();
   let created = 0;
   for (const [k, p] of posts.slice(0, free.length).entries()) {
     const keyword = tpl.cta_keyword;

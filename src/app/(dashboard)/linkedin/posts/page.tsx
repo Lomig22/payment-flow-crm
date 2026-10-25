@@ -21,7 +21,10 @@ const STATE: Record<LinkedinPost['status'], { label: string; cls: string }> = {
   cancelled:  { label: 'Retiré', cls: 'bg-gray-100 text-gray-500' },
 };
 
-function PostCard({ p }: { p: LinkedinPost }) {
+// Message privé à copier pour chaque personne qui commente : l'offre du CTA (150 leads) ou la ressource du post
+const LEADS_DM = "Hello ! Avec plaisir 🙂 Pour te préparer tes 150 leads qualifiés, dis-moi en 3 lignes :\n1. ce que tu vends\n2. ton client idéal (métier, taille d'entreprise, poste)\n3. ta zone géographique\n\nEt je te les envoie !";
+
+function PostCard({ p, leadsOffer }: { p: LinkedinPost; leadsOffer: boolean }) {
   const qc = useQueryClient();
   const [note, setNote] = useState(p.feedback ?? '');
   const [edit, setEdit] = useState(false);
@@ -46,7 +49,16 @@ function PostCard({ p }: { p: LinkedinPost }) {
         ? <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={14} className="input text-sm font-sans" />
         : <p className="text-sm text-gray-800 whitespace-pre-wrap">{p.body}</p>}
       {p.photo_url && <img src={p.photo_url} alt="" className="w-full max-w-sm rounded-lg" />}
-      {p.resource_slug && (
+      {leadsOffer && (
+        <div className="rounded-lg bg-indigo-50 p-3 text-sm flex flex-wrap items-center gap-2">
+          <Gift className="w-4 h-4 text-indigo-600" />
+          <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border">{p.keyword}</span>
+          <span className="text-indigo-800">Offre : 150 leads qualifiés dans la cible de la personne</span>
+          <button onClick={() => { navigator.clipboard.writeText(LEADS_DM); toast.success('Message copié : colle-le en message privé'); }}
+            className="ml-auto btn-secondary text-xs inline-flex items-center gap-1"><Copy className="w-3.5 h-3.5" />Copier le message privé</button>
+        </div>
+      )}
+      {!leadsOffer && p.resource_slug && (
         <div className="rounded-lg bg-indigo-50 p-3 text-sm flex flex-wrap items-center gap-2">
           <Gift className="w-4 h-4 text-indigo-600" />
           <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border">{p.keyword}</span>
@@ -221,12 +233,12 @@ export default function LinkedinPostsPage() {
         <h2 className="font-semibold text-gray-900 mb-3">À venir ({upcoming.length})</h2>
         {upcoming.length === 0
           ? <p className="text-sm text-gray-500">Aucun post programmé pour l&apos;instant.</p>
-          : <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{upcoming.map((p) => <PostCard key={p.id} p={p} />)}</div>}
+          : <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{upcoming.map((p) => <PostCard key={p.id} p={p} leadsOffer={!data.settings.cta_template.includes('{ressource}')} />)}</div>}
       </div>
       {past.length > 0 && (
         <div>
           <h2 className="font-semibold text-gray-900 mb-3">Récents</h2>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{past.map((p) => <PostCard key={p.id} p={p} />)}</div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{past.map((p) => <PostCard key={p.id} p={p} leadsOffer={!data.settings.cta_template.includes('{ressource}')} />)}</div>
         </div>
       )}
     </div>
