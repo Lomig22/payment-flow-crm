@@ -17,10 +17,12 @@ const MODEL = 'claude-opus-5-5';
 const MAX_ATTEMPTS = 3;
 const LEASE_MS = 30 * 60_000;
 // Voix : Anatole (voix partagée française), modèle flash (0,5 crédit par caractère)
-const VOICE_ID = process.env.AGENCY_VOICE_ID ?? 'Jrq4GqCKqYpigdQsZRkP';
+// Voix ElevenLabs « Corentin » (jeune, dynamique), choisie par Lomig le 26/10/2026 : la voix locale
+// Piper sonnait « vieille et instable » et ajoutait de la friction aux échanges commerciaux
+const VOICE_ID = process.env.AGENCY_VOICE_ID ?? 'IHngRooVccHyPqB4uQkG';
 const TTS_MODEL = 'eleven_flash_v2_5';
 // Débit : jamais plus de ×1,05 (brief des reels du 19/10/2026)
-const VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.8, style: 0.3, speed: 1.05, use_speaker_boost: true };
+const VOICE_SETTINGS = { stability: 0.35, similarity_boost: 0.8, style: 0.5, speed: 1.05, use_speaker_boost: true };   // réglages de l'essai retenu
 const CREDIT_RESERVE = Number(process.env.AGENCY_VOICE_RESERVE ?? 500);
 // Phrases de fin : toujours les mêmes, donc générées une seule fois (cache)
 // « Écris DEVIS en commentaire » : « Commente » était entendu « Commande » avec la voix Piper
@@ -28,7 +30,7 @@ export const OFFER_VO  = "Écris DEVIS en commentaire : je t'offre ton audit et 
 export const FOLLOW_VO = "Abonne-toi, et écris DEVIS en commentaire pour recevoir ton plan d'action offert.";
 // Voix des reels : « local » = Piper sur le VPS (gratuit, sans clé, défaut) ; « cloud » = Google si la
 // clé existe, sinon ElevenLabs dans la limite des crédits
-const LOCAL_TTS = (process.env.AGENCY_TTS ?? 'local') === 'local';
+const LOCAL_TTS = (process.env.AGENCY_TTS ?? 'elevenlabs') === 'local';   // Piper seulement sur demande explicite
 
 export type Funnel = 'tofu' | 'mofu' | 'bofu';
 const db = () => supabase as any;
@@ -270,8 +272,8 @@ const spoken = (text: string) => (useGoogle() ? pronounce(text, GOOGLE_RULES) : 
 const voPath = (text: string) => `agency/vo/${createHash('sha1').update(JSON.stringify(useGoogle()
   ? ['google', GOOGLE_VOICE, GOOGLE_RATE, spoken(text)]
   : [VOICE_ID, TTS_MODEL, VOICE_SETTINGS, spoken(text)])).digest('hex')}.mp3`;
-// Coût : crédits ElevenLabs (0,5 par caractère) ou caractères Google
-const credits = (text: string) => (useGoogle() ? spoken(text).length : Math.ceil(spoken(text).length * 0.5));
+// Coût : crédits ElevenLabs (modèle Flash : ~0,27 par caractère mesuré le 19/10/2026, compté 0,3) ou caractères Google
+const credits = (text: string) => (useGoogle() ? spoken(text).length : Math.ceil(spoken(text).length * 0.3));
 
 async function cached(path: string): Promise<boolean> {
   const dir = path.slice(0, path.lastIndexOf('/')), name = path.slice(path.lastIndexOf('/') + 1);
@@ -282,7 +284,7 @@ async function cached(path: string): Promise<boolean> {
 // Crédits utilisables aujourd'hui : solde (moins une réserve) réparti jusqu'au renouvellement.
 // Les jours sans voix s'accumulent (3 au plus) pour pouvoir payer un reel entier ; on retire ce
 // que la fabrique a déjà dépensé aujourd'hui
-async function voiceBudgetToday(): Promise<number> {
+async function voiceBudgetToday(all = false): Promise<number> {
   if (useGoogle()) {
     const month = parisDay().slice(0, 7);
     const { data } = await db().from('agency_reels').select('voice_credits').gte('day', `${month}-01`).gt('voice_credits', 0);
@@ -292,6 +294,7 @@ async function voiceBudgetToday(): Promise<number> {
   if (!res.ok) return 0;
   const s = await res.json();
   const left = (s.character_limit ?? 0) - (s.character_count ?? 0) - CREDIT_RESERVE;
+  if (all) return left;   // remplacement de voix des reels déjà programmés : tout le solde, sans répartition
   const days = s.next_character_count_reset_unix ? Math.max(1, Math.ceil((s.next_character_count_reset_unix * 1000 - Date.now()) / 86_400_000)) : 30;
   const today = parisDay();
   // Dépenses comptées le jour du RENDU (et non du plan : un reel écrit la veille et rendu aujourd'hui
@@ -337,7 +340,7 @@ async function prepareVoices(reel: any): Promise<{ urls: Record<number, string>;
   const missing = [];
   for (const l of lines) if (!(await cached(l.path))) missing.push(l);
   const cost = missing.reduce((n, l) => n + credits(l.text), 0);
-  if (cost > 0 && cost > (await voiceBudgetToday())) return { urls: {}, credits: 0 };
+  if (cost > 0 && cost > (await voiceBudgetToday(!!reel.spec?.revoice))) return { urls: {}, credits: 0 };
   for (const l of missing) await tts(l.text, l.path);
   const urls: Record<number, string> = {};
   for (const l of lines) {
@@ -357,6 +360,15 @@ export async function nextJob(): Promise<null | { id: string; funnel: Funnel; da
     .or(`status.eq.planned,and(status.eq.rendering,render_started_at.lt.${stale})`)
     .order('created_at', { ascending: true }).limit(5);
   for (const row of rows ?? []) {
+    // Nouvelle voix demandée pour un reel déjà publié entre-temps : rien à refaire (pas de crédits dépensés)
+    if (row.spec?.revoice && row.queue_id) {
+      const { data: q } = await db().from('content_queue').select('status').eq('id', row.queue_id).maybeSingle();
+      if (q?.status !== 'scheduled') {
+        const { revoice: _r, ...spec } = row.spec;
+        await db().from('agency_reels').update({ spec, status: 'uploaded', error: null, updated_at: new Date().toISOString() }).eq('id', row.id);
+        continue;
+      }
+    }
     if (row.attempts >= MAX_ATTEMPTS) {
       await db().from('agency_reels').update({ status: 'failed', error: row.error ?? 'Rendu interrompu', updated_at: new Date().toISOString() }).eq('id', row.id);
       continue;
@@ -415,8 +427,18 @@ export async function uploadUrl(id: string, size: number): Promise<{ upload_url:
 
 // Vidéo déposée : le traitement habituel de la file prend le relais (puis programmation auto)
 export async function markDone(id: string): Promise<void> {
-  const { data: reel } = await db().from('agency_reels').select('queue_id').eq('id', id).single();
+  const { data: reel } = await db().from('agency_reels').select('queue_id, spec').eq('id', id).single();
   if (!reel?.queue_id) throw new Error('Aucune entrée de file pour ce reel');
+  if (reel.spec?.revoice) {
+    // Nouvelle voix d'un reel déjà programmé : la nouvelle vidéo remplace l'ancienne sur le même créneau
+    // (retraitée puis reprogrammée à la même heure). Déjà publié entre-temps : on n'y touche plus.
+    const { data: swapped } = await db().from('content_queue').update({ status: 'uploading', uploaded_at: null, ig_container_id: null, updated_at: new Date().toISOString() })
+      .eq('id', reel.queue_id).eq('status', 'scheduled').select('id');
+    const { revoice: _r, ...spec } = reel.spec;
+    await db().from('agency_reels').update({ spec, status: 'uploaded', error: swapped?.length ? null : 'Nouvelle voix rendue trop tard : l\'ancienne vidéo était déjà publiée', updated_at: new Date().toISOString() }).eq('id', id);
+    if (swapped?.length) await markUploaded(reel.queue_id);
+    return;
+  }
   await markUploaded(reel.queue_id);
   // Validation automatique (10 reels/jour sans intervention, demande de Lomig du 16/10/2026) : le reel
   // est programmé dès son traitement ; Lomig peut le retirer depuis la page Fabrique avant publication.
