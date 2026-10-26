@@ -83,7 +83,7 @@ function PostCard({ p, leadsOffer }: { p: LinkedinPost; leadsOffer: boolean }) {
 
 // Selfie recadré en carré (centré, 1 080 × 1 080, JPEG) avant l'envoi : format demandé par Lomig.
 // Photos d'iPhone (HEIC, illisibles par Chrome : « The source image could not be decoded ») converties
-// en JPEG d'abord ; une photo qui reste illisible part telle quelle plutôt que de bloquer le dépôt.
+// en JPEG d'abord ; une photo qui reste illisible n'est envoyée que si LinkedIn sait la lire (JPEG, PNG, GIF).
 async function decode(f: Blob): Promise<ImageBitmap> {
   return createImageBitmap(f, { imageOrientation: 'from-image' } as any);
 }
@@ -97,7 +97,9 @@ async function toSquare(f: File): Promise<Blob> {
       const jpg = await heic2any({ blob: f, toType: 'image/jpeg', quality: 0.92 });
       img = await decode(Array.isArray(jpg) ? jpg[0] : jpg);
     } catch {
-      return f;   // illisible ici : envoyée sans recadrage
+      // LinkedIn n'accepte que JPEG / PNG / GIF : une photo non convertie ferait échouer le post à la publication
+      if (/^image\/(jpeg|png|gif)$/.test(f.type)) return f;   // lisible par LinkedIn : envoyée sans recadrage
+      throw new Error(`${f.name} n'a pas pu être convertie. Exporte-la en JPEG (Aperçu > Fichier > Exporter) ou règle l'iPhone sur Réglages > Appareil photo > Formats > « Le plus compatible ».`);
     }
   }
   const side = Math.min(img.width, img.height), out = Math.min(1080, side);
